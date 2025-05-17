@@ -1,0 +1,17 @@
+{
+  "name": "discord_message_sender",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "rolldown": "^1.0.0-beta.8",
+    "terser": "^5.39.2"
+  }
+}
