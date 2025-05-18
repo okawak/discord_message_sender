@@ -1,4 +1,5 @@
 import { defineConfig } from "rolldown";
+import wasm from "@rollup/plugin-wasm";
 import terser from "@rollup/plugin-terser";
 
 const prod = process.env.NODE_ENV === "production";
@@ -6,11 +7,13 @@ const prod = process.env.NODE_ENV === "production";
 export default defineConfig({
   input: "src/main.ts",
   output: {
-    dir: "dist",
+    dir: prod ? "dist" : ".",
     format: "cjs", // Obsidian は CommonJS 読み込み
     inlineDynamicImports: true, // 1ファイル配布
   },
-  // Obsidian 自体をバンドルしない
   external: ["obsidian"],
-  plugins: [prod && terser({ format: { comments: false } })].filter(Boolean), // false を除外
+  plugins: [
+    wasm({ maxFileSize: 10_000_000 }),
+    prod && terser({ format: { comments: false } }),
+  ].filter(Boolean), // false を除外
 });

@@ -3,15 +3,22 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
+  "author": "okawak",
+  "license": "MIT",
+  "scripts": {
+    "wasm": "wasm-pack build parse_message --release --target bundler -d ../pkg",
+    "bundle": "bunx rolldown -c",
+    "build": "bun run wasm && bun run bundle"
   },
-  "peerDependencies": {
-    "typescript": "^5.8.3"
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-wasm": "^6.2.2",
+    "@types/bun": "latest",
+    "obsidian": "^1.8.7",
+    "typescript": "^5.8.3",
+    "rolldown": "^1.0.0-beta.8"
   },
   "dependencies": {
-    "@rollup/plugin-terser": "^0.4.4",
-    "discord.js": "^14.19.3",
-    "rolldown": "^1.0.0-beta.8"
+    "discord.js": "^14.19.3"
   }
 }
