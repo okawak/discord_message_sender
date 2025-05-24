@@ -3,7 +3,7 @@
   "name": "Discord Message Sender",
   "version": "0.1.0",
   "minAppVersion": "1.5.9",
-  "description": "Send messages to Obsidian from Discord.",
+  "description": "Send messages from a Discord channel to your Obsidian vault",
   "author": "okawak",
   "authorUrl": "https://github.com/okawak/discord_message_sender",
   "isDesktopOnly": true
