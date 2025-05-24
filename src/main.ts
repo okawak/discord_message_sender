@@ -34,6 +34,7 @@ interface ProcessedMessage {
 interface DiscordMessage {
   id: string;
   content: string;
+  timestamp: string;
   author?: {
     bot?: boolean;
   };
@@ -237,7 +238,10 @@ export default class DiscordMessageSyncPlugin extends Plugin {
       return false;
     }
 
-    const processedMessage = this.parseMessage(message.content);
+    const processedMessage = this.parseMessage(
+      message.content,
+      message.timestamp
+    );
     if (!processedMessage.markdown) {
       return false;
     }
@@ -248,10 +252,11 @@ export default class DiscordMessageSyncPlugin extends Plugin {
     return true;
   }
 
-  private parseMessage(content: string): ProcessedMessage {
+  private parseMessage(content: string, timestamp: string): ProcessedMessage {
     const { md, is_clip, name } = process_message(
       content,
-      this.settings.messagePrefix
+      this.settings.messagePrefix,
+      timestamp
     );
     return {
       markdown: md,

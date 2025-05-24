@@ -10,7 +10,7 @@ pub struct ParseMessageResult<'a> {
 }
 
 #[wasm_bindgen]
-pub fn process_message(input: &str, prefix: &str) -> JsValue {
+pub fn process_message(input: &str, prefix: &str, timestamp: &str) -> JsValue {
     let dummy = ParseMessageResult {
         md: "> **Test Markdown**\n\n— *Dummy Bot*",
         is_clip: false,
