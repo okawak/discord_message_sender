@@ -238,10 +238,17 @@ export default class DiscordMessageSyncPlugin extends Plugin {
       return false;
     }
 
-    const processedMessage = this.parseMessage(
-      message.content,
-      message.timestamp
-    );
+    let processedMessage: ProcessedMessage;
+    try {
+      processedMessage = await this.parseMessage(
+        message.content,
+        message.timestamp
+      );
+    } catch (error) {
+      console.error("parseMessage error:", error);
+      return false;
+    }
+
     if (!processedMessage.markdown) {
       return false;
     }
@@ -252,17 +259,25 @@ export default class DiscordMessageSyncPlugin extends Plugin {
     return true;
   }
 
-  private parseMessage(content: string, timestamp: string): ProcessedMessage {
-    const { md, is_clip, name } = process_message(
-      content,
-      this.settings.messagePrefix,
-      timestamp
-    );
-    return {
-      markdown: md,
-      isClipping: is_clip,
-      fileName: name,
-    };
+  private async parseMessage(
+    content: string,
+    timestamp: string
+  ): Promise<ProcessedMessage> {
+    try {
+      const result = await process_message(
+        content,
+        this.settings.messagePrefix,
+        timestamp
+      );
+      const { md, is_clip, name } = result;
+      return {
+        markdown: md,
+        isClipping: is_clip,
+        fileName: name,
+      };
+    } catch (error) {
+      throw new Error(String(error));
+    }
   }
 
   private async saveMessageToVault(
