@@ -1,0 +1,10 @@
+{
+  "id": "discord-message-sender",
+  "name": "Discord Message Sender",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.9",
+  "description": "Send messages to Obsidian from Discord.",
+  "author": "okawak",
+  "authorUrl": "https://github.com/okawak/discord_message_sender",
+  "isDesktopOnly": true
+}
