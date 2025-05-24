@@ -125,13 +125,17 @@ export default class DiscordMessageSyncPlugin extends Plugin {
     try {
       while (true) {
         const messages = await this.fetchDiscordMessages(lastMessageId);
-        if (messages.length === 0) break;
+        if (messages.length === 0) {
+          break;
+        }
 
         const newestMessageId = messages[0]!.id;
 
         for (const message of messages.reverse()) {
           const wasProcessed = await this.processDiscordMessage(message);
-          if (wasProcessed) processedMessageCount++;
+          if (wasProcessed) {
+            processedMessageCount++;
+          }
           await this.delay(MESSAGE_PROCESSING_DELAY);
         }
 
@@ -229,10 +233,14 @@ export default class DiscordMessageSyncPlugin extends Plugin {
   private async processDiscordMessage(
     message: DiscordMessage
   ): Promise<boolean> {
-    if (message.author?.bot) return false;
+    if (message.author?.bot) {
+      return false;
+    }
 
     const processedMessage = this.parseMessage(message.content);
-    if (!processedMessage.markdown) return false;
+    if (!processedMessage.markdown) {
+      return false;
+    }
 
     await this.saveMessageToVault(message, processedMessage);
     await this.updateLastProcessedMessage(message.id);
@@ -315,7 +323,9 @@ export default class DiscordMessageSyncPlugin extends Plugin {
       } catch (error) {
         console.error("Error sending Discord notification:", error);
 
-        if (retryCount >= MAX_RETRIES) break;
+        if (retryCount >= MAX_RETRIES) {
+          break;
+        }
 
         retryCount++;
         await this.delay(1000 * retryCount);
@@ -334,7 +344,9 @@ export default class DiscordMessageSyncPlugin extends Plugin {
     vault: Vault,
     directoryPath: string
   ): Promise<void> {
-    if (vault.getAbstractFileByPath(directoryPath)) return;
+    if (vault.getAbstractFileByPath(directoryPath)) {
+      return;
+    }
 
     try {
       await vault.createFolder(directoryPath);
@@ -513,18 +525,6 @@ class DiscordPluginSettingTab extends PluginSettingTab {
     }
 
     let textComponent!: TextComponent;
-    setting.addText((text) => {
-      textComponent = text;
-      text.inputEl.type = "password";
-      text
-        .setPlaceholder(options.placeholder)
-        .setValue(options.getValue())
-        .onChange(async (value) => {
-          options.setValue(value.trim());
-          await this.plugin.saveSettings();
-        });
-    });
-
     // Toggle password visibility
     setting.addExtraButton((button) => {
       let isVisible = false;
@@ -538,6 +538,20 @@ class DiscordPluginSettingTab extends PluginSettingTab {
         .setIcon("eye-off")
         .setTooltip("Toggle password visibility")
         .onClick(toggleVisibility);
+
+      button.extraSettingsEl.style.order = "-1";
+    });
+
+    setting.addText((text) => {
+      textComponent = text;
+      text.inputEl.type = "password";
+      text
+        .setPlaceholder(options.placeholder)
+        .setValue(options.getValue())
+        .onChange(async (value) => {
+          options.setValue(value.trim());
+          await this.plugin.saveSettings();
+        });
     });
   }
 }

@@ -12,7 +12,7 @@ export default defineConfig({
     format: "cjs", // Obsidian requires CommonJS
     inlineDynamicImports: true,
     sourcemap: isDevelopment,
-    entryFilenames: "main.js",
+    entryFileNames: "main.js",
   },
   external: ["obsidian", "fs", "path", "crypto", "util", "stream", "events"],
   plugins: [
@@ -36,11 +36,6 @@ export default defineConfig({
         },
       }),
   ].filter(Boolean),
-
-  // Resolve options
-  resolve: {
-    preferBuiltins: true,
-  },
 
   // Performance optimizations
   treeshake: {
