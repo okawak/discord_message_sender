@@ -19,7 +19,7 @@
     "assets:prepare": "mkdirp dist && cpx pkg/parse_message_bg.wasm dist",
     "dev:build": "bun run wasm:build && bun run wasm:copy && bun run js:bundle",
     "build": "bun run wasm:build && bun run assets:prepare && NODE_ENV=production bun run js:bundle && bun run assets:copy",
-    "clean": "rimraf dist pkg main.js main.js.map *.wasm",
+    "clean": "rimraf dist pkg parse_message/target main.js main.js.map *.wasm",
     "lint": "bunx biome lint",
     "type-check": "tsc --noEmit"
   },

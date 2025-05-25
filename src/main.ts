@@ -13,6 +13,27 @@ import {
 import { process_message, initSync } from "../pkg/parse_message.js";
 
 // =============================================
+// URL fetching utility to use in Rust WASM
+// =============================================
+(globalThis as any).fetchUrlContent = async function (
+  url: string
+): Promise<string> {
+  try {
+    const response = await requestUrl({
+      url: url,
+      method: "GET",
+      headers: {
+        "User-Agent": "Obsidian Discord Sender Plugin",
+      },
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Failed to fetch URL content:", error);
+    return `<!-- Failed to fetch content from ${url}: ${error} -->`;
+  }
+};
+
+// =============================================
 // Types & Interfaces
 // =============================================
 interface DiscordPluginSettings {
