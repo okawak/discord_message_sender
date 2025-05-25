@@ -1,4 +1,4 @@
-English | [日本語](.github/README.ja.md)
+English | [日本語](.github/README.ja.md) | [简体中文](.github/README.zh-CN.md)
 
 # discord_message_sender
 
