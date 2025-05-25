@@ -18,7 +18,7 @@ jobs:
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          targets: wasm32-unknown-unknown
+          target: wasm32-unknown-unknown
 
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -37,7 +37,20 @@ jobs:
       - name: Create release archive
         run: |
           cd dist
-          zip -r ../discord-message-sender-${{ github.ref_name }}.zip .
+          zip_files=""
+          for file in manifest.json main.js styles.css parse_message_bg.wasm; do
+            if [ -s "$file" ]; then
+              zip_files="$zip_files $file"
+            else
+              echo "Skipping $file as it is empty or does not exist."
+            fi
+          done
+          if [ -n "$zip_files" ]; then
+            zip -r ../discord-message-sender-${{ github.ref_name }}.zip $zip_files
+          else
+            echo "No files to include in the zip archive."
+            exit 1
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
