@@ -439,7 +439,6 @@ class DiscordPluginSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h1", { text: "Discord Message Sender" });
 
     this.createDirectorySettings(containerEl);
     this.createDiscordSettings(containerEl);

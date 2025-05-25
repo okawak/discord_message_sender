@@ -14,6 +14,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Update version in package.json
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' package.json
+
+      - name: Update version in manifest.json
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' manifest.json
+
+      - name: Update version in Cargo.toml
+        run: |
+          sed -i 's/version = "[^"]*"/version = "${{ steps.get_version.outputs.VERSION }}"/' parse_message/Cargo.toml
+
+      - name: Commit version updates
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add package.json manifest.json parse_message/Cargo.toml
+          git commit -m "Update version to ${{ steps.get_version.outputs.VERSION }}" || exit 0
+
+      - name: Push changes
+        run: |
+          git push origin HEAD:main
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
