@@ -1,16 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
 import {
-  App,
+  type App,
   Plugin,
-  TextComponent,
+  type TextComponent,
   PluginSettingTab,
   Notice,
   Setting,
-  Vault,
+  type Vault,
   requestUrl,
 } from "obsidian";
-import initWasm, { process_message } from "../pkg/parse_message.js";
+import { process_message, initSync } from "../pkg/parse_message.js";
 
 // =============================================
 // Types & Interfaces
@@ -80,9 +80,14 @@ export default class DiscordMessageSyncPlugin extends Plugin {
   // Initialization Methods
   // =============================================
   private async initializeWasm(): Promise<void> {
-    const wasmPath = this.getWasmFilePath();
-    const wasmBytes = fs.readFileSync(wasmPath);
-    await initWasm(wasmBytes);
+    try {
+      const wasmPath = this.getWasmFilePath();
+      const wasmBytes = fs.readFileSync(wasmPath);
+      initSync(wasmBytes);
+    } catch (error) {
+      console.error("WASM initialization failed: ", error);
+      throw error;
+    }
   }
 
   private getWasmFilePath(): string {
@@ -130,7 +135,7 @@ export default class DiscordMessageSyncPlugin extends Plugin {
           break;
         }
 
-        const newestMessageId = messages[0]!.id;
+        const newestMessageId = messages[0]?.id;
 
         for (const message of messages.reverse()) {
           const wasProcessed = await this.processDiscordMessage(message);
@@ -219,8 +224,8 @@ export default class DiscordMessageSyncPlugin extends Plugin {
   ): Promise<void> {
     const retryAfterHeader = response.headers["Retry-After"];
     const waitTime = retryAfterHeader
-      ? parseInt(retryAfterHeader) * 1000
-      : 1000 * Math.pow(2, retryCount);
+      ? Number.parseInt(retryAfterHeader) * 1000
+      : 1000 * 2 ** retryCount;
 
     console.warn(`Rate limited. Waiting ${waitTime}ms before retry...`);
     new Notice(`Rate limited. Waiting ${Math.ceil(waitTime / 1000)}s...`);
@@ -413,7 +418,7 @@ class DiscordPluginSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h1", { text: "Discord Message Sender Settings" });
+    containerEl.createEl("h1", { text: "Discord Message Sender" });
 
     this.createDirectorySettings(containerEl);
     this.createDiscordSettings(containerEl);
@@ -424,7 +429,7 @@ class DiscordPluginSettingTab extends PluginSettingTab {
   // Grouped Settings Creation Methods
   // =============================================
   private createDirectorySettings(containerEl: HTMLElement): void {
-    containerEl.createEl("h2", { text: "Directory Settings" });
+    containerEl.createEl("h2", { text: "Directory" });
 
     this.addTextSetting(containerEl, {
       name: "Messages Directory",
@@ -449,7 +454,7 @@ class DiscordPluginSettingTab extends PluginSettingTab {
   }
 
   private createDiscordSettings(containerEl: HTMLElement): void {
-    containerEl.createEl("h2", { text: "Discord Configuration" });
+    containerEl.createEl("h2", { text: "Discord" });
 
     this.addPasswordSetting(containerEl, {
       name: "Bot Token",
@@ -483,7 +488,7 @@ class DiscordPluginSettingTab extends PluginSettingTab {
   }
 
   private createBehaviorSettings(containerEl: HTMLElement): void {
-    containerEl.createEl("h2", { text: "Behavior Settings" });
+    containerEl.createEl("h2", { text: "Others" });
 
     new Setting(containerEl)
       .setName("Auto-sync on startup")
