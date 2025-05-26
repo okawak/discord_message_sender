@@ -13,11 +13,13 @@ import {
 import { process_message, initSync } from "../pkg/parse_message.js";
 
 // =============================================
-// URL fetching utility to use in Rust WASM
+// Global type extension for WASM integration
 // =============================================
-(globalThis as any).fetchUrlContent = async function (
-  url: string
-): Promise<string> {
+declare global {
+  var fetchUrlContent: (url: string) => Promise<string>;
+}
+
+globalThis.fetchUrlContent = async function (url: string): Promise<string> {
   try {
     const response = await requestUrl({
       url: url,
@@ -113,14 +115,15 @@ export default class DiscordMessageSyncPlugin extends Plugin {
 
   private getWasmFilePath(): string {
     const manifestPath = this.manifest.dir!;
-    const pluginDirectory = path.isAbsolute(manifestPath)
-      ? manifestPath
-      : path.join(
-          (this.app.vault.adapter as any).basePath as string,
-          manifestPath
-        );
 
-    return path.join(pluginDirectory, WASM_FILE_NAME);
+    if (path.isAbsolute(manifestPath)) {
+      return path.join(manifestPath, WASM_FILE_NAME);
+    }
+
+    const adapter = this.app.vault.adapter as unknown as { basePath?: string };
+    const basePath = adapter.basePath || "";
+
+    return path.join(basePath, manifestPath, WASM_FILE_NAME);
   }
 
   private registerCommands(): void {
@@ -584,7 +587,7 @@ class DiscordPluginSettingTab extends PluginSettingTab {
         .setTooltip("Toggle password visibility")
         .onClick(toggleVisibility);
 
-      button.extraSettingsEl.style.order = "-1";
+      button.extraSettingsEl.addClass("discord-sender-plugin-password-toggle");
     });
 
     setting.addText((text) => {
