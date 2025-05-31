@@ -1,6 +1,6 @@
 {
   "name": "discord-message-sender",
-  "version": "0.1.6",
+  "version": "0.1.5",
   "description": "Send messages to Obsidian from Discord.",
   "type": "module",
   "private": true,
@@ -11,7 +11,8 @@
     "dev:build": "bun run wasm:build && bunx vite build --mode development",
     "build": "bun run wasm:build && bunx vite build --mode production && cpx manifest.json dist",
     "clean": "rimraf dist dev pkg parse_message/target main.js main.js.map *.wasm",
-    "lint": "bunx biome lint",
+    "check": "bunx biome check",
+    "check:fix": "bunx biome check --write",
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {

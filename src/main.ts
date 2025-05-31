@@ -1,15 +1,15 @@
 import { Notice, Plugin } from "obsidian";
-import { DiscordMessageSenderSettingTab } from "./settingTab";
-import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 import { fetchMessages, postNotification } from "./discordApi";
-import { saveToVault } from "./vault";
+import { DiscordMessageSenderSettingTab } from "./settingTab";
 import {
-  type DiscordPluginSettings,
-  type DiscordMessage,
-  type ProcessedMessage,
   DEFAULT_SETTINGS,
+  type DiscordMessage,
+  type DiscordPluginSettings,
+  type ProcessedMessage,
 } from "./settings";
 import { delay } from "./utils";
+import { saveToVault } from "./vault";
+import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 import "./global";
 
 const MESSAGE_PROCESSING_DELAY = 50; // ms
@@ -85,7 +85,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
         this.settings,
         processedMessageCount === 0
           ? "⚠️ No new messages."
-          : `✅ ${processedMessageCount} messages saved.`
+          : `✅ ${processedMessageCount} messages saved.`,
       );
     } catch (error) {
       console.error("Discord sync failed:", error);
@@ -99,7 +99,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   }
 
   private async processDiscordMessage(
-    message: DiscordMessage
+    message: DiscordMessage,
   ): Promise<boolean> {
     if (message.author?.bot) {
       return false;
@@ -109,7 +109,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     try {
       processedMessage = await this.parseMessage(
         message.content,
-        message.timestamp
+        message.timestamp,
       );
     } catch (error) {
       console.error("parseMessage error:", error);
@@ -124,14 +124,14 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       this.app.vault,
       this.settings.messageDirectoryName,
       this.settings.clippingDirectoryName,
-      processedMessage
+      processedMessage,
     );
     return true;
   }
 
   private async parseMessage(
     content: string,
-    timestamp: string
+    timestamp: string,
   ): Promise<ProcessedMessage> {
     try {
       const result = await parseMessageWasm(
@@ -139,7 +139,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
         this.manifest.dir!,
         content,
         this.settings.messagePrefix,
-        timestamp
+        timestamp,
       );
       const { md, is_clip, name } = result;
       return {

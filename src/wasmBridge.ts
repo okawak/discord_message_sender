@@ -10,7 +10,7 @@ let wasmReady: Promise<void> | null = null;
 
 export async function initWasmBridge(
   app: App,
-  manifestDir: string
+  manifestDir: string,
 ): Promise<void> {
   if (wasmReady) return wasmReady;
 
@@ -36,7 +36,7 @@ export async function parseMessageWasm(
   manifestDir: string,
   content: string,
   prefix: string,
-  timestamp: string
+  timestamp: string,
 ) {
   await initWasmBridge(app, manifestDir);
   return processMessage(content, prefix, timestamp);

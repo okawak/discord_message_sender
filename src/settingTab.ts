@@ -94,7 +94,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.enableAutoSyncOnStartup = value;
             await this.plugin.saveSettings();
-          })
+          }),
       );
   }
 
@@ -109,7 +109,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
       placeholder: string;
       getValue: () => string;
       setValue: (value: string) => void;
-    }
+    },
   ): void {
     const setting = new Setting(containerEl).setName(options.name);
 
@@ -124,7 +124,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         .onChange(async (value) => {
           options.setValue(value.trim());
           await this.plugin.saveSettings();
-        })
+        }),
     );
   }
 
@@ -136,7 +136,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
       placeholder: string;
       getValue: () => string;
       setValue: (value: string) => void;
-    }
+    },
   ): void {
     const setting = new Setting(containerEl).setName(options.name);
 

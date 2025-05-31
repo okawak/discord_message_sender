@@ -1,5 +1,5 @@
-import { requestUrl, Notice } from "obsidian";
-import type { DiscordPluginSettings, DiscordMessage } from "./settings";
+import { Notice, requestUrl } from "obsidian";
+import type { DiscordMessage, DiscordPluginSettings } from "./settings";
 import { delay } from "./utils";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
@@ -10,7 +10,7 @@ const MAX_RETRIES = 3;
 // Get message from Discord
 export async function fetchMessages(
   settings: DiscordPluginSettings,
-  after?: string
+  after?: string,
 ): Promise<DiscordMessage[]> {
   const path = `/channels/${
     settings.channelId
@@ -22,14 +22,14 @@ export async function fetchMessages(
 // Post message to Discord
 export async function postNotification(
   settings: DiscordPluginSettings,
-  text: string
+  text: string,
 ): Promise<void> {
   const path = `/channels/${settings.channelId}/messages`;
   await discordRequest(
     settings,
     "POST",
     path,
-    JSON.stringify({ content: text })
+    JSON.stringify({ content: text }),
   );
 }
 
@@ -37,7 +37,7 @@ async function discordRequest(
   settings: DiscordPluginSettings,
   method: "GET" | "POST",
   path: string,
-  body?: string
+  body?: string,
 ) {
   for (let i = 0; i <= MAX_RETRIES; i++) {
     const res = await requestUrl({

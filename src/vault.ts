@@ -6,7 +6,7 @@ export async function saveToVault(
   vault: Vault,
   msgDir: string,
   clipDir: string,
-  data: ProcessedMessage
+  data: ProcessedMessage,
 ): Promise<void> {
   const dir = data.isClipping ? clipDir : msgDir;
   await ensureDir(vault, dir);
