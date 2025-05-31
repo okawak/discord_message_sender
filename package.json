@@ -6,33 +6,24 @@
   "private": true,
   "author": "okawak",
   "license": "MIT",
-  "keywords": [
-    "obsidian",
-    "discord",
-    "plugin"
-  ],
   "scripts": {
     "wasm:build": "wasm-pack build parse_message --release --target web -d ../pkg",
-    "js:bundle": "bunx rolldown -c",
-    "wasm:copy": "cpx pkg/parse_message_bg.wasm .",
-    "assets:copy": "cpx manifest.json dist",
-    "assets:prepare": "mkdirp dist && cpx pkg/parse_message_bg.wasm dist",
-    "dev:build": "bun run wasm:build && bun run wasm:copy && bun run js:bundle",
-    "build": "bun run wasm:build && bun run assets:prepare && NODE_ENV=production bun run js:bundle && bun run assets:copy",
+    "dev:build": "bun run wasm:build && bunx vite build --mode development",
+    "build": "bun run wasm:build && bunx vite build --mode production && cpx manifest.json dist",
     "clean": "rimraf dist pkg parse_message/target main.js main.js.map *.wasm",
     "lint": "bunx biome lint",
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@rollup/plugin-terser": "^0.4.4",
-    "@rollup/plugin-wasm": "^6.2.2",
     "@types/bun": "latest",
     "cpx": "^1.5.0",
     "mkdirp": "^3.0.1",
     "obsidian": "^1.8.7",
     "rimraf": "^6.0.1",
-    "rolldown": "^1.0.0-beta.9-commit.d91dfb5",
-    "typescript": "^5.8.3"
+    "rollup-plugin-copy": "^3.5.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-wasm": "^3.4.1"
   },
   "dependencies": {},
   "engines": {
