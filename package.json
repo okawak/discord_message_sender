@@ -10,7 +10,7 @@
     "wasm:build": "wasm-pack build parse_message --release --target web -d ../pkg",
     "dev:build": "bun run wasm:build && bunx vite build --mode development",
     "build": "bun run wasm:build && bunx vite build --mode production && cpx manifest.json dist",
-    "clean": "rimraf dist pkg parse_message/target main.js main.js.map *.wasm",
+    "clean": "rimraf dist dev pkg parse_message/target main.js main.js.map *.wasm",
     "lint": "bunx biome lint",
     "type-check": "tsc --noEmit"
   },
@@ -22,8 +22,7 @@
     "rimraf": "^6.0.1",
     "rollup-plugin-copy": "^3.5.0",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5",
-    "vite-plugin-wasm": "^3.4.1"
+    "vite": "^6.3.5"
   },
   "dependencies": {},
   "engines": {

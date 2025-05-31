@@ -1,16 +1,15 @@
-import * as fs from "fs";
-import * as path from "path";
 import {
   type App,
-  Plugin,
+  type DataAdapter,
   type TextComponent,
-  PluginSettingTab,
-  Notice,
-  Setting,
   type Vault,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
   requestUrl,
 } from "obsidian";
-import { process_message, initSync } from "../pkg/parse_message.js";
+import { process_message, default as initWasm } from "../pkg/parse_message.js";
 
 // =============================================
 // Global type extension for WASM integration
@@ -103,27 +102,24 @@ export default class DiscordMessageSyncPlugin extends Plugin {
   // Initialization Methods
   // =============================================
   private async initializeWasm(): Promise<void> {
-    try {
-      const wasmPath = this.getWasmFilePath();
-      const wasmBytes = fs.readFileSync(wasmPath);
-      initSync(wasmBytes);
-    } catch (error) {
-      console.error("WASM initialization failed: ", error);
-      throw error;
+    const wasmPath = `${this.manifest.dir}/${WASM_FILE_NAME}`;
+
+    let bytes: Uint8Array;
+
+    const adapter = this.app.vault.adapter;
+    if (this.isDataAdapter(adapter)) {
+      const buf = await adapter.readBinary(wasmPath);
+      bytes = new Uint8Array(buf);
+    } else {
+      const res = await fetch(wasmPath);
+      bytes = new Uint8Array(await res.arrayBuffer());
     }
+
+    await initWasm(bytes);
   }
 
-  private getWasmFilePath(): string {
-    const manifestPath = this.manifest.dir!;
-
-    if (path.isAbsolute(manifestPath)) {
-      return path.join(manifestPath, WASM_FILE_NAME);
-    }
-
-    const adapter = this.app.vault.adapter as unknown as { basePath?: string };
-    const basePath = adapter.basePath || "";
-
-    return path.join(basePath, manifestPath, WASM_FILE_NAME);
+  private isDataAdapter(a: unknown): a is DataAdapter {
+    return !!a && typeof (a as DataAdapter).readBinary === "function";
   }
 
   private registerCommands(): void {

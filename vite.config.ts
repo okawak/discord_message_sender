@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
         ],
       },
     },
-    plugins: [!prod && copyMainToRoot()],
+    plugins: [!prod && copyMainToRoot()].filter(Boolean),
     optimizeDeps: {
       exclude: ["node:fs/promises", "node:path"],
     },
