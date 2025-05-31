@@ -16,9 +16,8 @@ pub async fn process_message(
     let input = input.trim();
     let prefix = prefix.trim();
 
-    // "!url hoge".strip_prefix("!") -> "url hoge"
+    // "!foo hoge".strip_prefix("!") -> "foo hoge"
     if let Some(rest) = input.strip_prefix(prefix) {
-        // currently only support "!url" command
         let (md, is_clip, name) = handle_command(rest.trim_start()).await?;
         let result = ParseMessageResult { md, is_clip, name };
         to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))

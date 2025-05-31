@@ -40,10 +40,6 @@ jobs:
           git add package.json manifest.json parse_message/Cargo.toml
           git commit -m "Update version to ${{ steps.get_version.outputs.VERSION }}" || exit 0
 
-      - name: Push changes
-        run: |
-          git push origin HEAD:main
-
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -63,6 +59,10 @@ jobs:
       - name: Build plugin
         run: bun run build
 
+      - name: Push changes
+        run: |
+          git push origin HEAD:main
+
       - name: Create release archive
         run: |
           cd dist
@@ -75,7 +75,6 @@ jobs:
             discord-message-sender-${{ github.ref_name }}.zip
             dist/manifest.json
             dist/main.js
-            dist/styles.css
             dist/parse_message_bg.wasm
           draft: false
           prerelease: false

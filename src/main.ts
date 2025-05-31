@@ -586,8 +586,6 @@ class DiscordPluginSettingTab extends PluginSettingTab {
         .setIcon("eye-off")
         .setTooltip("Toggle password visibility")
         .onClick(toggleVisibility);
-
-      button.extraSettingsEl.addClass("discord-sender-plugin-password-toggle");
     });
 
     setting.addText((text) => {
