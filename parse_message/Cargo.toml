@@ -1,6 +1,6 @@
 [package]
 name = "parse_message"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 authors = ["okawak <kodak2022@outlook.jp>"]
 description = "Parse Discord messages"
