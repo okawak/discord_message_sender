@@ -25,7 +25,7 @@ export async function initWasmBridge(
       const res = await fetch(`${manifestDir}/${WASM_FILE_NAME}`);
       bytes = new Uint8Array(await res.arrayBuffer());
     }
-    await initWasm(bytes);
+    await initWasm({ module: bytes });
   })();
 
   return wasmReady;
