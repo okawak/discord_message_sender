@@ -1,6 +1,6 @@
 {
   "name": "discord-message-sender",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Send messages to Obsidian from Discord.",
   "type": "module",
   "private": true,
@@ -16,6 +16,7 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/bun": "latest",
     "cpx": "^1.5.0",
     "mkdirp": "^3.0.1",
