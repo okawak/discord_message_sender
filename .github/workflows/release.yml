@@ -33,13 +33,6 @@ jobs:
         run: |
           sed -i '/^\[package\]/,/^\[/ s/^version = "[^"]*"/version = "${{ steps.get_version.outputs.VERSION }}"/' parse_message/Cargo.toml
 
-      - name: Commit version updates
-        run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git add package.json manifest.json parse_message/Cargo.toml
-          git commit -m "Update version to ${{ steps.get_version.outputs.VERSION }}" || exit 0
-
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -59,8 +52,12 @@ jobs:
       - name: Build plugin
         run: bun run build
 
-      - name: Push changes
+      - name: Commit and Push Version Updates
         run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add .
+          git commit -m "Update version to ${{ steps.get_version.outputs.VERSION }}" || exit 0
           git push origin HEAD:main
 
       - name: Create release archive

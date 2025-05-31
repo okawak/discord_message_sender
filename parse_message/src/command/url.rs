@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = globalThis, js_name = fetchUrlContent)]
+    #[wasm_bindgen(js_namespace = ["window", "discordMsgSync"], js_name = fetchUrlContent)]
     async fn fetch_url_content(url: &str) -> JsValue;
 }
 
