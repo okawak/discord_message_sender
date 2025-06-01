@@ -24,7 +24,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   }
 
   private createDirectorySettings(containerEl: HTMLElement): void {
-    containerEl.createEl("h2", { text: "Directory" });
+    new Setting(containerEl).setName("Directory").setHeading();
 
     this.addTextSetting(containerEl, {
       name: "Messages Directory",
@@ -49,7 +49,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   }
 
   private createDiscordSettings(containerEl: HTMLElement): void {
-    containerEl.createEl("h2", { text: "Discord" });
+    new Setting(containerEl).setName("Discord").setHeading();
 
     this.addPasswordSetting(containerEl, {
       name: "Bot Token",
@@ -83,7 +83,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   }
 
   private createBehaviorSettings(containerEl: HTMLElement): void {
-    containerEl.createEl("h2", { text: "Others" });
+    new Setting(containerEl).setName("Behavior").setHeading();
 
     new Setting(containerEl)
       .setName("Auto-sync on startup")

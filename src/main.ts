@@ -20,7 +20,12 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   private syncing = false;
 
   override async onload() {
-    await initWasmBridge(this.app, this.manifest.dir!);
+    if (!this.manifest.dir) {
+      new Notice("Discord Message Sender: Plugin directory not found.");
+      return;
+    }
+
+    await initWasmBridge(this.app, this.manifest.dir);
     await this.loadSettings();
     this.registerCommands();
     this.setupAutoSync();
@@ -48,13 +53,14 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       new Notice("Discord sync is already running.");
       return;
     }
-    this.syncing = true;
 
     if (!this.validateSettings()) {
       new Notice("Discord Sync: Bot token or channel ID is not configured.");
-      this.syncing = false;
       return;
     }
+
+    this.syncing = true;
+    new Notice("Starting Discord sync.");
 
     let lastMessageId = this.settings.lastProcessedMessageId;
     let processedMessageCount = 0;
@@ -133,10 +139,14 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     content: string,
     timestamp: string,
   ): Promise<ProcessedMessage> {
+    if (!this.manifest.dir) {
+      throw new Error("Plugin directory not found.");
+    }
+
     try {
       const result = await parseMessageWasm(
         this.app,
-        this.manifest.dir!,
+        this.manifest.dir,
         content,
         this.settings.messagePrefix,
         timestamp,
