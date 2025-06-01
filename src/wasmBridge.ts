@@ -1,4 +1,4 @@
-import type { App, DataAdapter } from "obsidian";
+import { type App, type DataAdapter, Notice } from "obsidian";
 import initWasm, {
   process_message as processMessage,
 } from "../pkg/parse_message.js";
@@ -18,14 +18,22 @@ export async function initWasmBridge(
     const adapter = app.vault.adapter;
     let bytes: Uint8Array;
 
-    if (isDataAdapter(adapter)) {
-      const buf = await adapter.readBinary(`${manifestDir}/${WASM_FILE_NAME}`);
-      bytes = new Uint8Array(buf);
-    } else {
-      const res = await fetch(`${manifestDir}/${WASM_FILE_NAME}`);
-      bytes = new Uint8Array(await res.arrayBuffer());
+    try {
+      if (isDataAdapter(adapter)) {
+        const buf = await adapter.readBinary(
+          `${manifestDir}/${WASM_FILE_NAME}`,
+        );
+        bytes = new Uint8Array(buf);
+      } else {
+        const res = await fetch(`${manifestDir}/${WASM_FILE_NAME}`);
+        bytes = new Uint8Array(await res.arrayBuffer());
+      }
+      await initWasm({ module: bytes });
+    } catch (error) {
+      wasmReady = null; // reset on error
+      new Notice("WASM initialization failed.");
+      throw new Error(`WASM initialization failed: ${error}`);
     }
-    await initWasm({ module: bytes });
   })();
 
   return wasmReady;
@@ -38,8 +46,12 @@ export async function parseMessageWasm(
   prefix: string,
   timestamp: string,
 ) {
-  await initWasmBridge(app, manifestDir);
-  return processMessage(content, prefix, timestamp);
+  try {
+    await initWasmBridge(app, manifestDir);
+    return await processMessage(content, prefix, timestamp);
+  } catch (error) {
+    throw new Error(`Failed to parse message: ${error}`);
+  }
 }
 
 function isDataAdapter(a: unknown): a is DataAdapter {

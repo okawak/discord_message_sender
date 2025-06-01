@@ -1,5 +1,6 @@
 import { Notice, Plugin } from "obsidian";
 import { fetchMessages, postNotification } from "./discordApi";
+import { cleanupGlobalNamespace } from "./global";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
 import {
   DEFAULT_SETTINGS,
@@ -10,7 +11,6 @@ import {
 import { delay } from "./utils";
 import { saveToVault } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
-import "./global";
 
 const MESSAGE_PROCESSING_DELAY = 50; // ms
 const REQUEST_INTERVAL_DELAY = 1000; // ms
@@ -32,7 +32,9 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
   }
 
-  override onunload(): void {}
+  override onunload(): void {
+    cleanupGlobalNamespace();
+  }
 
   private registerCommands(): void {
     this.addCommand({

@@ -2,10 +2,10 @@ import { requestUrl } from "obsidian";
 
 declare global {
   interface DiscordMsgSyncNS {
-    fetchUrlContent?: (url: string) => Promise<string>;
+    fetchUrlContent?: ((url: string) => Promise<string>) | undefined;
   }
   interface Window {
-    discordMsgSync?: DiscordMsgSyncNS;
+    discordMsgSync?: DiscordMsgSyncNS | undefined;
   }
 }
 
@@ -33,4 +33,11 @@ function getNamespace(): DiscordMsgSyncNS {
 const ns = getNamespace();
 if (!ns.fetchUrlContent) {
   ns.fetchUrlContent = fetchUrlContentImpl;
+}
+
+export function cleanupGlobalNamespace(): void {
+  if (window.discordMsgSync) {
+    window.discordMsgSync.fetchUrlContent = undefined;
+    window.discordMsgSync = undefined;
+  }
 }
