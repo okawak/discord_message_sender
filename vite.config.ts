@@ -1,7 +1,7 @@
-import { defineConfig } from "vite";
-import copy from "rollup-plugin-copy";
 import fs from "node:fs/promises";
 import { resolve } from "node:path";
+import copy from "rollup-plugin-copy";
+import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => {
   // define mode by `vite build --mode production`
@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       await fs
         .copyFile(
           resolve("dev/parse_message_bg.wasm"),
-          resolve("parse_message_bg.wasm")
+          resolve("parse_message_bg.wasm"),
         )
         .catch(() => {});
     },
