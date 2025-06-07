@@ -1,8 +1,9 @@
 use html5ever::QualName;
 use std::collections::HashMap;
 
+/// Represents a unique identifier for a node in the DOM tree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NodeId(usize); // as an index into the arena
+pub struct NodeId(usize); // Use usize to represent node IDs
 
 impl NodeId {
     pub(crate) fn new(id: usize) -> Self {

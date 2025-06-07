@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+/// Error types for HTML to Markdown conversion.
 #[derive(Error, Debug)]
 pub enum ConvertError {
     #[error("HTML parse error: {0}")]
