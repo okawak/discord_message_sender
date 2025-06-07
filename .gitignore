@@ -26,5 +26,6 @@ data.json
 /pkg
 
 # Output
+/target
 /dist
 /dev

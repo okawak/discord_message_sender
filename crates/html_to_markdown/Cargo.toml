@@ -1,0 +1,9 @@
+[package]
+name = "html_to_markdown"
+version.workspace = true
+authors.workspace = true
+description = "Parse HTML to Customized Markdown"
+edition.workspace = true
+repository.workspace = true
+
+[dependencies]

@@ -16,9 +16,11 @@ pub async fn handle(arg: Option<&str>) -> Result<(String, bool, String), JsValue
     let url_content_js = fetch_url_content(url_str).await;
     let url_content = url_content_js.as_string().unwrap_or_default();
 
+    // test
+    // Ok((url_content, true, "Raw Content".to_string()))
+
     // HTMLをマークダウンに変換
-    let processed_md =
-        process_html_to_markdown(&url_content, url_str, url.host_str().unwrap_or("unknown"));
+    let processed_md = process_html_to_markdown(&url_content, url_str, url.host_str().unwrap_or("unknown"));
     let site_name = url.host_str().unwrap_or("unknown").to_owned();
 
     Ok((processed_md, true, site_name))
