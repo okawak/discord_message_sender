@@ -10,11 +10,11 @@ repository.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+thiserror = "2"
 html_to_markdown = { path = "../html_to_markdown" }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
-thiserror = "2"
 url = "2"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
