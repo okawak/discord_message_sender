@@ -1,4 +1,4 @@
-use crate::dom::{Dom, Node, NodeData, NodeId};
+use crate::dom::{Dom, NodeData, NodeId};
 use crate::error::ConvertError;
 use html5ever::{
     ExpandedName,
@@ -93,17 +93,10 @@ impl TreeSink for VecSink {
             // the lifetime constraints of the TreeSink trait
             let leaked_name: &'static QualName = Box::leak(Box::new(name.clone()));
 
-            let node = Node {
-                data: NodeData::Element {
-                    tag: name,
-                    attrs: attrs_map,
-                },
-                parent: None,
-                children: Vec::new(),
-            };
-
-            let id = NodeId::new(dom.arena.len());
-            dom.arena.push(node);
+            let id = dom.create_without_parent(NodeData::Element {
+                tag: name,
+                attrs: attrs_map,
+            });
 
             // Store the leaked reference for efficient elem_name lookups
             self.element_names.borrow_mut().insert(id, leaked_name);

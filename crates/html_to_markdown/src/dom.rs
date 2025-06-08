@@ -68,13 +68,20 @@ impl Dom {
     }
 
     pub fn create(&mut self, data: NodeData, parent: NodeId) -> NodeId {
+        let id = self.create_without_parent(data);
+        self.arena[id.as_usize()].parent = Some(parent);
+        self.arena[parent.as_usize()].children.push(id);
+        id
+    }
+
+    /// Creates a node without setting parent-child relationships
+    pub fn create_without_parent(&mut self, data: NodeData) -> NodeId {
         let id = NodeId::new(self.arena.len());
         self.arena.push(Node {
             data,
-            parent: Some(parent),
+            parent: None,
             children: Vec::new(),
         });
-        self.arena[parent.as_usize()].children.push(id);
         id
     }
 
