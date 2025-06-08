@@ -9,8 +9,7 @@ description = "Send messages to Obsidian from Discord."
 edition = "2024"
 repository = "https://github.com/okawak/discord_message_sender"
 
-[profile.wasm-release]
-inherits = "release"
+[profile.release]
 opt-level = 'z'
 lto = true
 codegen-units = 1
