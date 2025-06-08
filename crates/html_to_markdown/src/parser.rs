@@ -64,7 +64,7 @@ impl TreeSink for VecSink {
         self.element_names
             .borrow()
             .get(id)
-            .unwrap_or_else(|| panic!("Node {id} is not an element"))
+            .unwrap_or_else(|| panic!("Node {} is not an element", id))
             .expanded()
     }
 
@@ -142,22 +142,37 @@ mod tests {
     use pretty_assertions::assert_eq;
     use rstest::*;
 
-    #[fixture]
-    fn valid_html() -> &'static str {
-        "<div><p>Hello <strong>world</strong></p></div>"
-    }
-
-    #[fixture]
-    fn invalid_html() -> &'static str {
-        "<div><p>Unclosed tags"
-    }
-
-    #[rstest]
-    fn test_parse_valid_html(valid_html: &str) {
-        let result = parse_html(valid_html);
+    #[rstest] // document, html, head, body
+    #[case("<div><p>Hello <strong>world</strong></p></div>", 9)] // div, p, "Hello " strong, "world"
+    #[case("<div><p>Unclosed tags", 7)] // div, p, "Unclosed tags" (auto-closing)
+    #[case("", 4)]
+    #[case(
+        "<div class=\"container\" id=\"main\"><a href=\"https://example.com\">Link</a></div>",
+        7
+    )] // div, a, "Link"
+    #[case("<div><!-- This is a comment --><p>Content</p></div>", 8)] // div, comment, p, "Content"
+    #[case("<div><img src=\"test.jpg\" alt=\"test\"><br><hr></div>", 8)] // div, img, br, hr
+    #[case("<p>Simple text</p>", 6)] // p, "Simple text"
+    #[case("<div><span>Nested</span></div>", 7)] // div, span, "Nested"
+    #[case("<h1>Header</h1><p>Paragraph</p>", 8)] // h1, "Header", p, "Paragraph"
+    fn test_parse_html_success(#[case] html: &str, #[case] expected_nodes: usize) {
+        let result = parse_html(html);
         assert_eq!(result.is_ok(), true);
 
         let dom = result.unwrap();
-        assert_eq!(dom.node_count() > 0, true);
+        assert_eq!(dom.node_count(), expected_nodes);
+    }
+
+    #[rstest] // document
+    #[case(
+        "<html><head><title>Test</title></head><body><div><ul><li>Item 1</li><li>Item 2</li></ul></div></body></html>",
+        12 // html, head, title, "Test", body, div, ul, li, "Item 1", li, "Item 2"
+    )]
+    fn test_parse_html_complex_structure(#[case] html: &str, #[case] expected_nodes: usize) {
+        let result = parse_html(html);
+        assert_eq!(result.is_ok(), true);
+
+        let dom = result.unwrap();
+        assert_eq!(dom.node_count(), expected_nodes,);
     }
 }

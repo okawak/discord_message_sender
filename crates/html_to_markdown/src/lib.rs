@@ -3,9 +3,10 @@ pub mod error;
 mod frontmatters;
 mod parser;
 mod renderers;
+mod utils;
 
 use error::ConvertError;
-use frontmatters::FRONTMATTERS;
+use frontmatters::get_frontmatter_extractors;
 
 /// Convert HTML to Markdown with front-matter extraction
 ///
@@ -43,22 +44,32 @@ pub fn convert(html: &str, keys: &[&str]) -> Result<String, ConvertError> {
     let dom = parser::parse_html(html)?;
 
     // front-matter
-    let mut fm = String::from("---\n");
-    for k in keys {
-        if let Some(ext) = FRONTMATTERS.iter().find(|e| e.key() == *k) {
-            if let Some(val) = ext.extract(&dom) {
-                if *k == "tags" {
-                    fm.push_str(&format!("tags: [{}]\n", val));
-                } else {
-                    fm.push_str(&format!("{k}: {val}\n"));
+    let extractors = get_frontmatter_extractors(keys);
+    let frontmatter_entries: Vec<String> = extractors
+        .into_iter()
+        .filter_map(|(key, extractor)| {
+            extractor.extract(&dom).map(|val| {
+                match key {
+                    "tags" => format!("tags: [{}]", val), // e.g. val = "tag1, tag2"
+                    _ => format!("{}: {}", key, val),
                 }
-            }
+            })
+        })
+        .collect();
+
+    let mut result = String::new();
+    if !frontmatter_entries.is_empty() {
+        result.push_str("---\n");
+        for entry in frontmatter_entries {
+            result.push_str(&entry);
+            result.push('\n');
         }
+        result.push_str("---\n\n");
     }
-    fm.push_str("---\n\n");
 
     // render body
     let mut ctx = renderers::Context;
     let body = renderers::render_node(&dom, dom.document, &mut ctx)?;
-    Ok(fm + &body)
+    result.push_str(&body);
+    Ok(result)
 }
