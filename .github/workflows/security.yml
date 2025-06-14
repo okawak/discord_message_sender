@@ -17,5 +17,3 @@ jobs:
 
       - name: Audit Rust Dependencies
         uses: actions-rust-lang/audit@v1
-        with:
-          workingDirectory: parse_message
