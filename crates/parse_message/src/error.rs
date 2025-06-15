@@ -9,6 +9,8 @@ pub enum MessageError {
     Network(String),
     #[error("Unknown command")]
     UnknownCommand,
+    #[error("HTML conversion error")]
+    ConversionError,
     #[error("Unexpected error: {0}")]
     Other(String),
 }

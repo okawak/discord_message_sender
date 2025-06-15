@@ -18,7 +18,7 @@ pub async fn process_message(
 
     // "!foo hoge".strip_prefix("!") -> "foo hoge"
     if let Some(rest) = input.strip_prefix(prefix) {
-        let (md, is_clip, name) = handle_command(rest.trim_start()).await?;
+        let (md, is_clip, name) = handle_command(rest.trim_start(), &timestamp).await?;
         let result = ParseMessageResult { md, is_clip, name };
         to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
     } else {

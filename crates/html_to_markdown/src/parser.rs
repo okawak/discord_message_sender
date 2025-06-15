@@ -106,7 +106,7 @@ impl TreeSink for VecSink {
     }
 
     fn create_comment(&self, text: html5ever::tendril::StrTendril) -> NodeId {
-        self.with_mut(|dom| dom.create(NodeData::Comment(text.to_string()), dom.document))
+        self.with_mut(|dom| dom.create_without_parent(NodeData::Comment(text.to_string())))
     }
 
     fn append(&self, parent: &NodeId, child: NodeOrText<NodeId>) {

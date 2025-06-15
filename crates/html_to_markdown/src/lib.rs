@@ -17,7 +17,7 @@ use frontmatters::get_frontmatter_extractors;
 ///
 /// # Returns
 ///
-/// * `Result<String, ConvertError>` - The converted Markdown content with front-matter, or an error.
+/// * `Result<String, ConvertError>` - The converted Markdown content with front-matter (YAML format), or an error.
 ///
 /// # Example
 ///
@@ -48,12 +48,9 @@ pub fn convert(html: &str, keys: &[&str]) -> Result<String, ConvertError> {
     let frontmatter_entries: Vec<String> = extractors
         .into_iter()
         .filter_map(|(key, extractor)| {
-            extractor.extract(&dom).map(|val| {
-                match key {
-                    "tags" => format!("tags: [{}]", val), // e.g. val = "tag1, tag2"
-                    _ => format!("{}: {}", key, val),
-                }
-            })
+            extractor
+                .extract(&dom)
+                .map(|val| format!("{}: {}", key, val))
         })
         .collect();
 
@@ -68,8 +65,9 @@ pub fn convert(html: &str, keys: &[&str]) -> Result<String, ConvertError> {
     }
 
     // render body
-    let mut ctx = renderers::Context;
-    let body = renderers::render_node(&dom, dom.document, &mut ctx)?;
+    let mut ctx = renderers::Context::default();
+    let start_id = dom.find_body().unwrap_or(dom.document);
+    let body = renderers::render_node(&dom, start_id, &mut ctx)?;
     result.push_str(&body);
     Ok(result)
 }

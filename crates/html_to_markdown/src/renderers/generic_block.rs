@@ -4,12 +4,15 @@ use crate::{
     error::ConvertError,
 };
 
-pub struct Paragraph;
+pub struct GenericBlock;
 
-impl Renderer for Paragraph {
+impl Renderer for GenericBlock {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
         if let NodeData::Element { tag, .. } = &dom.node(id).data {
-            tag.local.as_ref() == "p"
+            matches!(
+                tag.local.as_ref(),
+                "div" | "section" | "article" | "aside" | "nav" | "main" | "header" | "footer"
+            )
         } else {
             false
         }
@@ -25,4 +28,4 @@ impl Renderer for Paragraph {
     }
 }
 
-pub static PARAGRAPH: Paragraph = Paragraph;
+pub static BLOCK: GenericBlock = GenericBlock;
