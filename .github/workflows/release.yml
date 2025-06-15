@@ -31,7 +31,7 @@ jobs:
 
       - name: Update version in Cargo.toml
         run: |
-          sed -i '/^\[package\]/,/^\[/ s/^version = "[^"]*"/version = "${{ steps.get_version.outputs.VERSION }}"/' Cargo.toml
+          sed -i '/^\[workspace\.package\]/,/^\[/ s/^version = "[^"]*"/version = "${{ steps.get_version.outputs.VERSION }}"/' Cargo.toml
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
