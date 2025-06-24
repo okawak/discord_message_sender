@@ -7,14 +7,11 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "include": ["src/**/*.ts", "vite.config.ts"]
+    "includes": ["src/**/*.ts", "vite.config.ts"]
   },
   "formatter": {
     "enabled": true,
     "indentStyle": "space"
-  },
-  "organizeImports": {
-    "enabled": true
   },
   "linter": {
     "enabled": true,

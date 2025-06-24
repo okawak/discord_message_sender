@@ -1,13 +1,13 @@
 import { Notice, Plugin } from "obsidian";
 import { fetchMessages, postNotification } from "./discordApi";
 import { cleanupGlobalNamespace } from "./global";
-import { DiscordMessageSenderSettingTab } from "./settingTab";
 import {
   DEFAULT_SETTINGS,
   type DiscordMessage,
   type DiscordPluginSettings,
   type ProcessedMessage,
 } from "./settings";
+import { DiscordMessageSenderSettingTab } from "./settingTab";
 import { saveToVault } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 

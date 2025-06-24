@@ -5,6 +5,7 @@ authors.workspace = true
 description = "Parse Discord messages"
 edition.workspace = true
 repository.workspace = true
+license-file.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

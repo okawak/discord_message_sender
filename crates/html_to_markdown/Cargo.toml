@@ -5,6 +5,7 @@ authors.workspace = true
 description = "Parse HTML to Customized Markdown"
 edition.workspace = true
 repository.workspace = true
+license-file.workspace = true
 
 [dependencies]
 thiserror = "2"
