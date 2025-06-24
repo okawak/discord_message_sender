@@ -67,5 +67,5 @@ async function discordRequest(
     }
     await delay(1000 * (i + 1));
   }
-  throw new Error("Discord Request: unrecoverable error");
+  throw new Error("Discord request: unrecoverable error");
 }

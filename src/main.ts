@@ -21,7 +21,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
   override async onload() {
     if (!this.manifest.dir) {
-      new Notice("Discord Message Sender: Plugin directory not found.");
+      new Notice("Discord message sender: plugin directory not found.");
       return;
     }
 
@@ -39,7 +39,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   private registerCommands(): void {
     this.addCommand({
       id: "sync-discord-messages",
-      name: "Sync Discord Messages",
+      name: "Sync discord messages",
       callback: () => this.syncDiscordMessages(),
     });
   }
@@ -57,7 +57,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     }
 
     if (!this.validateSettings()) {
-      new Notice("Discord Sync: Bot token or channel ID is not configured.");
+      new Notice("Discord sync: bot token or channel ID is not configured.");
       return;
     }
 

@@ -27,7 +27,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Directory").setHeading();
 
     this.addTextSetting(containerEl, {
-      name: "Messages Directory",
+      name: "Messages directory",
       description: "Directory where regular Discord messages will be saved",
       placeholder: "DiscordLogs",
       getValue: () => this.plugin.settings.messageDirectoryName,
@@ -37,7 +37,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     });
 
     this.addTextSetting(containerEl, {
-      name: "Clippings Directory",
+      name: "Clippings directory",
       description: "Directory where URL clippings will be saved",
       placeholder: "DiscordClippings",
       getValue: () => this.plugin.settings.clippingDirectoryName,
@@ -52,7 +52,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Discord").setHeading();
 
     this.addPasswordSetting(containerEl, {
-      name: "Bot Token",
+      name: "Bot token",
       description: "Your Discord bot token",
       placeholder: "xxxxx.yyyyy.zzzzz",
       getValue: () => this.plugin.settings.botToken,
@@ -72,7 +72,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     });
 
     this.addTextSetting(containerEl, {
-      name: "Message Prefix",
+      name: "Message prefix",
       description: "Prefix for message processing",
       placeholder: "!",
       getValue: () => this.plugin.settings.messagePrefix,
