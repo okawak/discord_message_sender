@@ -1,6 +1,5 @@
 import { Notice, requestUrl } from "obsidian";
 import type { DiscordMessage, DiscordPluginSettings } from "./settings";
-import { delay } from "./utils";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 const RATE_LIMIT_STATUS_CODE = 429;
@@ -55,7 +54,7 @@ async function discordRequest(
     if (res.status === RATE_LIMIT_STATUS_CODE) {
       const wait = Number(res.headers["Retry-After"] ?? 1) * 1000 * (i + 1);
       new Notice(`Rate-limited. Retry after ${Math.ceil(wait / 1000)}s`);
-      await delay(wait);
+      await sleep(wait);
       continue;
     }
 
@@ -65,7 +64,7 @@ async function discordRequest(
     if (i === MAX_RETRIES) {
       throw new Error(`Discord API failed: ${res.status}`);
     }
-    await delay(1000 * (i + 1));
+    await sleep(1000 * (i + 1));
   }
   throw new Error("Discord request: unrecoverable error");
 }

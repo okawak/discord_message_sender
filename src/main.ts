@@ -8,7 +8,6 @@ import {
   type DiscordPluginSettings,
   type ProcessedMessage,
 } from "./settings";
-import { delay } from "./utils";
 import { saveToVault } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 
@@ -83,11 +82,11 @@ export default class DiscordMessageSenderPlugin extends Plugin {
             processedMessageCount++;
             newestMessageIdProcessed = message.id;
           }
-          await delay(MESSAGE_PROCESSING_DELAY);
+          await sleep(MESSAGE_PROCESSING_DELAY);
         }
 
         lastMessageId = newestMessageId;
-        await delay(REQUEST_INTERVAL_DELAY);
+        await sleep(REQUEST_INTERVAL_DELAY);
       }
       await postNotification(
         this.settings,
