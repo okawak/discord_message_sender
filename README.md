@@ -69,7 +69,7 @@ Please enter the following information in the plugin settings:
 
 Messages starting with the configured prefix (default: `!`) are treated as special commands.
 
-### `!url` - Web Page Clipping
+### `!url` - Web Page Clipping (under development)
 
 **Example:**
 ```
