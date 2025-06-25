@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { resolve } from "node:path";
-import copy from "rollup-plugin-copy";
+import { wasm } from "@rollup/plugin-wasm";
 import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => {
@@ -15,12 +15,6 @@ export default defineConfig(({ mode }) => {
       await fs
         .copyFile(resolve("dev/main.js.map"), resolve("main.js.map"))
         .catch(() => {});
-      await fs
-        .copyFile(
-          resolve("dev/parse_message_bg.wasm"),
-          resolve("parse_message_bg.wasm"),
-        )
-        .catch(() => {});
     },
   });
 
@@ -34,7 +28,6 @@ export default defineConfig(({ mode }) => {
       outDir: prod ? "dist" : "dev",
       emptyOutDir: true,
       sourcemap: !prod,
-      assetsInlineLimit: 0,
       rollupOptions: {
         external: [
           "obsidian",
@@ -51,13 +44,9 @@ export default defineConfig(({ mode }) => {
           inlineDynamicImports: true,
         },
         plugins: [
-          // copy parse_message_bg.wasm to dist or dev
-          copy({
-            targets: [
-              { src: "pkg/parse_message_bg.wasm", dest: prod ? "dist" : "dev" },
-            ],
-            hook: "writeBundle",
-            verbose: !prod,
+          wasm({
+            targetEnv: "auto-inline",
+            maxFileSize: Infinity,
           }),
         ],
       },

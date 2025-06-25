@@ -24,7 +24,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
-    await initWasmBridge(this.app, this.manifest.dir);
+    await initWasmBridge();
     await this.loadSettings();
     this.registerCommands();
     this.setupAutoSync();
@@ -146,8 +146,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     try {
       const result = await parseMessageWasm(
-        this.app,
-        this.manifest.dir,
         content,
         this.settings.messagePrefix,
         timestamp,

@@ -74,7 +74,6 @@ jobs:
             discord-message-sender-${{ github.ref_name }}.zip
             dist/manifest.json
             dist/main.js
-            dist/parse_message_bg.wasm
           draft: false
           prerelease: false
           generate_release_notes: true
