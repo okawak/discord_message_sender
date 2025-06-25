@@ -1,7 +1,7 @@
 {
   "id": "discord-message-sender",
   "name": "Discord Message Sender",
-  "version": "0.1.10",
+  "version": "0.2.0",
   "minAppVersion": "1.8.10",
   "description": "Send messages from a Discord channel to your Vault",
   "author": "okawak",

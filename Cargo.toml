@@ -3,7 +3,7 @@ members = ["./crates/parse_message", "crates/html_to_markdown"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.10"
+version = "0.2.0"
 authors = ["okawak"]
 description = "Send messages to Obsidian from Discord."
 edition = "2024"
