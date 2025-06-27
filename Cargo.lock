@@ -171,7 +171,7 @@ dependencies = [
 
 [[package]]
 name = "html_to_markdown"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "html5ever",
  "pretty_assertions",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "parse_message"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "chrono",
  "html_to_markdown",
