@@ -1,4 +1,4 @@
-import type { Vault } from "obsidian";
+import { TFolder, type Vault } from "obsidian";
 import type { ProcessedMessage } from "./settings";
 
 // Save to Obsidian vault
@@ -21,7 +21,15 @@ export async function saveToVault(
 }
 
 async function ensureDir(vault: Vault, p: string): Promise<void> {
-  if (vault.getAbstractFileByPath(p)) return;
+  const existing = vault.getAbstractFileByPath(p);
+  if (existing instanceof TFolder) return;
+
+  if (existing) {
+    // If it exists but is not a folder, throw an error
+    throw new Error(
+      `Cannot create directory "${p}": a file with the same name already exists`,
+    );
+  }
 
   const parent = p.split("/").slice(0, -1).join("/");
   if (parent) {

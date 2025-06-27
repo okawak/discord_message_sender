@@ -38,7 +38,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   private registerCommands(): void {
     this.addCommand({
       id: "sync-discord-messages",
-      name: "Sync discord messages",
+      name: "Sync Discord messages",
       callback: () => this.syncDiscordMessages(),
     });
   }
@@ -56,7 +56,9 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     }
 
     if (!this.validateSettings()) {
-      new Notice("Discord sync: bot token or channel ID is not configured.");
+      new Notice(
+        "Discord message sender: bot token or channel ID is not configured.",
+      );
       return;
     }
 
