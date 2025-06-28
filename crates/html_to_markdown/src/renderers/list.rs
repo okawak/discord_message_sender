@@ -22,7 +22,7 @@ impl Renderer for List {
                     ctx.list_depth += 1;
                     let content = render_children(dom, id, ctx)?;
                     ctx.list_depth -= 1;
-                    Ok(format!("{}\n", content))
+                    Ok(format!("{content}\n"))
                 }
                 "li" => {
                     let indent = "  ".repeat(ctx.list_depth.saturating_sub(1));

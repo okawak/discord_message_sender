@@ -25,8 +25,8 @@ impl Renderer for Table {
 
         if let NodeData::Element { tag, .. } = &dom.node(id).data {
             match tag.local.as_ref() {
-                "table" => Ok(format!("{}\n\n", content)),
-                "tr" => Ok(format!("| {} |\n", content)),
+                "table" => Ok(format!("{content}\n\n")),
+                "tr" => Ok(format!("| {content} |\n")),
                 "th" | "td" => Ok(format!("{} | ", content.trim())),
                 _ => Ok(content),
             }

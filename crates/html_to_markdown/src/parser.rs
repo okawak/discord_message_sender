@@ -64,7 +64,7 @@ impl TreeSink for VecSink {
         self.element_names
             .borrow()
             .get(id)
-            .unwrap_or_else(|| panic!("Node {} is not an element", id))
+            .unwrap_or_else(|| panic!("Node {id} is not an element"))
             .expanded()
     }
 

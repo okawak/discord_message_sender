@@ -76,8 +76,10 @@ static TAG_RENDERERS: LazyLock<HashMap<&'static str, &'static dyn Renderer>> =
 
 static GENERIC_RENDERERS: LazyLock<Vec<&'static dyn Renderer>> = LazyLock::new(|| {
     // priority order of renderers
-    let renderers = vec![&generic_block::BLOCK as &'static dyn Renderer];
-    renderers
+    vec![
+        &code_block::CODE_BLOCK as &'static dyn Renderer,
+        &generic_block::BLOCK as &'static dyn Renderer,
+    ]
 });
 
 pub fn render_node(dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {

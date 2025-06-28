@@ -13,10 +13,11 @@
     "clean": "cargo clean && rimraf dist dev pkg main.js main.js.map *.wasm",
     "check": "bunx biome check",
     "check:fix": "bunx biome check --write",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "cargo test --release"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.0.5",
+    "@biomejs/biome": "^2.0.6",
     "@rollup/plugin-wasm": "^6.2.2",
     "@types/bun": "^1.2.17",
     "cpx": "^1.5.0",

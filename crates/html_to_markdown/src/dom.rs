@@ -87,14 +87,14 @@ impl Dom {
 
     pub fn node(&self, id: NodeId) -> &Node {
         if !id.is_valid() || id.as_usize() >= self.arena.len() {
-            panic!("Invalid NodeId: {}", id);
+            panic!("Invalid NodeId: {id}");
         }
         &self.arena[id.as_usize()]
     }
 
     pub fn node_mut(&mut self, id: NodeId) -> &mut Node {
         if !id.is_valid() || id.as_usize() >= self.arena.len() {
-            panic!("Invalid NodeId: {}", id);
+            panic!("Invalid NodeId: {id}");
         }
         &mut self.arena[id.as_usize()]
     }

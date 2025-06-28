@@ -23,16 +23,16 @@ impl Renderer for Inline {
             match tag.local.as_ref() {
                 "strong" | "b" => {
                     let content = render_children(dom, id, ctx)?;
-                    Ok(format!("**{}**", content))
+                    Ok(format!("**{content}**"))
                 }
                 "em" | "i" => {
                     let content = render_children(dom, id, ctx)?;
-                    Ok(format!("*{}*", content))
+                    Ok(format!("*{content}*"))
                 }
                 "a" => {
                     let content = render_children(dom, id, ctx)?;
                     if let Some(href) = attrs.get("href") {
-                        Ok(format!("[{}]({})", content, href))
+                        Ok(format!("[{content}]({href})"))
                     } else {
                         Ok(content)
                     }

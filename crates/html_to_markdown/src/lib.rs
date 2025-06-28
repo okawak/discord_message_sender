@@ -47,11 +47,7 @@ pub fn convert(html: &str, keys: &[&str]) -> Result<String, ConvertError> {
     let extractors = get_frontmatter_extractors(keys);
     let frontmatter_entries: Vec<String> = extractors
         .into_iter()
-        .filter_map(|(key, extractor)| {
-            extractor
-                .extract(&dom)
-                .map(|val| format!("{}: {}", key, val))
-        })
+        .filter_map(|(key, extractor)| extractor.extract(&dom).map(|val| format!("{key}: {val}")))
         .collect();
 
     let mut result = String::new();
