@@ -3,7 +3,7 @@ use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 static SUPPORTED_LANGUAGES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
@@ -171,11 +171,11 @@ impl CodeBlock {
     }
 
     /// check if code block has data-lang attribute
-    fn has_code_lang_attribute(&self, attrs: &std::collections::HashMap<String, String>) -> bool {
+    fn has_code_lang_attribute(&self, attrs: &HashMap<String, String>) -> bool {
         attrs.contains_key("data-lang")
     }
     /// check code-frame class (<div class="code-frame">)
-    fn is_code_frame(&self, attrs: &std::collections::HashMap<String, String>) -> bool {
+    fn is_code_frame(&self, attrs: &HashMap<String, String>) -> bool {
         attrs
             .get("class")
             .is_some_and(|class| class.contains("code-frame"))
@@ -238,11 +238,11 @@ pub static CODE_BLOCK: CodeBlock = CodeBlock;
 
 #[cfg(test)]
 mod tests {
-    use super::{CodeBlock, Context};
+    use super::*;
     use crate::parser;
     use crate::renderers;
     use pretty_assertions::assert_eq;
-    use rstest::*;
+    use rstest::rstest;
 
     /// inline code test
     #[rstest]

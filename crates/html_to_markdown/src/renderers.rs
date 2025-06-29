@@ -77,7 +77,7 @@ static TAG_RENDERERS: LazyLock<HashMap<&'static str, &'static dyn Renderer>> =
 static GENERIC_RENDERERS: LazyLock<Vec<&'static dyn Renderer>> = LazyLock::new(|| {
     // priority order of renderers
     vec![
-        &code_block::CODE_BLOCK as &'static dyn Renderer,
+        &code_block::CODE_BLOCK as &'static dyn Renderer, // for elements like <div class="code-block">
         &generic_block::BLOCK as &'static dyn Renderer,
     ]
 });
