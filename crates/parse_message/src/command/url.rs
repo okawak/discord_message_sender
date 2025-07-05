@@ -20,9 +20,10 @@ pub async fn handle(arg: Option<&str>, timestamp: &str) -> Result<(String, bool,
 
     // frontmatter keys, now for test
     // TODO: get from TypeScript Settings
-    let keys = vec!["title"];
+    let keys = vec!["title", "source"];
 
-    let processed_md = convert(&url_content, &keys).map_err(|_| MessageError::ConversionError)?;
+    let processed_md =
+        convert(url_str, &url_content, &keys).map_err(|_| MessageError::ConversionError)?;
     // TODO: retrieve site name from front-matter
     let title = message::format_name(timestamp);
 
@@ -30,5 +31,6 @@ pub async fn handle(arg: Option<&str>, timestamp: &str) -> Result<(String, bool,
 }
 
 fn is_valid_url(url: &str) -> bool {
-    url.starts_with("http://") || url.starts_with("https://")
+    // accept HTTPS secure URLs only
+    url.starts_with("https://")
 }

@@ -112,8 +112,12 @@ impl TreeSink for VecSink {
     fn append(&self, parent: &NodeId, child: NodeOrText<NodeId>) {
         self.with_mut(|dom| match child {
             NodeOrText::AppendNode(id) => {
-                dom.node_mut(id).parent.get_or_insert(*parent);
-                dom.node_mut(*parent).children.push(id);
+                if let Some(node) = dom.node_mut(id) {
+                    node.parent.get_or_insert(*parent);
+                }
+                if let Some(parent_node) = dom.node_mut(*parent) {
+                    parent_node.children.push(id);
+                }
             }
             NodeOrText::AppendText(t) => {
                 dom.create(NodeData::Text(t.to_string()), *parent);

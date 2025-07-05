@@ -8,7 +8,11 @@ pub struct Table;
 
 impl Renderer for Table {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
+        let Some(node) = dom.node(id) else {
+            return false;
+        };
+
+        if let NodeData::Element { tag, .. } = &node.data {
             matches!(
                 tag.local.as_ref(),
                 "table" | "thead" | "tbody" | "tr" | "th" | "td"
@@ -18,20 +22,24 @@ impl Renderer for Table {
         }
     }
 
-    fn render(&self, dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
+    fn render(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
         ctx.in_table = true;
-        let content = render_children(dom, id, ctx)?;
+        let content = render_children(url, dom, id, ctx)?;
         ctx.in_table = false;
 
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
-            match tag.local.as_ref() {
-                "table" => Ok(format!("{content}\n\n")),
-                "tr" => Ok(format!("| {content} |\n")),
-                "th" | "td" => Ok(format!("{} | ", content.trim())),
-                _ => Ok(content),
-            }
-        } else {
-            Ok(content)
+        let (tag, _) = dom.get_element_data(id)?;
+
+        match tag.local.as_ref() {
+            "table" => Ok(format!("{content}\n\n")),
+            "tr" => Ok(format!("| {content} |\n")),
+            "th" | "td" => Ok(format!("{} | ", content.trim())),
+            _ => Ok(content),
         }
     }
 }

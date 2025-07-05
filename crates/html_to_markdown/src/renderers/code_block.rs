@@ -70,21 +70,36 @@ pub struct CodeBlock;
 
 impl CodeBlock {
     fn create_code_block(&self, content: &str, language: Option<String>) -> String {
-        match language {
-            Some(lang) => format!("```{lang}\n{content}\n```\n\n"),
-            None => format!("```\n{content}\n```\n\n"),
+        let capacity = content.len() + language.as_ref().map_or(0, |l| l.len()) + 10; // "```", newlines, etc.
+
+        let mut result = String::with_capacity(capacity);
+
+        result.push_str("```");
+        if let Some(lang) = &language {
+            result.push_str(lang);
         }
+        result.push('\n');
+        result.push_str(content);
+        if !content.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push_str("```\n\n");
+        result
     }
 
     fn find_code_content(dom: &Dom, id: NodeId) -> Result<String, ConvertError> {
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
+        let Some(node) = dom.node(id) else {
+            return Ok(String::new());
+        };
+
+        if let NodeData::Element { tag, .. } = &node.data {
             if tag.local.as_ref() == "code" {
                 return Ok(Self::extract_text_content(dom, id));
             }
         }
 
         // recursively find code content in children
-        for &child_id in &dom.node(id).children {
+        for &child_id in dom.iter_children(id)? {
             if let Ok(content) = Self::find_code_content(dom, child_id) {
                 if !content.trim().is_empty() {
                     return Ok(content);
@@ -96,16 +111,22 @@ impl CodeBlock {
     }
 
     fn extract_text_content(dom: &Dom, id: NodeId) -> String {
+        let Some(node) = dom.node(id) else {
+            return String::new();
+        };
+
         let mut result = String::new();
-        for &child_id in &dom.node(id).children {
-            match &dom.node(child_id).data {
-                NodeData::Text(text) => {
-                    result.push_str(text);
+        for &child_id in &node.children {
+            if let Some(child_node) = dom.node(child_id) {
+                match &child_node.data {
+                    NodeData::Text(text) => {
+                        result.push_str(text);
+                    }
+                    NodeData::Element { .. } => {
+                        result.push_str(&Self::extract_text_content(dom, child_id));
+                    }
+                    _ => {}
                 }
-                NodeData::Element { .. } => {
-                    result.push_str(&Self::extract_text_content(dom, child_id));
-                }
-                _ => {}
             }
         }
 
@@ -115,38 +136,40 @@ impl CodeBlock {
 
     /// Extracts the programming language from a code block.
     fn extract_language(&self, dom: &Dom, id: NodeId) -> Option<String> {
-        if let NodeData::Element { attrs, .. } = &dom.node(id).data {
-            // data-lang attribute
-            if let Some(lang) = attrs.get("data-lang") {
-                return Some(lang.clone());
-            }
+        let (_, attrs) = dom.get_element_data(id).ok()?;
 
-            // class attribute
-            if let Some(class) = attrs.get("class") {
-                for class_name in class.split_whitespace() {
-                    // language-*, lang-*, highlight-* patterns
-                    if let Some(lang) = class_name.strip_prefix("language-") {
-                        return Some(lang.to_string());
-                    }
-                    if let Some(lang) = class_name.strip_prefix("lang-") {
-                        return Some(lang.to_string());
-                    }
-                    if let Some(lang) = class_name.strip_prefix("highlight-") {
-                        return Some(lang.to_string());
-                    }
+        // data-lang attribute
+        if let Some(lang) = attrs.get("data-lang") {
+            return Some(lang.clone());
+        }
 
-                    // Check for standalone language names
-                    if self.is_valid_language(class_name) {
-                        return Some(class_name.to_string());
-                    }
+        // class attribute
+        if let Some(class) = attrs.get("class") {
+            for class_name in class.split_whitespace() {
+                // language-*, lang-*, highlight-* patterns
+                if let Some(lang) = class_name.strip_prefix("language-") {
+                    return Some(lang.to_string());
+                }
+                if let Some(lang) = class_name.strip_prefix("lang-") {
+                    return Some(lang.to_string());
+                }
+                if let Some(lang) = class_name.strip_prefix("highlight-") {
+                    return Some(lang.to_string());
+                }
+
+                // Check for standalone language names
+                if self.is_valid_language(class_name) {
+                    return Some(class_name.to_string());
                 }
             }
         }
 
         // Check children recursively
-        for &child_id in &dom.node(id).children {
-            if let Some(lang) = self.extract_language(dom, child_id) {
-                return Some(lang);
+        if let Ok(children) = dom.iter_children(id) {
+            for &child_id in children {
+                if let Some(lang) = self.extract_language(dom, child_id) {
+                    return Some(lang);
+                }
             }
         }
         None
@@ -159,13 +182,14 @@ impl CodeBlock {
     /// Render code block with preserved whitespace
     fn render_with_preserved_whitespace(
         &self,
+        url: &str,
         dom: &Dom,
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
         let old_preserve = ctx.preserve_whitespace;
         ctx.preserve_whitespace = true;
-        let content = render_children(dom, id, ctx)?;
+        let content = render_children(url, dom, id, ctx)?;
         ctx.preserve_whitespace = old_preserve;
         Ok(content)
     }
@@ -184,7 +208,11 @@ impl CodeBlock {
 
 impl Renderer for CodeBlock {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
-        let NodeData::Element { tag, attrs, .. } = &dom.node(id).data else {
+        let Some(node) = dom.node(id) else {
+            return false;
+        };
+
+        let NodeData::Element { tag, attrs, .. } = &node.data else {
             return false;
         };
 
@@ -192,11 +220,8 @@ impl Renderer for CodeBlock {
             "pre" => true,
             "code" => {
                 // <code> in <pre> should not be rendered as inline code
-                if let Some(parent_id) = dom.node(id).parent {
-                    if let NodeData::Element {
-                        tag: parent_tag, ..
-                    } = &dom.node(parent_id).data
-                    {
+                if let Ok(Some(parent_id)) = dom.get_parent(id) {
+                    if let Ok((parent_tag, _)) = dom.get_element_data(parent_id) {
                         return parent_tag.local.as_ref() != "pre";
                     }
                 }
@@ -206,10 +231,14 @@ impl Renderer for CodeBlock {
         }
     }
 
-    fn render(&self, dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
-        let NodeData::Element { tag, attrs, .. } = &dom.node(id).data else {
-            return render_children(dom, id, ctx);
-        };
+    fn render(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let (tag, attrs) = dom.get_element_data(id)?;
 
         // process elements that have data-lang attribute and code-frame class
         if self.is_code_frame(attrs) || self.has_code_lang_attribute(attrs) {
@@ -221,15 +250,15 @@ impl Renderer for CodeBlock {
         match tag.local.as_ref() {
             "pre" => {
                 let language = self.extract_language(dom, id);
-                let content = self.render_with_preserved_whitespace(dom, id, ctx)?;
+                let content = self.render_with_preserved_whitespace(url, dom, id, ctx)?;
                 Ok(self.create_code_block(&content, language))
             }
             "code" => {
                 // inline code
-                let content = self.render_with_preserved_whitespace(dom, id, ctx)?;
+                let content = self.render_with_preserved_whitespace(url, dom, id, ctx)?;
                 Ok(format!("`{content}`"))
             }
-            _ => render_children(dom, id, ctx),
+            _ => render_children(url, dom, id, ctx),
         }
     }
 }
@@ -257,7 +286,7 @@ mod tests {
     fn test_inline_code_elements(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render inline code");
         assert_eq!(result, expected);
     }
@@ -292,7 +321,7 @@ mod tests {
     fn test_pre_code_blocks(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render code block");
         assert_eq!(result, expected);
     }
@@ -322,7 +351,7 @@ mod tests {
     fn test_multiple_classes_language_extraction(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render code block");
         assert_eq!(result, expected);
     }
@@ -344,7 +373,7 @@ mod tests {
     fn test_data_lang_attribute(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render code element");
         assert_eq!(result, expected);
     }
@@ -368,7 +397,7 @@ mod tests {
     fn test_complex_nested_code_frame(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render complex code frame");
         assert_eq!(result, expected);
     }
@@ -390,7 +419,7 @@ line2
     fn test_multiline_preservation(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render code element");
         assert_eq!(result, expected);
     }
@@ -406,7 +435,7 @@ line2
     fn test_empty_code(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render code element");
         assert_eq!(result, expected);
     }

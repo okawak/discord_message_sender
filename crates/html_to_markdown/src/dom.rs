@@ -1,3 +1,4 @@
+use crate::error::ConvertError;
 use html5ever::QualName;
 use std::collections::HashMap;
 
@@ -11,12 +12,6 @@ impl NodeId {
     }
     pub(crate) fn as_usize(self) -> usize {
         self.0
-    }
-
-    pub const INVALID: Self = Self(usize::MAX);
-
-    pub fn is_valid(self) -> bool {
-        self != Self::INVALID
     }
 }
 
@@ -67,6 +62,35 @@ impl Dom {
         }
     }
 
+    pub fn get_node(&self, id: NodeId) -> Result<&Node, ConvertError> {
+        self.node(id)
+            .ok_or_else(|| ConvertError::InvalidNode(format!("Node {id} not found")))
+    }
+
+    pub fn get_element_data(
+        &self,
+        id: NodeId,
+    ) -> Result<(&QualName, &HashMap<String, String>), ConvertError> {
+        match &self.get_node(id)?.data {
+            NodeData::Element { tag, attrs, .. } => Ok((tag, attrs)),
+            _ => Err(ConvertError::Unsupported(format!(
+                "Node {id} is not an element"
+            ))),
+        }
+    }
+
+    pub fn iter_children(&self, id: NodeId) -> Result<std::slice::Iter<NodeId>, ConvertError> {
+        Ok(self.get_node(id)?.children.iter())
+    }
+
+    pub fn node_exists(&self, id: NodeId) -> bool {
+        self.node(id).is_some()
+    }
+
+    pub fn get_parent(&self, id: NodeId) -> Result<Option<NodeId>, ConvertError> {
+        Ok(self.get_node(id)?.parent)
+    }
+
     pub fn create(&mut self, data: NodeData, parent: NodeId) -> NodeId {
         let id = self.create_without_parent(data);
         self.arena[id.as_usize()].parent = Some(parent);
@@ -85,18 +109,12 @@ impl Dom {
         id
     }
 
-    pub fn node(&self, id: NodeId) -> &Node {
-        if !id.is_valid() || id.as_usize() >= self.arena.len() {
-            panic!("Invalid NodeId: {id}");
-        }
-        &self.arena[id.as_usize()]
+    pub fn node(&self, id: NodeId) -> Option<&Node> {
+        self.arena.get(id.as_usize())
     }
 
-    pub fn node_mut(&mut self, id: NodeId) -> &mut Node {
-        if !id.is_valid() || id.as_usize() >= self.arena.len() {
-            panic!("Invalid NodeId: {id}");
-        }
-        &mut self.arena[id.as_usize()]
+    pub fn node_mut(&mut self, id: NodeId) -> Option<&mut Node> {
+        self.arena.get_mut(id.as_usize())
     }
 
     pub fn node_count(&self) -> usize {
@@ -104,7 +122,7 @@ impl Dom {
     }
 
     pub fn find_element_by_tag(&self, start_id: NodeId, tag_name: &str) -> Option<NodeId> {
-        let node = self.node(start_id);
+        let node = self.node(start_id)?;
 
         if let NodeData::Element { tag, .. } = &node.data {
             if tag.local.as_ref() == tag_name {
@@ -132,7 +150,9 @@ impl Dom {
         tag_name: &str,
         results: &mut Vec<NodeId>,
     ) {
-        let node = self.node(node_id);
+        let Some(node) = self.node(node_id) else {
+            return;
+        };
 
         if let NodeData::Element { tag, .. } = &node.data {
             if tag.local.as_ref() == tag_name {
@@ -146,21 +166,21 @@ impl Dom {
     }
 
     pub fn collect_text_content(&self, node_id: NodeId) -> String {
-        let mut text = String::new();
-        let node = self.node(node_id);
+        let Some(node) = self.node(node_id) else {
+            return String::new();
+        };
 
         match &node.data {
-            NodeData::Text(content) => {
-                text.push_str(content);
-            }
+            NodeData::Text(content) => content.clone(),
             NodeData::Element { .. } => {
+                let mut text = String::new();
                 for &child_id in &node.children {
                     text.push_str(&self.collect_text_content(child_id));
                 }
+                text
             }
-            _ => {}
+            _ => String::new(),
         }
-        text
     }
 
     pub fn find_elements_with_attribute(
@@ -181,7 +201,9 @@ impl Dom {
         attr_value: Option<&str>,
         results: &mut Vec<NodeId>,
     ) {
-        let node = self.node(node_id);
+        let Some(node) = self.node(node_id) else {
+            return;
+        };
 
         if let NodeData::Element { attrs, .. } = &node.data {
             if let Some(value) = attrs.get(attr_name) {

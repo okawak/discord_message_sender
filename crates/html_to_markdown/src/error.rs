@@ -6,6 +6,9 @@ pub enum ConvertError {
     #[error("HTML parse error: {0}")]
     Parse(String),
 
+    #[error("Invalid node: {0}")]
+    InvalidNode(String),
+
     #[error("Unsupported tag: <{0}>")]
     Unsupported(String),
 

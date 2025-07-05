@@ -4,29 +4,70 @@ pub mod heading;
 pub mod ignored_tags;
 pub mod inline;
 pub mod list;
+pub mod media;
 pub mod paragraph;
 pub mod table;
 
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::normalize_html_text,
+    utils::{cow_to_string, normalize_html_text},
 };
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::LazyLock;
 
 #[derive(Debug, Default)]
 pub struct Context {
+    pub inline_depth: usize,
+    /// Depth of nested lists, used for rendering list items
     pub list_depth: usize,
     pub in_table: bool,
     pub preserve_whitespace: bool,
     pub in_heading: bool,
+    pub link_info: Option<LinkInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LinkInfo {
+    pub url: String,
+    pub target_priority: Vec<&'static str>,
+    pub applied: RefCell<bool>,
+}
+
+impl LinkInfo {
+    pub fn new(url: String) -> Self {
+        Self {
+            url,
+            target_priority: vec!["img", "h1", "h2", "h3", "h4", "h5", "h6", "p", "span"],
+            applied: RefCell::new(false),
+        }
+    }
+
+    pub fn is_target_candidate(&self, tag_name: &str) -> bool {
+        self.target_priority.contains(&tag_name)
+    }
+
+    pub fn try_apply_link(&self, tag_name: &str) -> bool {
+        if !*self.applied.borrow() && self.is_target_candidate(tag_name) {
+            *self.applied.borrow_mut() = true;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 pub trait Renderer: Send + Sync {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool;
-    fn render(&self, dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError>;
+    fn render(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError>;
 }
 
 /// Number of renderers to preallocate in the map.
@@ -46,12 +87,17 @@ static TAG_RENDERERS: LazyLock<HashMap<&'static str, &'static dyn Renderer>> =
         map.insert("p", &paragraph::PARAGRAPH as &'static dyn Renderer);
 
         let inline = &inline::INLINE as &'static dyn Renderer;
-        // span, del, ins, mark, sub, sup and small are not transformed to markdown
+        // <span>, <del>, <ins>, <mark>, <sub>, <sup> and <small> are not transformed to markdown
+        // (text is preserved as is)
         for tag in [
-            "strong", "b", "em", "i", "a", "span", "br", "del", "ins", "mark", "sub", "sup",
-            "small", "img",
+            "strong", "b", "em", "i", "span", "br", "del", "ins", "mark", "sub", "sup", "small",
         ] {
             map.insert(tag, inline);
+        }
+
+        let media = &media::MEDIA as &'static dyn Renderer;
+        for tag in ["a", "img", "audio", "video"] {
+            map.insert(tag, media);
         }
 
         let code_block = &code_block::CODE_BLOCK as &'static dyn Renderer;
@@ -85,12 +131,21 @@ static GENERIC_RENDERERS: LazyLock<Vec<&'static dyn Renderer>> = LazyLock::new(|
     ]
 });
 
-pub fn render_node(dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
+pub fn render_node(
+    url: &str,
+    dom: &Dom,
+    id: NodeId,
+    ctx: &mut Context,
+) -> Result<String, ConvertError> {
+    let Some(node) = dom.node(id) else {
+        return Err(ConvertError::InvalidNode(format!("Node {id} not found")));
+    };
+
     // Check if the node is an element and has a registered renderer
-    if let NodeData::Element { tag, .. } = &dom.node(id).data {
+    if let NodeData::Element { tag, .. } = &node.data {
         if let Some(&renderer) = TAG_RENDERERS.get(tag.local.as_ref()) {
             if renderer.matches(dom, id) {
-                return renderer.render(dom, id, ctx);
+                return renderer.render(url, dom, id, ctx);
             }
         }
     }
@@ -98,23 +153,31 @@ pub fn render_node(dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, C
     // generic renderers: check all registered renderers
     for &renderer in GENERIC_RENDERERS.iter() {
         if renderer.matches(dom, id) {
-            return renderer.render(dom, id, ctx);
+            return renderer.render(url, dom, id, ctx);
         }
     }
 
     // default case: render children recursively
-    render_children(dom, id, ctx)
+    render_children(url, dom, id, ctx)
 }
 
-pub fn render_children(dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
-    match &dom.node(id).data {
+pub fn render_children(
+    url: &str,
+    dom: &Dom,
+    id: NodeId,
+    ctx: &mut Context,
+) -> Result<String, ConvertError> {
+    let Some(node) = dom.node(id) else {
+        return Err(ConvertError::InvalidNode(format!("Node {id} not found")));
+    };
+    match &node.data {
         NodeData::Element { .. } => {
-            let children = &dom.node(id).children;
+            let children = &node.children;
 
             let mut result = String::with_capacity(children.len() * CHARS_PER_CHILD);
 
             for &child in children {
-                result.push_str(&render_node(dom, child, ctx)?);
+                result.push_str(&render_node(url, dom, child, ctx)?);
             }
             Ok(result)
         }
@@ -122,15 +185,17 @@ pub fn render_children(dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<Strin
             if ctx.preserve_whitespace {
                 Ok(text.clone())
             } else {
-                Ok(normalize_html_text(text).unwrap_or_default())
+                Ok(normalize_html_text(text, ctx.inline_depth > 0)
+                    .map(cow_to_string)
+                    .unwrap_or_default())
             }
         }
         NodeData::Document => {
-            let children = &dom.node(id).children;
+            let children = &node.children;
             let mut result = String::with_capacity(children.len() * CHARS_PER_CHILD);
 
             for &child in children {
-                result.push_str(&render_node(dom, child, ctx)?);
+                result.push_str(&render_node(url, dom, child, ctx)?);
             }
             Ok(result)
         }

@@ -8,53 +8,49 @@ pub struct Inline;
 
 impl Renderer for Inline {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
+        let Some(node) = dom.node(id) else {
+            return false;
+        };
+
+        if let NodeData::Element { tag, .. } = &node.data {
             matches!(
                 tag.local.as_ref(),
-                "strong" | "b" | "em" | "i" | "a" | "span" | "br" | "img"
+                "strong" | "b" | "em" | "i" | "span" | "br"
             )
         } else {
             false
         }
     }
 
-    fn render(&self, dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
-        if let NodeData::Element { tag, attrs, .. } = &dom.node(id).data {
-            match tag.local.as_ref() {
-                "strong" | "b" => {
-                    let content = render_children(dom, id, ctx)?;
-                    Ok(format!("**{content}**"))
-                }
-                "em" | "i" => {
-                    let content = render_children(dom, id, ctx)?;
-                    Ok(format!("*{content}*"))
-                }
-                "a" => {
-                    let content = render_children(dom, id, ctx)?;
-                    if let Some(href) = attrs.get("href") {
-                        Ok(format!("[{content}]({href})"))
-                    } else {
-                        Ok(content)
-                    }
-                }
-                "br" => Ok("\n".to_string()),
-                "img" => {
-                    if ctx.in_heading {
-                        if let Some(alt) = attrs.get("alt") {
-                            Ok(alt.clone())
-                        } else {
-                            Ok(String::new())
-                        }
-                    } else {
-                        let alt = attrs.get("alt").unwrap_or(&String::new()).clone();
-                        let src = attrs.get("src").unwrap_or(&String::new()).clone();
-                        Ok(format!("![{alt}]({src})"))
-                    }
-                }
-                _ => render_children(dom, id, ctx),
+    fn render(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let (tag, _) = dom.get_element_data(id)?;
+
+        match tag.local.as_ref() {
+            "strong" | "b" => {
+                ctx.inline_depth += 1;
+                let content = render_children(url, dom, id, ctx)?;
+                ctx.inline_depth -= 1;
+                Ok(format!("**{content}**"))
             }
-        } else {
-            render_children(dom, id, ctx)
+            "em" | "i" => {
+                ctx.inline_depth += 1;
+                let content = render_children(url, dom, id, ctx)?;
+                ctx.inline_depth -= 1;
+                Ok(format!("*{content}*"))
+            }
+            "br" => Ok("\n".to_string()),
+            _ => {
+                ctx.inline_depth += 1;
+                let content = render_children(url, dom, id, ctx)?;
+                ctx.inline_depth -= 1;
+                Ok(content)
+            }
         }
     }
 }

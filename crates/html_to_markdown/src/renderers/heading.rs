@@ -2,52 +2,99 @@ use super::{Context, Renderer, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::normalize_heading_content,
+    utils::{cow_to_string, normalize_heading_content},
 };
 
 pub struct Heading;
 
+impl Heading {
+    fn get_heading_level(tag_name: &str) -> &'static str {
+        match tag_name {
+            "h1" => "#",
+            "h2" => "##",
+            "h3" => "###",
+            "h4" => "####",
+            "h5" => "#####",
+            "h6" => "######",
+            _ => "#",
+        }
+    }
+
+    fn render_with_context(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let old_in_heading = ctx.in_heading;
+        let old_preserve_whitespace = ctx.preserve_whitespace;
+        let old_inline_depth = ctx.inline_depth;
+
+        ctx.in_heading = true;
+        ctx.preserve_whitespace = true;
+        ctx.inline_depth = 1;
+
+        let content = render_children(url, dom, id, ctx)?;
+
+        ctx.in_heading = old_in_heading;
+        ctx.preserve_whitespace = old_preserve_whitespace;
+        ctx.inline_depth = old_inline_depth;
+
+        Ok(cow_to_string(normalize_heading_content(&content)))
+    }
+
+    fn format_heading(&self, content: &str, level: &str, link_url: Option<&str>) -> String {
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+
+        match link_url {
+            Some(url) => format!("{level} [{trimmed}]({url})\n\n"),
+            None => format!("{level} {trimmed}\n\n"),
+        }
+    }
+}
+
 impl Renderer for Heading {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
+        let Some(node) = dom.node(id) else {
+            return false;
+        };
+
+        if let NodeData::Element { tag, .. } = &node.data {
             matches!(tag.local.as_ref(), "h1" | "h2" | "h3" | "h4" | "h5" | "h6")
         } else {
             false
         }
     }
 
-    fn render(&self, dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
-        let old_preserve = ctx.preserve_whitespace;
-        let old_in_heading = ctx.in_heading;
+    fn render(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let content = self.render_with_context(url, dom, id, ctx)?;
 
-        ctx.preserve_whitespace = true; // Preserve whitespace for headings
-        ctx.in_heading = true; // Process in heading context
-
-        let content = render_children(dom, id, ctx)?;
-
-        ctx.preserve_whitespace = old_preserve; // Restore original setting
-        ctx.in_heading = old_in_heading;
-
-        let normalized_content = normalize_heading_content(&content);
-
-        if normalized_content.trim().is_empty() {
+        if content.trim().is_empty() {
             return Ok(String::new());
         }
 
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
-            let level = match tag.local.as_ref() {
-                "h1" => "#",
-                "h2" => "##",
-                "h3" => "###",
-                "h4" => "####",
-                "h5" => "#####",
-                "h6" => "######",
-                _ => "#",
-            };
-            Ok(format!("{} {}\n\n", level, normalized_content.trim()))
-        } else {
-            Ok(normalized_content)
-        }
+        let (tag, _) = dom.get_element_data(id)?;
+        let tag_name = tag.local.as_ref();
+        let level = Self::get_heading_level(tag_name);
+
+        // Check for links in the heading content
+        let link_url = ctx
+            .link_info
+            .as_ref()
+            .filter(|link_info| link_info.try_apply_link(tag_name))
+            .map(|link_info| link_info.url.as_str());
+
+        Ok(self.format_heading(&content, level, link_url))
     }
 }
 
@@ -72,7 +119,7 @@ mod tests {
     fn test_basic_headings(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -86,7 +133,7 @@ mod tests {
     fn test_whitespace_normalization(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -100,7 +147,7 @@ mod tests {
     fn test_empty_headings(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -124,7 +171,7 @@ mod tests {
     fn test_nested_formatting(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -140,17 +187,27 @@ mod tests {
         "# [Blog Post Title](/blog/post-1)\n\n"
     )]
     #[case(
-        "<h2>Section with <a href=\"#anchor\">Internal Link</a></h2>",
-        "## Section with [Internal Link](#anchor)\n\n"
-    )]
-    #[case(
         "<h1>Before <a href=\"/path\">Link</a> After</h1>",
         "# Before [Link](/path) After\n\n"
     )]
     fn test_headings_with_links(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
+            .expect("Failed to render heading");
+        assert_eq!(result, expected);
+    }
+
+    /// anchor links in headings (anchor links are ignored in rendering)
+    #[rstest]
+    #[case(
+        "<h2>Section with <a href=\"#anchor\">Internal Link</a></h2>",
+        "## Section with Internal Link\n\n"
+    )]
+    fn test_headings_with_anchor_links(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -172,7 +229,7 @@ mod tests {
     fn test_complex_nested_structures(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -189,7 +246,7 @@ mod tests {
     fn test_html_entities_and_special_chars(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -209,7 +266,7 @@ mod tests {
     fn test_headings_with_attributes(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -235,7 +292,7 @@ mod tests {
     fn test_real_world_heading_structures(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -247,7 +304,7 @@ mod tests {
     fn test_headings_with_line_breaks(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -260,7 +317,7 @@ mod tests {
     fn test_headings_with_ignored_content(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }
@@ -274,7 +331,7 @@ mod tests {
     fn test_long_headings(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
-        let result = renderers::render_node(&dom, dom.document, &mut context)
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
             .expect("Failed to render heading");
         assert_eq!(result, expected);
     }

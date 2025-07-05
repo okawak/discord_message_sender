@@ -1,6 +1,6 @@
 use crate::dom::{Dom, NodeData};
 use crate::frontmatters::FrontMatter;
-use crate::utils::normalize_html_text;
+use crate::utils::{cow_to_string, normalize_html_text};
 
 pub struct TitleExtractor;
 
@@ -9,7 +9,7 @@ impl FrontMatter for TitleExtractor {
         "title"
     }
 
-    fn extract(&self, dom: &Dom) -> Option<String> {
+    fn extract(&self, _url: &str, dom: &Dom) -> Option<String> {
         let extractors = [
             extract_head_title,      // 1. <head><title>
             extract_meta_name_title, // 2. <meta name="title">
@@ -35,17 +35,19 @@ fn extract_head_title(dom: &Dom) -> Option<String> {
     let title_id = dom.find_element_by_tag(head_id, "title")?;
 
     let text = dom.collect_text_content(title_id);
-    normalize_html_text(&text)
+    normalize_html_text(&text, false).map(cow_to_string)
 }
 
 fn extract_meta_content(dom: &Dom, attr_name: &str, attr_value: &str) -> Option<String> {
     for meta_id in dom.find_all_meta() {
-        let node = dom.node(meta_id);
+        let Some(node) = dom.node(meta_id) else {
+            continue;
+        };
 
         if let NodeData::Element { attrs, .. } = &node.data {
             if let (Some(value), Some(content)) = (attrs.get(attr_name), attrs.get("content")) {
                 if value == attr_value {
-                    return normalize_html_text(content);
+                    return normalize_html_text(content, false).map(cow_to_string);
                 }
             }
         }
@@ -70,7 +72,7 @@ fn extract_first_heading(dom: &Dom, tag: &str) -> Option<String> {
     let heading_id = dom.find_element_by_tag(body_id, tag)?;
 
     let text = dom.collect_text_content(heading_id);
-    normalize_html_text(&text)
+    normalize_html_text(&text, false).map(cow_to_string)
 }
 
 pub static EXTRACTOR: TitleExtractor = TitleExtractor;
@@ -118,7 +120,7 @@ mod tests {
     #[case(r#"<html><head><title>  </title></head></html>"#, None)] // Empty title
     fn test_title_extraction(#[case] html: &str, #[case] expected: Option<&str>) {
         let dom = parser::parse_html(html).unwrap();
-        let result = EXTRACTOR.extract(&dom);
+        let result = EXTRACTOR.extract("", &dom);
 
         assert_eq!(result, expected.map(|s| s.to_string()));
     }
@@ -173,7 +175,7 @@ mod tests {
     )]
     fn test_priority_order(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).unwrap();
-        let result = EXTRACTOR.extract(&dom);
+        let result = EXTRACTOR.extract("", &dom);
 
         assert_eq!(result, Some(expected.to_string()));
     }
@@ -188,7 +190,7 @@ mod tests {
     fn test_heading_fallback_order(#[case] tag: &str, #[case] expected: &str) {
         let html = format!(r#"<html><body><p>Content</p><{tag}>{expected}</{tag}></body></html>"#);
         let dom = parser::parse_html(&html).unwrap();
-        let result = EXTRACTOR.extract(&dom);
+        let result = EXTRACTOR.extract("", &dom);
 
         assert_eq!(result, Some(expected.to_string()));
     }
@@ -211,7 +213,7 @@ mod tests {
     )]
     fn test_whitespace_normalization(#[case] html: &str, #[case] expected: Option<&str>) {
         let dom = parser::parse_html(html).unwrap();
-        let result = EXTRACTOR.extract(&dom);
+        let result = EXTRACTOR.extract("", &dom);
         assert_eq!(result, expected.map(|s| s.to_string()));
     }
 }

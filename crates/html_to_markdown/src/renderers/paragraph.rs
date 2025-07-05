@@ -8,20 +8,35 @@ pub struct Paragraph;
 
 impl Renderer for Paragraph {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
-        if let NodeData::Element { tag, .. } = &dom.node(id).data {
+        let Some(node) = dom.node(id) else {
+            return false;
+        };
+
+        if let NodeData::Element { tag, .. } = &node.data {
             tag.local.as_ref() == "p"
         } else {
             false
         }
     }
 
-    fn render(&self, dom: &Dom, id: NodeId, ctx: &mut Context) -> Result<String, ConvertError> {
-        let content = render_children(dom, id, ctx)?;
+    fn render(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let old_inline_depth = ctx.inline_depth;
+        ctx.inline_depth = 1;
+
+        let content = render_children(url, dom, id, ctx)?;
+
+        ctx.inline_depth = old_inline_depth;
+
         if content.trim().is_empty() {
-            Ok(String::new())
-        } else {
-            Ok(format!("{}\n\n", content.trim()))
+            return Ok(String::new());
         }
+        Ok(format!("{}\n\n", content.trim()))
     }
 }
 
