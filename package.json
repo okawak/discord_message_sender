@@ -11,7 +11,7 @@
     "dev:build": "bun run wasm:build && bunx vite build --mode development",
     "build": "bun run wasm:build && bunx vite build --mode production && cpx manifest.json dist",
     "clean": "cargo clean && rimraf dist dev pkg main.js main.js.map *.wasm",
-    "check": "bunx biome check",
+    "check": "bunx biome check && cargo clippy",
     "check:fix": "bunx biome check --write",
     "type-check": "tsc --noEmit",
     "test": "cargo test --release"
@@ -19,14 +19,14 @@
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",
     "@rollup/plugin-wasm": "^6.2.2",
-    "@types/bun": "^1.2.17",
+    "@types/bun": "^1.2.18",
     "cpx": "^1.5.0",
     "mkdirp": "^3.0.1",
     "obsidian": "^1.8.7",
     "rimraf": "^6.0.1",
     "rollup-plugin-copy": "^3.5.0",
     "typescript": "^5.8.3",
-    "vite": "^7.0.0"
+    "vite": "^7.0.2"
   },
   "dependencies": {},
   "engines": {

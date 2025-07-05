@@ -21,6 +21,7 @@ pub struct Context {
     pub list_depth: usize,
     pub in_table: bool,
     pub preserve_whitespace: bool,
+    pub in_heading: bool,
 }
 
 pub trait Renderer: Send + Sync {
@@ -45,8 +46,10 @@ static TAG_RENDERERS: LazyLock<HashMap<&'static str, &'static dyn Renderer>> =
         map.insert("p", &paragraph::PARAGRAPH as &'static dyn Renderer);
 
         let inline = &inline::INLINE as &'static dyn Renderer;
+        // span, del, ins, mark, sub, sup and small are not transformed to markdown
         for tag in [
-            "strong", "b", "em", "i", "a", "span", "del", "ins", "mark", "sub", "sup",
+            "strong", "b", "em", "i", "a", "span", "br", "del", "ins", "mark", "sub", "sup",
+            "small", "img",
         ] {
             map.insert(tag, inline);
         }

@@ -11,7 +11,7 @@ impl Renderer for Inline {
         if let NodeData::Element { tag, .. } = &dom.node(id).data {
             matches!(
                 tag.local.as_ref(),
-                "strong" | "b" | "em" | "i" | "a" | "span" | "br"
+                "strong" | "b" | "em" | "i" | "a" | "span" | "br" | "img"
             )
         } else {
             false
@@ -38,6 +38,19 @@ impl Renderer for Inline {
                     }
                 }
                 "br" => Ok("\n".to_string()),
+                "img" => {
+                    if ctx.in_heading {
+                        if let Some(alt) = attrs.get("alt") {
+                            Ok(alt.clone())
+                        } else {
+                            Ok(String::new())
+                        }
+                    } else {
+                        let alt = attrs.get("alt").unwrap_or(&String::new()).clone();
+                        let src = attrs.get("src").unwrap_or(&String::new()).clone();
+                        Ok(format!("![{alt}]({src})"))
+                    }
+                }
                 _ => render_children(dom, id, ctx),
             }
         } else {
