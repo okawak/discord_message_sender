@@ -9,8 +9,7 @@ license-file.workspace = true
 
 [dependencies]
 thiserror = "2"
-html5ever = "0.33"
-url = "2"
+html5ever = "0.35"
 
 [dev-dependencies]
 pretty_assertions = "1"

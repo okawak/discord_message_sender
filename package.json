@@ -14,7 +14,7 @@
     "check": "bunx biome check && cargo clippy",
     "check:fix": "bunx biome check --write",
     "type-check": "tsc --noEmit",
-    "test": "cargo test --release"
+    "test": "cargo test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",

@@ -9,6 +9,9 @@ pub enum ConvertError {
     #[error("Invalid node: {0}")]
     InvalidNode(String),
 
+    #[error("Invalid URL: {0}")]
+    InvalidUrl(String),
+
     #[error("Unsupported tag: <{0}>")]
     Unsupported(String),
 

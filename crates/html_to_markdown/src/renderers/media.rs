@@ -4,45 +4,129 @@ use crate::{
     error::ConvertError,
 };
 use std::collections::HashMap;
-use url::Url;
 
 pub struct Media;
 
 impl Media {
     /// Resolves a relative URL to an absolute URL using the base URL
-    fn resolve_url(&self, base_url: &str, url: &str) -> String {
-        if url.starts_with("https://") {
-            return url.to_string();
+    fn resolve_url(&self, base_url: &str, url: &str) -> Result<String, ConvertError> {
+        if url.starts_with("https://")
+            || url.starts_with("mailto:")
+            || url.starts_with("tel:")
+            || url.starts_with("ftp:")
+        {
+            return Ok(url.to_string());
         }
 
         let clean_base = base_url.split('#').next().unwrap_or(base_url);
         let clean_base = clean_base.split('?').next().unwrap_or(clean_base);
 
         // extension check
-        let base_for_join = if clean_base.ends_with('/') || !self.has_file_extension(clean_base) {
-            if clean_base.ends_with('/') {
-                clean_base.to_string()
-            } else {
-                format!("{clean_base}/")
-            }
-        } else {
+        let base_for_join = if self.has_file_extension(clean_base) {
+            let trimmed = clean_base
+                .rsplit_once('/')
+                .map(|(base, _)| format!("{base}/"))
+                .ok_or_else(|| {
+                    ConvertError::InvalidUrl(format!("File extension seems invalid {clean_base}"))
+                })?;
+            trimmed.to_string()
+        } else if clean_base.ends_with('/') {
             clean_base.to_string()
+        } else {
+            format!("{clean_base}/")
         };
 
-        match Url::parse(&base_for_join) {
-            Ok(base) => match base.join(url) {
-                Ok(resolved) => resolved.to_string(),
-                Err(_) => url.to_string(),
-            },
-            Err(_) => url.to_string(),
+        match self.url_join(&base_for_join, url) {
+            Ok(resolved) => Ok(resolved),
+            Err(_) => Ok(url.to_string()),
         }
     }
 
     fn has_file_extension(&self, url: &str) -> bool {
+        // https:// included at lest two slashes
+        if url.matches('/').count() <= 2 {
+            return false;
+        }
+
         url.split('/')
             .next_back()
             .map(|segment| segment.contains('.') && segment.split('.').count() > 1)
             .unwrap_or(false)
+    }
+
+    fn url_join(&self, base: &str, relative: &str) -> Result<String, ConvertError> {
+        let (host, path) = self.parse_url(base)?;
+
+        if relative.starts_with("/") {
+            Ok(format!("https://{host}{relative}"))
+        } else if relative.starts_with("./") {
+            let rel_path = relative.strip_prefix("./").ok_or_else(|| {
+                ConvertError::InvalidUrl(format!("Cannot strip ./ from {relative}"))
+            })?;
+            if path.ends_with('/') {
+                Ok(format!("https://{host}{path}{rel_path}"))
+            } else {
+                Ok(format!("https://{host}{path}/{rel_path}"))
+            }
+        } else if relative.starts_with("../") {
+            self.resolve_parent_path(&host, &path, relative)
+        } else if path.ends_with('/') {
+            Ok(format!("https://{host}{path}{relative}"))
+        } else {
+            Ok(format!("https://{host}{path}/{relative}"))
+        }
+    }
+
+    fn parse_url(&self, url: &str) -> Result<(String, String), ConvertError> {
+        if !url.starts_with("https://") {
+            return Err(ConvertError::InvalidUrl(format!(
+                "Not HTTPS protocol: {url}"
+            )));
+        }
+
+        let rest_url = url.strip_prefix("https://").ok_or_else(|| {
+            ConvertError::InvalidUrl(format!("Failed to strip https:// from {url}"))
+        })?;
+        let (host, path) = if let Some(slash_pos) = rest_url.find('/') {
+            (&rest_url[..slash_pos], &rest_url[slash_pos..])
+        } else {
+            (rest_url, "/")
+        };
+        Ok((host.to_string(), path.to_string()))
+    }
+
+    fn resolve_parent_path(
+        &self,
+        host: &str,
+        path: &str,
+        relative: &str,
+    ) -> Result<String, ConvertError> {
+        // split by '/' and collect as Vec
+        let mut path_parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let mut rel_parts: Vec<&str> = relative.split('/').collect();
+
+        while let Some(&part) = rel_parts.first() {
+            if part == ".." {
+                if !path_parts.is_empty() {
+                    path_parts.pop();
+                }
+                rel_parts.remove(0);
+            } else if part == "." {
+                rel_parts.remove(0);
+            } else {
+                break;
+            }
+        }
+
+        path_parts.extend(rel_parts.iter().filter(|s| !s.is_empty()));
+
+        let final_path = if path_parts.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{}", path_parts.join("/"))
+        };
+
+        Ok(format!("https://{host}{final_path}"))
     }
 
     /// Validates if the URL is safe to include in markdown
@@ -145,7 +229,7 @@ impl Renderer for Media {
 
                 if let Some(href) = attrs.get("href") {
                     if self.is_safe_url(href) {
-                        let resolved_url = self.resolve_url(url, href);
+                        let resolved_url = self.resolve_url(url, href)?;
 
                         // in case of complex links, like bookmark, example:
                         // <a href="https://example.com/path?query#fragment">
@@ -182,7 +266,7 @@ impl Renderer for Media {
                     && link_info.try_apply_link("img")
                 {
                     if self.is_safe_url(&src) {
-                        let resolved_src = self.resolve_url(url, &src);
+                        let resolved_src = self.resolve_url(url, &src)?;
                         return Ok(format!(
                             "[![{alt}]({resolved_src})]({})\n\n",
                             &link_info.url
@@ -194,7 +278,7 @@ impl Renderer for Media {
 
                 // normal process
                 if self.is_safe_url(&src) {
-                    let resolved_src = self.resolve_url(url, &src);
+                    let resolved_src = self.resolve_url(url, &src)?;
                     Ok(format!("![{alt}]({resolved_src})\n\n"))
                 } else {
                     Ok(format!("{alt}\n\n"))
@@ -242,13 +326,18 @@ mod tests {
         "/from/root/index.html",
         "https://blog.example.com/from/root/index.html"
     )]
+    #[case(
+        "https://blog.example.com/file/index.html",
+        "/root/index.html",
+        "https://blog.example.com/root/index.html"
+    )]
     fn test_root_relative_urls(
         #[case] base_url: &str,
         #[case] relative_url: &str,
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, relative_url), expected);
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// relative URL path test
@@ -273,13 +362,18 @@ mod tests {
         "images/icon.gif",
         "https://example.com/category/subcategory/images/icon.gif"
     )]
+    #[case(
+        "https://example.com/category/subcategory/index.html",
+        "images/icon.gif",
+        "https://example.com/category/subcategory/images/icon.gif"
+    )]
     fn test_relative_urls_from_subpages(
         #[case] base_url: &str,
         #[case] relative_url: &str,
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, relative_url), expected);
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// relative URL from current directory test
@@ -294,13 +388,18 @@ mod tests {
         "./assets/diagram.png",
         "https://example.com/docs/assets/diagram.png"
     )]
+    #[case(
+        "https://example.com/docs/index.html",
+        "./assets/diagram.png",
+        "https://example.com/docs/assets/diagram.png"
+    )]
     fn test_current_directory_relative_urls(
         #[case] base_url: &str,
         #[case] relative_url: &str,
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, relative_url), expected);
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// upstream relative URL test
@@ -325,13 +424,18 @@ mod tests {
         "../../../root.jpg",
         "https://example.com/root.jpg"
     )]
+    #[case(
+        "https://example.com/a/b/index.html",
+        "../c/root.jpg",
+        "https://example.com/a/c/root.jpg"
+    )]
     fn test_parent_directory_relative_urls(
         #[case] base_url: &str,
         #[case] relative_url: &str,
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, relative_url), expected);
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// absolute URL passthrough test
@@ -352,7 +456,7 @@ mod tests {
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, absolute_url), expected);
+        assert_eq!(media.resolve_url(base_url, absolute_url).unwrap(), expected);
     }
 
     /// special schemes test
@@ -370,7 +474,7 @@ mod tests {
     )]
     fn test_special_schemes(#[case] base_url: &str, #[case] url: &str, #[case] expected: &str) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, url), expected);
+        assert_eq!(media.resolve_url(base_url, url).unwrap(), expected);
     }
 
     /// query parameters and fragments test
@@ -396,7 +500,7 @@ mod tests {
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, relative_url), expected);
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// file-based relative URLs test
@@ -422,7 +526,7 @@ mod tests {
         #[case] expected: &str,
     ) {
         let media = Media;
-        assert_eq!(media.resolve_url(base_url, relative_url), expected);
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// anchor links test
