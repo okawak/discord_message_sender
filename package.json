@@ -1,6 +1,6 @@
 {
   "name": "discord-message-sender",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Send messages to Obsidian from Discord.",
   "type": "module",
   "private": true,
