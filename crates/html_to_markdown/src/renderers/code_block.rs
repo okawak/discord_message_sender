@@ -69,10 +69,15 @@ static SUPPORTED_LANGUAGES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 pub struct CodeBlock;
 
 impl CodeBlock {
-    fn create_code_block(&self, content: &str, language: Option<String>) -> String {
+    fn create_code_block(&self, content: &str, language: Option<String>, ctx: &Context) -> String {
         let capacity = content.len() + language.as_ref().map_or(0, |l| l.len()) + 10; // "```", newlines, etc.
 
         let mut result = String::with_capacity(capacity);
+
+        // Add a newline before the code block if we are in a list context
+        if ctx.list_depth > 0 {
+            result.push_str("\n\n");
+        }
 
         result.push_str("```");
         if let Some(lang) = &language {
@@ -84,6 +89,7 @@ impl CodeBlock {
             result.push('\n');
         }
         result.push_str("```\n\n");
+
         result
     }
 
@@ -244,14 +250,14 @@ impl Renderer for CodeBlock {
         if self.is_code_frame(attrs) || self.has_code_lang_attribute(attrs) {
             let language = self.extract_language(dom, id);
             let code_content = Self::find_code_content(dom, id)?;
-            return Ok(self.create_code_block(&code_content, language));
+            return Ok(self.create_code_block(&code_content, language, ctx));
         }
 
         match tag.local.as_ref() {
             "pre" => {
                 let language = self.extract_language(dom, id);
                 let content = self.render_with_preserved_whitespace(url, dom, id, ctx)?;
-                Ok(self.create_code_block(&content, language))
+                Ok(self.create_code_block(&content, language, ctx))
             }
             "code" => {
                 // inline code
@@ -270,6 +276,7 @@ mod tests {
     use super::*;
     use crate::parser;
     use crate::renderers;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
@@ -293,30 +300,67 @@ mod tests {
 
     /// code block tests
     #[rstest]
-    #[case(r#"<pre><code>simple code</code></pre>"#, "```\nsimple code\n```\n\n")]
+    #[case(r#"<pre><code>simple code</code></pre>"#,
+        indoc! {r#"
+            ```
+            simple code
+            ```
+
+            "#}
+    )]
     #[case(
         r#"<pre><code class="language-rust">fn main() {}</code></pre>"#,
-        "```rust\nfn main() {}\n```\n\n"
+        indoc! {r#"
+            ```rust
+            fn main() {}
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="lang-python">print("hello")</code></pre>"#,
-        "```python\nprint(\"hello\")\n```\n\n"
+        indoc! {r#"
+            ```python
+            print("hello")
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="highlight-javascript">console.log();</code></pre>"#,
-        "```javascript\nconsole.log();\n```\n\n"
+        indoc! {r#"
+            ```javascript
+            console.log();
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="rust">let x = 42;</code></pre>"#,
-        "```rust\nlet x = 42;\n```\n\n"
+        indoc! {r#"
+            ```rust
+            let x = 42;
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="csharp">var name = "test";</code></pre>"#,
-        "```csharp\nvar name = \"test\";\n```\n\n"
+        indoc! {r#"
+            ```csharp
+            var name = "test";
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="unknown-language">some code</code></pre>"#,
-        "```\nsome code\n```\n\n"
+        indoc! {r#"
+            ```
+            some code
+            ```
+
+            "#}
     )]
     fn test_pre_code_blocks(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
@@ -330,23 +374,48 @@ mod tests {
     #[rstest]
     #[case(
         r#"<pre><code class="hljs language-rust syntax-highlighting">fn main() {}</code></pre>"#,
-        "```rust\nfn main() {}\n```\n\n"
+        indoc! {r#"
+            ```rust
+            fn main() {}
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="prettyprint lang-python linenums">print("hello")</code></pre>"#,
-        "```python\nprint(\"hello\")\n```\n\n"
+        indoc! {r#"
+            ```python
+            print("hello")
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="highlight highlight-javascript syntax">console.log();</code></pre>"#,
-        "```javascript\nconsole.log();\n```\n\n"
+        indoc! {r#"
+            ```javascript
+            console.log();
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="code-block typescript syntax-ts">type T = string;</code></pre>"#,
-        "```typescript\ntype T = string;\n```\n\n"
+        indoc! {r#"
+            ```typescript
+            type T = string;
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="styled-code syntax-highlighted">no language</code></pre>"#,
-        "```\nno language\n```\n\n"
+        indoc! {r#"
+            ```
+            no language
+            ```
+
+            "#}
     )]
     fn test_multiple_classes_language_extraction(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
@@ -360,15 +429,30 @@ mod tests {
     #[rstest]
     #[case(
         r#"<div data-lang="typescript"><pre><code>type T = string;</code></pre></div>"#,
-        "```typescript\ntype T = string;\n```\n\n"
+        indoc! {r#"
+            ```typescript
+            type T = string;
+            ```
+
+            "#}
     )]
     #[case(
         r#"<section data-lang="go"><pre><code>fmt.Println()</code></pre></section>"#,
-        "```go\nfmt.Println()\n```\n\n"
+        indoc! {r#"
+            ```go
+            fmt.Println()
+            ```
+
+            "#}
     )]
     #[case(
         r#"<article data-lang="java"><pre><code>System.out.println();</code></pre></article>"#,
-        "```java\nSystem.out.println();\n```\n\n"
+        indoc! {r#"
+            ```java
+            System.out.println();
+            ```
+
+            "#}
     )]
     fn test_data_lang_attribute(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
@@ -392,7 +476,12 @@ mod tests {
                 <pre><code><span class="kt">var</span> <span class="n">name</span> <span class="p">=</span> <span class="n">person</span><span class="p">?.</span><span class="n">name</span><span class="p">;</span></code></pre>
             </div>
         </div>"#,
-        "```csharp\nvar name = person?.name;\n```\n\n"
+        indoc! {r#"
+            ```csharp
+            var name = person?.name;
+            ```
+
+            "#}
     )]
     fn test_complex_nested_code_frame(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
@@ -408,13 +497,27 @@ mod tests {
         r#"<pre><code>line1
 line2
     indented</code></pre>"#,
-        "```\nline1\nline2\n    indented\n```\n\n"
+        indoc! {r#"
+            ```
+            line1
+            line2
+                indented
+            ```
+
+            "#}
     )]
     #[case(
         r#"<pre><code class="language-python">def hello():
     print("Hello, World!")
     return True</code></pre>"#,
-        "```python\ndef hello():\n    print(\"Hello, World!\")\n    return True\n```\n\n"
+        indoc! {r#"
+            ```python
+            def hello():
+                print("Hello, World!")
+                return True
+            ```
+
+            "#}
     )]
     fn test_multiline_preservation(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");

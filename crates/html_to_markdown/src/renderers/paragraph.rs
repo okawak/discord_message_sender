@@ -28,9 +28,7 @@ impl Renderer for Paragraph {
     ) -> Result<String, ConvertError> {
         let old_inline_depth = ctx.inline_depth;
         ctx.inline_depth = 1;
-
         let content = render_children(url, dom, id, ctx)?;
-
         ctx.inline_depth = old_inline_depth;
 
         if content.trim().is_empty() {

@@ -296,6 +296,7 @@ mod tests {
     use super::*;
     use crate::parser;
     use crate::renderers;
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
@@ -626,12 +627,20 @@ mod tests {
     #[case(
         r#"<article><p>Here's a diagram:</p><img src="/assets/architecture-diagram.png" alt="System Architecture"></article>"#,
         "https://docs.example.com/guide/introduction",
-        "Here's a diagram:\n\n![System Architecture](https://docs.example.com/assets/architecture-diagram.png)\n\n"
+        indoc! {r#"
+            Here's a diagram:
+
+            ![System Architecture](https://docs.example.com/assets/architecture-diagram.png)
+
+            "#}
     )]
     #[case(
         r#"<figure><img src="../images/chart.svg" alt="Performance Chart"><figcaption>Q4 Performance</figcaption></figure>"#,
         "https://example.com/reports/2024",
-        "![Performance Chart](https://example.com/reports/images/chart.svg)\n\nQ4 Performance"
+        indoc! {r#"
+            ![Performance Chart](https://example.com/reports/images/chart.svg)
+
+            Q4 Performance"#}
     )]
     fn test_article_images(#[case] html: &str, #[case] base_url: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
@@ -646,7 +655,10 @@ mod tests {
     #[case(
         r#"<img src="https://cdn.example.com/uploads/2024/header-image.jpg" alt="Header Image">"#,
         "https://blog.example.com/post/123",
-        "![Header Image](https://cdn.example.com/uploads/2024/header-image.jpg)\n\n"
+        indoc! {r#"
+            ![Header Image](https://cdn.example.com/uploads/2024/header-image.jpg)
+
+            "#}
     )]
     #[case(
         r#"<img src="https://images.unsplash.com/photo-1234567890" alt="Stock Photo">"#,
@@ -672,7 +684,14 @@ mod tests {
             </a>
         </div>"#,
         "https://shop.example.com/category/computers",
-        "[![Gaming Laptop](https://shop.example.com/images/products/laptop-thumb.jpg)](https://shop.example.com/products/laptop)\n\n### Gaming Laptop\n\nHigh-performance laptop for gaming\n\n"
+        indoc! {r#"
+            [![Gaming Laptop](https://shop.example.com/images/products/laptop-thumb.jpg)](https://shop.example.com/products/laptop)
+
+            ### Gaming Laptop
+
+            High-performance laptop for gaming
+
+            "#}
     )]
     #[case(
         r#"<div class="card-no-image">
@@ -682,7 +701,12 @@ mod tests {
             </a>
         </div>"#,
         "https://shop.example.com/category/computers",
-        "### [Gaming Laptop](https://shop.example.com/products/laptop)\n\nHigh-performance laptop for gaming\n\n"
+        indoc! {r#"
+            ### [Gaming Laptop](https://shop.example.com/products/laptop)
+
+            High-performance laptop for gaming
+
+            "#}
     )]
     fn test_complex_nested_media(
         #[case] html: &str,
@@ -782,7 +806,18 @@ mod tests {
             </main>
         </article>"#,
         "https://blog.example.com/posts/rust-web-dev",
-        "# How to Use Rust for Web Development\n\nPublished on [2024](https://blog.example.com/blog/2024)\n\nRust is becoming popular for web development. Here's why:\n\n![Rust Programming Language Logo](https://blog.example.com/posts/assets/rust-logo.png)\n\nFor more information, visit the [official Rust website](https://www.rust-lang.org/).\n\n"
+        indoc! {r#"
+            # How to Use Rust for Web Development
+
+            Published on [2024](https://blog.example.com/blog/2024)
+
+            Rust is becoming popular for web development. Here's why:
+
+            ![Rust Programming Language Logo](https://blog.example.com/posts/assets/rust-logo.png)
+
+            For more information, visit the [official Rust website](https://www.rust-lang.org/).
+
+            "#}
     )]
     fn test_realistic_blog_structure(
         #[case] html: &str,
