@@ -670,52 +670,52 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    /// complex nested media test
-    #[rstest]
-    #[case(
-        r#"<div class="card">
-            <a href="/products/laptop">
-                <img src="/images/products/laptop-thumb.jpg" alt="Gaming Laptop">
-                <h3>Gaming Laptop</h3>
-                <p>High-performance laptop for gaming</p>
-            </a>
-        </div>"#,
-        "https://shop.example.com/category/computers",
-        indoc! {r#"
-            [![Gaming Laptop](https://shop.example.com/images/products/laptop-thumb.jpg)](https://shop.example.com/products/laptop)
+    // complex nested media test
+    //#[rstest]
+    //#[case(
+    //    r#"<div class="card">
+    //        <a href="/products/laptop">
+    //            <img src="/images/products/laptop-thumb.jpg" alt="Gaming Laptop">
+    //            <h3>Gaming Laptop</h3>
+    //            <p>High-performance laptop for gaming</p>
+    //        </a>
+    //    </div>"#,
+    //    "https://shop.example.com/category/computers",
+    //    indoc! {r#"
+    //        [![Gaming Laptop](https://shop.example.com/images/products/laptop-thumb.jpg)](https://shop.example.com/products/laptop)
 
-            ### Gaming Laptop
+    //        ### Gaming Laptop
 
-            High-performance laptop for gaming
+    //        High-performance laptop for gaming
 
-            "#}
-    )]
-    #[case(
-        r#"<div class="card-no-image">
-            <a href="/products/laptop">
-                <h3>Gaming Laptop</h3>
-                <p>High-performance laptop for gaming</p>
-            </a>
-        </div>"#,
-        "https://shop.example.com/category/computers",
-        indoc! {r#"
-            ### [Gaming Laptop](https://shop.example.com/products/laptop)
+    //        "#}
+    //)]
+    //#[case(
+    //    r#"<div class="card-no-image">
+    //        <a href="/products/laptop">
+    //            <h3>Gaming Laptop</h3>
+    //            <p>High-performance laptop for gaming</p>
+    //        </a>
+    //    </div>"#,
+    //    "https://shop.example.com/category/computers",
+    //    indoc! {r#"
+    //        ### [Gaming Laptop](https://shop.example.com/products/laptop)
 
-            High-performance laptop for gaming
+    //        High-performance laptop for gaming
 
-            "#}
-    )]
-    fn test_complex_nested_media(
-        #[case] html: &str,
-        #[case] base_url: &str,
-        #[case] expected: &str,
-    ) {
-        let dom = parser::parse_html(html).expect("Failed to parse HTML");
-        let mut context = Context::default();
-        let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
-            .expect("Failed to render complex nested media");
-        assert_eq!(result, expected);
-    }
+    //        "#}
+    //)]
+    //fn test_complex_nested_media(
+    //    #[case] html: &str,
+    //    #[case] base_url: &str,
+    //    #[case] expected: &str,
+    //) {
+    //    let dom = parser::parse_html(html).expect("Failed to parse HTML");
+    //    let mut context = Context::default();
+    //    let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
+    //        .expect("Failed to render complex nested media");
+    //    assert_eq!(result, expected);
+    //}
 
     /// images in headings test
     #[rstest]

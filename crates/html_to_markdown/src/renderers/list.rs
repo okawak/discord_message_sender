@@ -4,33 +4,155 @@ use crate::{
     error::ConvertError,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ListType {
+    Unordered,
+    Ordered,
+}
+
+impl ListType {
+    const fn indent_size(self) -> usize {
+        match self {
+            ListType::Unordered => 2, // size of "- "
+            ListType::Ordered => 3,   // size of "1. "
+        }
+    }
+
+    fn from_tag(tag: &str) -> Option<Self> {
+        match tag {
+            "ul" => Some(ListType::Unordered),
+            "ol" => Some(ListType::Ordered),
+            _ => None,
+        }
+    }
+}
+
 pub struct List;
 
 impl List {
     fn is_ordered_list(&self, dom: &Dom, id: NodeId) -> bool {
-        let Ok(Some(parent_id)) = dom.get_parent(id) else {
+        dom.get_parent(id)
+            .ok()
+            .flatten()
+            .and_then(|parent_id| dom.get_element_data(parent_id).ok())
+            .map(|(tag, _)| tag.local.as_ref() == "ol")
+            .unwrap_or(false)
+    }
+
+    /// Check if this list item needs extra spacing before it
+    fn needs_spacing_before_item(&self, dom: &Dom, id: NodeId) -> bool {
+        let parent_id = match dom.get_parent(id).ok().flatten() {
+            Some(id) => id,
+            None => return false,
+        };
+
+        let children: Vec<_> = match dom.iter_children(parent_id) {
+            Ok(iter) => iter.collect(),
+            Err(_) => return false,
+        };
+
+        // Find the index of current item
+        let Some(current_index) = children.iter().position(|&&child_id| child_id == id) else {
             return false;
         };
 
-        if let Ok((parent_tag, _)) = dom.get_element_data(parent_id) {
-            parent_tag.local.as_ref() == "ol"
-        } else {
-            false
+        // If this is the first item, no spacing needed
+        if current_index == 0 {
+            return false;
         }
+
+        // Find the previous <li> element (skip text nodes)
+        for &&prev_child_id in children[..current_index].iter().rev() {
+            if let Some(prev_node) = dom.node(prev_child_id) {
+                if let NodeData::Element { tag, .. } = &prev_node.data {
+                    if tag.local.as_ref() == "li" {
+                        return self.previous_item_ends_with_block_element(dom, &prev_child_id);
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Check if the previous list item ends with a block element (p or pre)
+    fn previous_item_ends_with_block_element(&self, dom: &Dom, item_id: &NodeId) -> bool {
+        let children: Vec<_> = match dom.iter_children(*item_id) {
+            Ok(iter) => iter.collect(),
+            Err(_) => return false,
+        };
+
+        for &&child_id in children.iter().rev() {
+            let Some(child_node) = dom.node(child_id) else {
+                continue;
+            };
+
+            match &child_node.data {
+                NodeData::Element { tag, .. } => {
+                    return matches!(tag.local.as_ref(), "p" | "pre");
+                }
+                NodeData::Text(text) if !text.trim().is_empty() => {
+                    return false;
+                }
+                _ => continue,
+            }
+        }
+
+        false
+    }
+
+    // Custom rendering for list item children to handle proper spacing
+    fn render_list_item_children(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let mut result = String::new();
+        let indent = " ".repeat(ctx.list_depth);
+
+        let children: Vec<_> = dom.iter_children(id)?.collect();
+        let mut prev_was_code_block = false;
+
+        for (index, &child_id) in children.iter().enumerate() {
+            let child_result = super::render_node(url, dom, *child_id, ctx)?;
+
+            if prev_was_code_block && index > 0 && !child_result.trim().is_empty() {
+                result.push_str(&format!("\n\n{indent}"));
+            }
+
+            result.push_str(&child_result);
+
+            // フラグ更新
+            if let Some(child_node) = dom.node(*child_id) {
+                prev_was_code_block = match &child_node.data {
+                    NodeData::Element { tag, .. } => tag.local.as_ref() == "pre",
+                    NodeData::Text(text) => {
+                        if !text.trim().is_empty() {
+                            false
+                        } else {
+                            prev_was_code_block
+                        }
+                    }
+                    _ => false,
+                };
+            }
+        }
+
+        Ok(result)
     }
 }
 
 impl Renderer for List {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
-        let Some(node) = dom.node(id) else {
-            return false;
-        };
-
-        if let NodeData::Element { tag, .. } = &node.data {
-            matches!(tag.local.as_ref(), "ul" | "ol" | "li")
-        } else {
-            false
-        }
+        dom.node(id)
+            .and_then(|node| match &node.data {
+                NodeData::Element { tag, .. } => Some(tag.local.as_ref()),
+                _ => None,
+            })
+            .map(|tag| matches!(tag, "ul" | "ol" | "li"))
+            .unwrap_or(false)
     }
 
     fn render(
@@ -41,61 +163,68 @@ impl Renderer for List {
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
         let (tag, _) = dom.get_element_data(id)?;
+        let tag_name = tag.local.as_ref();
 
-        match tag.local.as_ref() {
-            "ul" => {
-                ctx.list_depth += 2; // "- " is 2 characters
-                let content = render_children(url, dom, id, ctx)?;
-                ctx.list_depth -= 2;
-
-                // Outermost list performs final formatting
-                if ctx.list_depth == 0 {
-                    if content.trim().is_empty() {
-                        Ok(String::new())
-                    } else {
-                        Ok(format!("{}\n\n", content.trim_end()))
-                    }
-                } else {
-                    // Nested list - add leading newline
-                    Ok(format!("\n{content}"))
-                }
-            }
-            "ol" => {
-                ctx.list_depth += 3; // "1. " is 3 characters
-                let content = render_children(url, dom, id, ctx)?;
-                ctx.list_depth -= 3;
-
-                // Outermost list performs final formatting
-                if ctx.list_depth == 0 {
-                    if content.trim().is_empty() {
-                        Ok(String::new())
-                    } else {
-                        Ok(format!("{}\n\n", content.trim_end()))
-                    }
-                } else {
-                    // Nested list - add leading newline
-                    Ok(format!("\n{content}"))
-                }
-            }
-            "li" => {
-                ctx.list_first_item = true;
-                let content = render_children(url, dom, id, ctx)?;
-
-                if content.trim().is_empty() {
-                    return Ok(String::new());
-                }
-
-                // list content should not have leading/trailing whitespace - saturating_sub(n)
-                let marker = if self.is_ordered_list(dom, id) {
-                    format!("{}1.", " ".repeat(ctx.list_depth.saturating_sub(3)))
-                } else {
-                    format!("{}-", " ".repeat(ctx.list_depth.saturating_sub(2)))
-                };
-
-                Ok(format!("{marker} {content}\n"))
-            }
+        match tag_name {
+            "ul" | "ol" => self.render_list(url, dom, id, ctx, tag_name),
+            "li" => self.render_list_item(url, dom, id, ctx),
             _ => render_children(url, dom, id, ctx),
         }
+    }
+}
+
+impl List {
+    fn render_list(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+        tag: &str,
+    ) -> Result<String, ConvertError> {
+        let list_type = ListType::from_tag(tag)
+            .ok_or_else(|| ConvertError::Unsupported(format!("Unknown list tag: {tag}")))?;
+
+        ctx.list_depth += list_type.indent_size();
+        let content = render_children(url, dom, id, ctx)?;
+        ctx.list_depth -= list_type.indent_size();
+
+        if ctx.list_depth == 0 {
+            if content.trim().is_empty() {
+                Ok(String::new())
+            } else {
+                Ok(format!("{}\n\n", content.trim_end()))
+            }
+        } else {
+            Ok(format!("\n{}", content.trim_end()))
+        }
+    }
+
+    fn render_list_item(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &mut Context,
+    ) -> Result<String, ConvertError> {
+        let needs_spacing = self.needs_spacing_before_item(dom, id);
+        let prefix = if needs_spacing { "\n" } else { "" };
+
+        ctx.list_first_item = true;
+        let content = self.render_list_item_children(url, dom, id, ctx)?;
+
+        if content.trim().is_empty() {
+            return Ok(String::new());
+        }
+
+        // list content should not have leading/trailing whitespace - saturating_sub(n)
+        let marker = if self.is_ordered_list(dom, id) {
+            format!("{}1.", " ".repeat(ctx.list_depth.saturating_sub(3)))
+        } else {
+            format!("{}-", " ".repeat(ctx.list_depth.saturating_sub(2)))
+        };
+
+        Ok(format!("{prefix}{marker} {content}\n"))
     }
 }
 
@@ -357,10 +486,9 @@ mod tests {
             "#}
     )]
     #[case(
-        "<ul><li>Before nested<ol><li>Ordered in unordered</li></ol>After nested</li></ul>",
+        "<ul><li>Before nested<ol><li>Ordered in unordered</li></ol><p>After nested</p></li></ul>",
         indoc! {r#"
             - Before nested
-
               1. Ordered in unordered
 
               After nested
@@ -405,6 +533,17 @@ mod tests {
                ```
 
             1. Configure the tool with your settings.
+
+            "#}
+    )]
+    #[case(
+        r#"<ol><li><p>Project setup:</p><div class="div-1"><div class="div-2"><pre><code class="language-bash">npm init -y</code></pre></div></div></li></ol>"#,
+        indoc! {r#"
+            1. Project setup:
+
+               ```bash
+               npm init -y
+               ```
 
             "#}
     )]

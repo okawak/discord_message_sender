@@ -12,6 +12,9 @@ pub enum ConvertError {
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
 
+    #[error("Invalid List: {0}")]
+    InvalidList(String),
+
     #[error("Unsupported tag: <{0}>")]
     Unsupported(String),
 

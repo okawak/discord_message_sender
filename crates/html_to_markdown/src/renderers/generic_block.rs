@@ -29,6 +29,13 @@ impl Renderer for GenericBlock {
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
+        let (tag, _) = dom.get_element_data(id)?;
+
+        // div elements are treated transparently - just render children without any formatting
+        if tag.local.as_ref() == "div" {
+            return render_children(url, dom, id, ctx);
+        }
+
         let indent = " ".repeat(ctx.list_depth);
         let content = render_children(url, dom, id, ctx)?;
         if content.trim().is_empty() {
