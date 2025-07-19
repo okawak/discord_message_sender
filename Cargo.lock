@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "html_to_markdown"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "html5ever",
  "indoc",
@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "parse_message"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "chrono",
  "html_to_markdown",
