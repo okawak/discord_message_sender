@@ -26,15 +26,21 @@ impl Renderer for Paragraph {
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
-        let old_inline_depth = ctx.inline_depth;
-        ctx.inline_depth = 1;
+        let is_first_in_list = ctx.list_depth > 0 && ctx.list_first_item;
+        let indent = " ".repeat(ctx.list_depth);
         let content = render_children(url, dom, id, ctx)?;
-        ctx.inline_depth = old_inline_depth;
-
         if content.trim().is_empty() {
             return Ok(String::new());
         }
-        Ok(format!("{}\n\n", content.trim()))
+
+        // Handle the first item in a list differently
+        if is_first_in_list {
+            Ok(content)
+        } else if ctx.list_depth > 0 {
+            Ok(format!("\n\n{indent}{content}"))
+        } else {
+            Ok(format!("{content}\n\n"))
+        }
     }
 }
 

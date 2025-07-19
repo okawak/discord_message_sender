@@ -23,6 +23,7 @@ pub struct Context {
     pub inline_depth: usize,
     /// Depth of nested lists, used for rendering list items
     pub list_depth: usize,
+    pub list_first_item: bool,
     pub in_table: bool,
     pub preserve_whitespace: bool,
     pub in_heading: bool,
@@ -185,9 +186,21 @@ pub fn render_children(
             if ctx.preserve_whitespace {
                 Ok(text.clone())
             } else {
-                Ok(normalize_html_text(text, ctx.inline_depth > 0)
+                let normalized = normalize_html_text(text, ctx.inline_depth > 0)
                     .map(cow_to_string)
-                    .unwrap_or_default())
+                    .unwrap_or_default();
+
+                if ctx.inline_depth > 0 {
+                    return Ok(normalized);
+                }
+
+                // Handle list items
+                if ctx.list_first_item && ctx.list_depth > 0 && !normalized.is_empty() {
+                    // first item in a list
+                    ctx.list_first_item = false;
+                }
+
+                Ok(normalized)
             }
         }
         NodeData::Document => {

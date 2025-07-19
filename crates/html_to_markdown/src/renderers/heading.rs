@@ -29,17 +29,14 @@ impl Heading {
     ) -> Result<String, ConvertError> {
         let old_in_heading = ctx.in_heading;
         let old_preserve_whitespace = ctx.preserve_whitespace;
-        let old_inline_depth = ctx.inline_depth;
 
         ctx.in_heading = true;
         ctx.preserve_whitespace = true;
-        ctx.inline_depth = 1;
 
         let content = render_children(url, dom, id, ctx)?;
 
         ctx.in_heading = old_in_heading;
         ctx.preserve_whitespace = old_preserve_whitespace;
-        ctx.inline_depth = old_inline_depth;
 
         Ok(cow_to_string(normalize_heading_content(&content)))
     }

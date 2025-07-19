@@ -44,7 +44,7 @@ impl Renderer for Inline {
                 ctx.inline_depth -= 1;
                 Ok(format!("*{content}*"))
             }
-            "br" => Ok("\n".to_string()),
+            "br" => Ok("<br>".to_string()),
             _ => {
                 ctx.inline_depth += 1;
                 let content = render_children(url, dom, id, ctx)?;

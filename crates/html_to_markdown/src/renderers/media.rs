@@ -248,9 +248,6 @@ impl Renderer for Media {
                 } else {
                     result.push_str(&content);
                 }
-                if ctx.inline_depth == 0 {
-                    result.push_str("\n\n");
-                }
                 Ok(result)
             }
             "img" => {
@@ -535,17 +532,17 @@ mod tests {
     #[case(
         r##"<a href="#introduction">Introduction</a>"##,
         "https://example.com/guide",
-        "Introduction\n\n"
+        "Introduction"
     )]
     #[case(
         r##"<a href="#section-1">Go to Section 1</a>"##,
         "https://docs.example.com/api",
-        "Go to Section 1\n\n"
+        "Go to Section 1"
     )]
     #[case(
         r##"<a href="#top">Back to Top</a>"##,
         "https://blog.example.com/post/123",
-        "Back to Top\n\n"
+        "Back to Top"
     )]
     fn test_internal_anchor_links(
         #[case] html: &str,
@@ -745,7 +742,7 @@ mod tests {
     #[case(
         r#"<a href="javascript:alert('XSS')">Malicious Link</a>"#,
         "https://example.com",
-        "Malicious Link\n\n"
+        "Malicious Link"
     )]
     #[case(
         r#"<img src="javascript:alert('XSS')" alt="Malicious Image">"#,
@@ -770,13 +767,9 @@ mod tests {
     #[case(
         r#"<a>Link without href</a>"#,
         "https://example.com",
-        "Link without href\n\n"
+        "Link without href"
     )]
-    #[case(
-        r#"<a href="">Empty href</a>"#,
-        "https://example.com",
-        "Empty href\n\n"
-    )]
+    #[case(r#"<a href="">Empty href</a>"#, "https://example.com", "Empty href")]
     #[case(r#"<img alt="without src">"#, "https://example.com", "without src\n\n")]
     #[case(
         r#"<img src="" alt="Empty src">"#,

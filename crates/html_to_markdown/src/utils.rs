@@ -70,10 +70,14 @@ pub fn normalize_html_text(text: &str, preserve_edge_spaces: bool) -> Option<Cow
 
 /// Normalizes heading content by removing extra whitespace
 pub fn normalize_heading_content(content: &str) -> Cow<'_, str> {
-    if content.contains('\n') {
+    let needs_br_replacement = content.contains("<br>");
+    let needs_newline_replacement = content.contains('\n') || content.contains('\r');
+
+    if needs_br_replacement || needs_newline_replacement {
         Cow::Owned(
             content
-                .replace('\n', " ")
+                .replace("<br>", " ")
+                .replace(['\r', '\n'], " ")
                 .split_whitespace()
                 .collect::<Vec<_>>()
                 .join(" "),
@@ -138,6 +142,10 @@ mod tests {
     #[case("\n\nLeading newlines", "Leading newlines")]
     #[case("Trailing newlines\n\n", "Trailing newlines")]
     #[case("Mixed\n  spaces\n\nand\nnewlines", "Mixed spaces and newlines")]
+    #[case("Title<br>With<br>Break", "Title With Break")]
+    #[case("Mixed<br>breaks\tand\nnewlines", "Mixed breaks and newlines")]
+    #[case("<br>Leading break", "Leading break")]
+    #[case("Trailing break<br>", "Trailing break")]
     fn test_normalize_heading_content(#[case] input: &str, #[case] expected: &str) {
         assert_eq!(normalize_heading_content(input), expected);
     }

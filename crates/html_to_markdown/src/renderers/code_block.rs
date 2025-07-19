@@ -69,26 +69,34 @@ static SUPPORTED_LANGUAGES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 pub struct CodeBlock;
 
 impl CodeBlock {
-    fn create_code_block(&self, content: &str, language: Option<String>, ctx: &Context) -> String {
+    fn create_code_block(
+        &self,
+        content: &str,
+        language: Option<String>,
+        ctx: &mut Context,
+    ) -> String {
+        let indent = " ".repeat(ctx.list_depth);
         let capacity = content.len() + language.as_ref().map_or(0, |l| l.len()) + 10; // "```", newlines, etc.
 
         let mut result = String::with_capacity(capacity);
-
-        // Add a newline before the code block if we are in a list context
         if ctx.list_depth > 0 {
             result.push_str("\n\n");
         }
 
-        result.push_str("```");
+        result.push_str(&format!("{indent}```"));
         if let Some(lang) = &language {
             result.push_str(lang);
         }
         result.push('\n');
-        result.push_str(content);
+        result.push_str(&format!("{indent}{content}"));
         if !content.ends_with('\n') {
             result.push('\n');
         }
-        result.push_str("```\n\n");
+        result.push_str(&format!("{indent}```"));
+
+        if ctx.list_depth == 0 {
+            result.push_str("\n\n");
+        }
 
         result
     }
@@ -494,9 +502,11 @@ mod tests {
     /// preserving multiline code blocks
     #[rstest]
     #[case(
-        r#"<pre><code>line1
-line2
-    indented</code></pre>"#,
+        indoc! {r#"
+            <pre><code>line1
+            line2
+                indented</code></pre>"#
+        },
         indoc! {r#"
             ```
             line1
@@ -507,9 +517,11 @@ line2
             "#}
     )]
     #[case(
-        r#"<pre><code class="language-python">def hello():
-    print("Hello, World!")
-    return True</code></pre>"#,
+        indoc! {r#"
+            <pre><code class="language-python">def hello():
+                print("Hello, World!")
+                return True</code></pre>"#
+        },
         indoc! {r#"
             ```python
             def hello():

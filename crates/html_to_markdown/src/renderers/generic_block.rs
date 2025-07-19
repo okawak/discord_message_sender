@@ -29,11 +29,12 @@ impl Renderer for GenericBlock {
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
+        let indent = " ".repeat(ctx.list_depth);
         let content = render_children(url, dom, id, ctx)?;
         if content.trim().is_empty() {
             Ok(String::new())
         } else {
-            Ok(format!("{}\n\n", content.trim()))
+            Ok(format!("{indent}{}\n\n", content.trim()))
         }
     }
 }
