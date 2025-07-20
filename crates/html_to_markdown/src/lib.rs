@@ -28,7 +28,7 @@ use frontmatters::get_frontmatter_extractors;
 /// let keys = ["title"];
 /// let markdown = html_to_markdown::convert(url, html, &keys);
 /// assert!(markdown.is_ok());
-/// //assert!(markdown.unwrap().contains("---\ntitle: Title\n---\n\n# Title\n\nContent"));
+/// assert!(markdown.unwrap().contains("---\ntitle: Title\n---\n\n# Title\n\nContent"));
 /// ```
 ///
 /// if you don't need front-matter, you can pass an empty slice for `keys`.
@@ -39,7 +39,7 @@ use frontmatters::get_frontmatter_extractors;
 /// let keys: Vec<&str> = vec![];
 /// let markdown = html_to_markdown::convert(url, html, &keys);
 /// assert!(markdown.is_ok());
-/// //assert!(markdown.unwrap().contains("# Title\n\nContent"));
+/// assert!(markdown.unwrap().contains("# Title\n\nContent"));
 /// ```
 ///
 pub fn convert(url: &str, html: &str, keys: &[&str]) -> Result<String, ConvertError> {
@@ -79,7 +79,10 @@ pub fn convert(url: &str, html: &str, keys: &[&str]) -> Result<String, ConvertEr
 
     // render body
     let mut ctx = renderers::Context::default();
-    let start_id = dom.find_body().unwrap_or(dom.document);
+    let start_id = dom
+        .find_article()
+        .or_else(|| dom.find_body())
+        .unwrap_or(dom.document);
     let body = renderers::render_node(url, &dom, start_id, &mut ctx)?;
     markdown.push_str(&body);
     Ok(markdown)

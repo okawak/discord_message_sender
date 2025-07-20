@@ -233,6 +233,10 @@ impl Dom {
         self.find_element_by_tag(self.document, "body")
     }
 
+    pub fn find_article(&self) -> Option<NodeId> {
+        self.find_element_by_tag(self.document, "article")
+    }
+
     pub fn find_all_meta(&self) -> Vec<NodeId> {
         self.find_all_elements_by_tag(self.document, "meta")
     }

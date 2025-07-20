@@ -13,7 +13,11 @@ impl Renderer for IgnoredTags {
         };
 
         if let NodeData::Element { tag, .. } = &node.data {
-            matches!(tag.local.as_ref(), "script" | "style" | "noscript")
+            matches!(
+                tag.local.as_ref(),
+                "script" | "style" | "noscript" // script
+                 | "footer" | "nav" // navigation tags
+            )
         } else {
             false
         }

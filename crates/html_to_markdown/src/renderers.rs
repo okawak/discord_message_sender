@@ -117,7 +117,7 @@ static TAG_RENDERERS: LazyLock<HashMap<&'static str, &'static dyn Renderer>> =
         }
 
         let ignored_tags = &ignored_tags::IGNORED_TAGS as &'static dyn Renderer;
-        for tag in ["script", "style", "noscript"] {
+        for tag in ["script", "style", "noscript", "footer", "nav"] {
             map.insert(tag, ignored_tags);
         }
 
