@@ -111,6 +111,22 @@ pub fn cow_to_string(cow: Cow<'_, str>) -> String {
     cow.into_owned()
 }
 
+#[inline]
+pub fn format_list_content(ctx: &mut crate::renderers::Context, content: &str) -> String {
+    let indent = " ".repeat(ctx.list_depth);
+
+    let result = match (ctx.list_depth > 0, ctx.list_first_item) {
+        (true, false) => format!("\n\n{indent}{content}"),
+        (false, false) => format!("{content}\n\n"),
+        _ => content.to_string(),
+    };
+
+    if ctx.list_depth > 0 && ctx.list_first_item && !content.trim().is_empty() {
+        ctx.list_first_item = false;
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

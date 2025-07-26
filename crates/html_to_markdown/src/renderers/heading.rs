@@ -41,15 +41,23 @@ impl Heading {
         Ok(cow_to_string(normalize_heading_content(&content)))
     }
 
-    fn format_heading(&self, content: &str, level: &str, link_url: Option<&str>) -> String {
+    fn format_heading(
+        &self,
+        content: &str,
+        level: &str,
+        link_url: &Option<String>,
+        needs_separation: bool,
+    ) -> String {
         let trimmed = content.trim();
         if trimmed.is_empty() {
             return String::new();
         }
 
+        let newlines = if needs_separation { "\n\n" } else { "" };
+
         match link_url {
-            Some(url) => format!("{level} [{trimmed}]({url})\n\n"),
-            None => format!("{level} {trimmed}\n\n"),
+            Some(url) => format!("{newlines}{level} [{trimmed}]({url})\n\n"),
+            None => format!("{newlines}{level} {trimmed}\n\n"),
         }
     }
 }
@@ -74,6 +82,7 @@ impl Renderer for Heading {
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
+        let old_last_char = ctx.last_char;
         let content = self.render_with_context(url, dom, id, ctx)?;
 
         if content.trim().is_empty() {
@@ -84,14 +93,9 @@ impl Renderer for Heading {
         let tag_name = tag.local.as_ref();
         let level = Self::get_heading_level(tag_name);
 
-        // Check for links in the heading content
-        let link_url = ctx
-            .link_info
-            .as_ref()
-            .filter(|link_info| link_info.try_apply_link(tag_name))
-            .map(|link_info| link_info.url.as_str());
+        let needs_separation = old_last_char.is_some_and(|c| c != '\n');
 
-        Ok(self.format_heading(&content, level, link_url))
+        Ok(self.format_heading(&content, level, &ctx.link_info, needs_separation))
     }
 }
 
@@ -326,6 +330,21 @@ mod tests {
         "# This is a very long heading that spans multiple words and might need special handling for formatting and line breaks\n\n"
     )]
     fn test_long_headings(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node("", &dom, dom.document, &mut context)
+            .expect("Failed to render heading");
+        assert_eq!(result, expected);
+    }
+
+    /// block separation tests
+    #[rstest]
+    #[case("<h1>Title</h1>", "# Title\n\n")]
+    #[case("<span>text</span><h1>Title</h1>", "text\n\n# Title\n\n")]
+    #[case("<strong>bold</strong><h1>Title</h1>", "**bold**\n\n# Title\n\n")]
+    #[case("<h1>First</h1><h2>Second</h2>", "# First\n\n## Second\n\n")]
+    #[case("<p>paragraph</p><h1>Title</h1>", "paragraph\n\n# Title\n\n")]
+    fn test_heading_block_separation(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
         let result = renderers::render_node("", &dom, dom.document, &mut context)

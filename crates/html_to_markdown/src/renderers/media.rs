@@ -1,7 +1,8 @@
-use super::{Context, LinkInfo, Renderer, render_children};
+use super::{Context, Renderer, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
+    utils::format_list_content,
 };
 use std::collections::HashMap;
 
@@ -181,19 +182,16 @@ impl Media {
         resolved_url: String,
     ) -> Result<String, ConvertError> {
         let old_link_info = ctx.link_info.take();
-        let old_inline_depth = ctx.inline_depth;
+        let old_inline_status = ctx.in_inline;
 
-        ctx.inline_depth = 1;
-        ctx.link_info = Some(LinkInfo::new(resolved_url));
+        ctx.link_info = Some(resolved_url);
+        ctx.in_inline = true;
 
-        let mut result = render_children(url, dom, id, ctx)?;
+        let result = render_children(url, dom, id, ctx)?;
 
         ctx.link_info = old_link_info;
-        ctx.inline_depth = old_inline_depth;
+        ctx.in_inline = old_inline_status;
 
-        if ctx.inline_depth == 0 {
-            result.push_str("\n\n");
-        }
         Ok(result)
     }
 }
@@ -219,36 +217,36 @@ impl Renderer for Media {
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
         let (tag, attrs) = dom.get_element_data(id)?;
+        let old_inline_status = ctx.in_inline;
 
         match tag.local.as_ref() {
             "a" => {
-                ctx.inline_depth += 1;
-                let content = render_children(url, dom, id, ctx)?;
-                ctx.inline_depth -= 1;
-                let mut result = String::new();
+                if let Some(href) = attrs.get("href")
+                    && self.is_safe_url(href)
+                {
+                    let resolved_url = self.resolve_url(url, href)?;
 
-                if let Some(href) = attrs.get("href") {
-                    if self.is_safe_url(href) {
-                        let resolved_url = self.resolve_url(url, href)?;
-
-                        // in case of complex links, like bookmark, example:
-                        // <a href="https://example.com/path?query#fragment">
-                        //   <img src="/assets/image.png" alt="Image">
-                        //   <span>Link Text</span>
-                        //   <p>Additional Info</p>
-                        // </a>
-                        if self.has_multiple_elements(dom, id) {
-                            return self.render_complex_link(url, dom, id, ctx, resolved_url);
-                        }
-
-                        result.push_str(&format!("[{content}]({resolved_url})"));
-                    } else {
-                        result.push_str(&content);
+                    // in case of complex links, like bookmark, example:
+                    // <a href="https://example.com/path?query#fragment">
+                    //   <img src="/assets/image.png" alt="Image">
+                    //   <span>Link Text</span>
+                    //   <p>Additional Info</p>
+                    // </a>
+                    if self.has_multiple_elements(dom, id) {
+                        return self.render_complex_link(url, dom, id, ctx, resolved_url);
                     }
+
+                    ctx.in_inline = true;
+                    let content = render_children(url, dom, id, ctx)?;
+                    ctx.in_inline = old_inline_status;
+
+                    Ok(format!("[{content}]({resolved_url})"))
                 } else {
-                    result.push_str(&content);
+                    ctx.in_inline = true;
+                    let content = render_children(url, dom, id, ctx)?;
+                    ctx.in_inline = old_inline_status;
+                    Ok(content)
                 }
-                Ok(result)
             }
             "img" => {
                 if ctx.in_heading {
@@ -259,26 +257,24 @@ impl Renderer for Media {
                 let src = attrs.get("src").unwrap_or(&String::new()).clone();
 
                 // check link context
-                if let Some(link_info) = &ctx.link_info
-                    && link_info.try_apply_link("img")
-                {
+                let result = if let Some(link_info) = &ctx.link_info {
                     if self.is_safe_url(&src) {
                         let resolved_src = self.resolve_url(url, &src)?;
-                        return Ok(format!(
-                            "[![{alt}]({resolved_src})]({})\n\n",
-                            &link_info.url
-                        ));
+                        format!("[![{alt}]({resolved_src})]({link_info})",)
                     } else {
-                        return Ok(format!("[{alt}]({})\n\n", &link_info.url));
+                        format!("[{alt}]({link_info})")
                     }
-                }
-
-                // normal process
-                if self.is_safe_url(&src) {
+                } else if self.is_safe_url(&src) {
                     let resolved_src = self.resolve_url(url, &src)?;
-                    Ok(format!("![{alt}]({resolved_src})\n\n"))
+                    format!("![{alt}]({resolved_src})")
                 } else {
-                    Ok(format!("{alt}\n\n"))
+                    alt
+                };
+
+                if ctx.in_inline && ctx.link_info.is_none() {
+                    Ok(result)
+                } else {
+                    Ok(format_list_content(ctx, &result))
                 }
             }
             _ => render_children(url, dom, id, ctx),
@@ -579,22 +575,6 @@ mod tests {
         assert_eq!(media.is_safe_url(url), expected);
     }
 
-    // realistic link test: navigation links
-    // for now, navigation links are not assumed to be rendered (this test will implement in nav renderer)
-    //#[rstest]
-    //#[case(
-    //    r#"<nav><a href="/">Home</a> | <a href="/about">About</a> | <a href="/contact">Contact</a></nav>"#,
-    //    "https://example.com/blog/post",
-    //    "[Home](https://example.com/) | [About](https://example.com/about) | [Contact](https://example.com/contact)\n\n"
-    //)]
-    //fn test_navigation_links(#[case] html: &str, #[case] base_url: &str, #[case] expected: &str) {
-    //    let dom = parser::parse_html(html).expect("Failed to parse HTML");
-    //    let mut context = Context::default();
-    //    let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
-    //        .expect("Failed to render navigation");
-    //    assert_eq!(result, expected);
-    //}
-
     /// exrernal links and special links test
     #[rstest]
     #[case(
@@ -670,52 +650,52 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    // complex nested media test
-    //#[rstest]
-    //#[case(
-    //    r#"<div class="card">
-    //        <a href="/products/laptop">
-    //            <img src="/images/products/laptop-thumb.jpg" alt="Gaming Laptop">
-    //            <h3>Gaming Laptop</h3>
-    //            <p>High-performance laptop for gaming</p>
-    //        </a>
-    //    </div>"#,
-    //    "https://shop.example.com/category/computers",
-    //    indoc! {r#"
-    //        [![Gaming Laptop](https://shop.example.com/images/products/laptop-thumb.jpg)](https://shop.example.com/products/laptop)
+    /// complex nested media test
+    #[rstest]
+    #[case(
+        r#"<div class="card">
+            <a href="/products/laptop">
+                <img src="/images/products/laptop-thumb.jpg" alt="Gaming Laptop">
+                <h3>Gaming Laptop</h3>
+                <p>High-performance laptop for gaming</p>
+            </a>
+        </div>"#,
+        "https://shop.example.com/category/computers",
+        indoc! {r#"
+            [![Gaming Laptop](https://shop.example.com/images/products/laptop-thumb.jpg)](https://shop.example.com/products/laptop)
 
-    //        ### Gaming Laptop
+            ### [Gaming Laptop](https://shop.example.com/products/laptop)
 
-    //        High-performance laptop for gaming
+            High-performance laptop for gaming
 
-    //        "#}
-    //)]
-    //#[case(
-    //    r#"<div class="card-no-image">
-    //        <a href="/products/laptop">
-    //            <h3>Gaming Laptop</h3>
-    //            <p>High-performance laptop for gaming</p>
-    //        </a>
-    //    </div>"#,
-    //    "https://shop.example.com/category/computers",
-    //    indoc! {r#"
-    //        ### [Gaming Laptop](https://shop.example.com/products/laptop)
+            "#}
+    )]
+    #[case(
+        r#"<div class="card-no-image">
+            <a href="/products/laptop">
+                <h3>Gaming Laptop</h3>
+                <p>High-performance laptop for gaming</p>
+            </a>
+        </div>"#,
+        "https://shop.example.com/category/computers",
+        indoc! {r#"
+            ### [Gaming Laptop](https://shop.example.com/products/laptop)
 
-    //        High-performance laptop for gaming
+            High-performance laptop for gaming
 
-    //        "#}
-    //)]
-    //fn test_complex_nested_media(
-    //    #[case] html: &str,
-    //    #[case] base_url: &str,
-    //    #[case] expected: &str,
-    //) {
-    //    let dom = parser::parse_html(html).expect("Failed to parse HTML");
-    //    let mut context = Context::default();
-    //    let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
-    //        .expect("Failed to render complex nested media");
-    //    assert_eq!(result, expected);
-    //}
+            "#}
+    )]
+    fn test_complex_nested_media(
+        #[case] html: &str,
+        #[case] base_url: &str,
+        #[case] expected: &str,
+    ) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
+            .expect("Failed to render complex nested media");
+        assert_eq!(result, expected);
+    }
 
     /// images in headings test
     #[rstest]
@@ -812,6 +792,11 @@ mod tests {
 
             "#}
     )]
+    #[case(
+        r#"<a href="/dir1"><img alt="" src="https://example.com" /></a>"#,
+        "https://example.com",
+        "[![](https://example.com)](https://example.com/dir1)"
+    )]
     fn test_realistic_blog_structure(
         #[case] html: &str,
         #[case] base_url: &str,
@@ -821,6 +806,35 @@ mod tests {
         let mut context = Context::default();
         let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
             .expect("Failed to render blog structure");
+        assert_eq!(result, expected);
+    }
+
+    /// Lists with images and links
+    #[rstest]
+    #[case(
+        "<ul><li><img src=\"/icon.png\" alt=\"Icon\"><p>Item with image</p></li></ul>",
+        indoc! {r#"
+            - ![Icon](https://example.com/icon.png)
+
+              Item with image
+
+            "#}
+    )]
+    #[case(
+        "<ul><li><a href=\"/page\"><img src=\"thumb.jpg\" alt=\"Thumbnail\"><p>Link with image</p></a></li></ul>",
+        indoc! {r#"
+            - [![Thumbnail](https://example.com/thumb.jpg)](https://example.com/page)
+
+              Link with image
+
+            "#}
+    )]
+    fn test_lists_with_media(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result =
+            renderers::render_node("https://example.com", &dom, dom.document, &mut context)
+                .expect("Failed to render list with media");
         assert_eq!(result, expected);
     }
 }

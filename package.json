@@ -21,11 +21,10 @@
   "devDependencies": {
     "@biomejs/biome": "^2.1.2",
     "@rollup/plugin-wasm": "^6.2.2",
-    "@types/bun": "^1.2.18",
-    "mkdirp": "^3.0.1",
+    "@types/bun": "^1.2.19",
     "obsidian": "^1.8.7",
     "typescript": "^5.8.3",
-    "vite": "^7.0.5"
+    "vite": "^7.0.6"
   },
   "dependencies": {},
   "engines": {

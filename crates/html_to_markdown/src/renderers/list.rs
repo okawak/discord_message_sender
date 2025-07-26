@@ -124,7 +124,10 @@ impl List {
 
             result.push_str(&child_result);
 
-            // フラグ更新
+            if !child_result.trim().is_empty() {
+                ctx.list_first_item = false;
+            }
+
             if let Some(child_node) = dom.node(*child_id) {
                 prev_was_code_block = match &child_node.data {
                     NodeData::Element { tag, .. } => tag.local.as_ref() == "pre",
@@ -587,33 +590,6 @@ mod tests {
             .expect("Failed to render deeply nested list");
         assert_eq!(result, expected);
     }
-
-    // Lists with images and links
-    //#[rstest]
-    //#[case(
-    //    "<ul><li><img src=\"/icon.png\" alt=\"Icon\">Item with image</li></ul>",
-    //    indoc! {r#"
-    //        - ![Icon](https://example.com/icon.png)
-
-    //          Item with image
-
-    //        "#}
-    //)]
-    //#[case(
-    //    "<ul><li><a href=\"/page\"><img src=\"thumb.jpg\" alt=\"Thumbnail\">Link with image</a></li></ul>",
-    //    indoc! {r#"
-    //        - [![Thumbnail]](https://example.com/thumb.jpg) Link with image
-
-    //        "#}
-    //)]
-    //fn test_lists_with_media(#[case] html: &str, #[case] expected: &str) {
-    //    let dom = parser::parse_html(html).expect("Failed to parse HTML");
-    //    let mut context = Context::default();
-    //    let result =
-    //        renderers::render_node("https://example.com", &dom, dom.document, &mut context)
-    //            .expect("Failed to render list with media");
-    //    assert_eq!(result, expected);
-    //}
 
     /// Lists with line breaks
     #[rstest]

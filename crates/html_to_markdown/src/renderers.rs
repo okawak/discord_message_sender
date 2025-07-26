@@ -13,51 +13,22 @@ use crate::{
     error::ConvertError,
     utils::{cow_to_string, normalize_html_text},
 };
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::default::Default;
 use std::sync::LazyLock;
 
 #[derive(Debug, Default)]
 pub struct Context {
-    pub inline_depth: usize,
+    pub in_inline: bool,
     /// Depth of nested lists, used for rendering list items
     pub list_depth: usize,
     pub list_first_item: bool,
     pub in_table: bool,
     pub preserve_whitespace: bool,
     pub in_heading: bool,
-    pub link_info: Option<LinkInfo>,
-}
-
-#[derive(Debug, Clone)]
-pub struct LinkInfo {
-    pub url: String,
-    pub target_priority: Vec<&'static str>,
-    pub applied: RefCell<bool>,
-}
-
-impl LinkInfo {
-    pub fn new(url: String) -> Self {
-        Self {
-            url,
-            target_priority: vec!["img", "h1", "h2", "h3", "h4", "h5", "h6", "p", "span"],
-            applied: RefCell::new(false),
-        }
-    }
-
-    pub fn is_target_candidate(&self, tag_name: &str) -> bool {
-        self.target_priority.contains(&tag_name)
-    }
-
-    pub fn try_apply_link(&self, tag_name: &str) -> bool {
-        if !*self.applied.borrow() && self.is_target_candidate(tag_name) {
-            *self.applied.borrow_mut() = true;
-            true
-        } else {
-            false
-        }
-    }
+    pub link_info: Option<String>,
+    /// Last character of the previous output to determine if block separation is needed
+    pub last_char: Option<char>,
 }
 
 pub trait Renderer: Send + Sync {
@@ -185,21 +156,13 @@ pub fn render_children(
         NodeData::Text(text) => {
             if ctx.preserve_whitespace {
                 Ok(text.clone())
+                //Ok(format_list_content(ctx, text))
             } else {
-                let normalized = normalize_html_text(text, ctx.inline_depth > 0)
+                let normalized = normalize_html_text(text, ctx.in_inline)
                     .map(cow_to_string)
                     .unwrap_or_default();
 
-                if ctx.inline_depth > 0 {
-                    return Ok(normalized);
-                }
-
-                // Handle list items
-                if ctx.list_first_item && ctx.list_depth > 0 && !normalized.is_empty() {
-                    // first item in a list
-                    ctx.list_first_item = false;
-                }
-
+                //Ok(format_list_content(ctx, &normalized))
                 Ok(normalized)
             }
         }

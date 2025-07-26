@@ -6,6 +6,13 @@ use crate::{
 
 pub struct Inline;
 
+impl Inline {
+    /// Updates the last output character in context
+    fn update_last_char(&self, ctx: &mut Context, content: &str) {
+        ctx.last_char = content.chars().last();
+    }
+}
+
 impl Renderer for Inline {
     fn matches(&self, dom: &Dom, id: NodeId) -> bool {
         let Some(node) = dom.node(id) else {
@@ -30,28 +37,31 @@ impl Renderer for Inline {
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
         let (tag, _) = dom.get_element_data(id)?;
+        let old_inline_status = ctx.in_inline;
 
-        match tag.local.as_ref() {
+        let result = match tag.local.as_ref() {
             "strong" | "b" => {
-                ctx.inline_depth += 1;
+                ctx.in_inline = true;
                 let content = render_children(url, dom, id, ctx)?;
-                ctx.inline_depth -= 1;
-                Ok(format!("**{content}**"))
+                ctx.in_inline = old_inline_status;
+                format!("**{content}**")
             }
             "em" | "i" => {
-                ctx.inline_depth += 1;
+                ctx.in_inline = true;
                 let content = render_children(url, dom, id, ctx)?;
-                ctx.inline_depth -= 1;
-                Ok(format!("*{content}*"))
+                ctx.in_inline = old_inline_status;
+                format!("*{content}*")
             }
-            "br" => Ok("<br>".to_string()),
+            "br" => "<br>".to_string(),
             _ => {
-                ctx.inline_depth += 1;
+                ctx.in_inline = true;
                 let content = render_children(url, dom, id, ctx)?;
-                ctx.inline_depth -= 1;
-                Ok(content)
+                ctx.in_inline = old_inline_status;
+                content
             }
-        }
+        };
+        self.update_last_char(ctx, &result);
+        Ok(result)
     }
 }
 
