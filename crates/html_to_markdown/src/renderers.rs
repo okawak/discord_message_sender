@@ -1,3 +1,4 @@
+pub mod aside;
 pub mod code_block;
 pub mod generic_block;
 pub mod heading;
@@ -86,6 +87,8 @@ static TAG_RENDERERS: LazyLock<HashMap<&'static str, &'static dyn Renderer>> =
         for tag in ["ul", "ol", "li"] {
             map.insert(tag, list);
         }
+
+        map.insert("aside", &aside::ASIDE as &'static dyn Renderer);
 
         let ignored_tags = &ignored_tags::IGNORED_TAGS as &'static dyn Renderer;
         for tag in ["script", "style", "noscript", "footer", "nav"] {

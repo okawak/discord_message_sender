@@ -1,3 +1,5 @@
+pub mod filtering;
+
 use std::borrow::Cow;
 
 /// Normalization utilities for HTML text and content
