@@ -16,7 +16,7 @@ impl Renderer for GenericBlock {
         if let NodeData::Element { tag, .. } = &node.data {
             matches!(
                 tag.local.as_ref(),
-                "div" | "section" | "article" | "main" | "header"
+                "div" | "section" | "summary" | "article" | "main" | "header"
             )
         } else {
             false

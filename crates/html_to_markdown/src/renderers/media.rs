@@ -161,12 +161,12 @@ impl Media {
 
         let mut element_count = 0;
         for &child_id in children {
-            if let Some(child_node) = dom.node(child_id) {
-                if let NodeData::Element { .. } = &child_node.data {
-                    element_count += 1;
-                    if element_count > 1 {
-                        return true;
-                    }
+            if let Some(child_node) = dom.node(child_id)
+                && let NodeData::Element { .. } = &child_node.data
+            {
+                element_count += 1;
+                if element_count > 1 {
+                    return true;
                 }
             }
         }

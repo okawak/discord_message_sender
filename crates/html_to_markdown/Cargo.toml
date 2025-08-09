@@ -13,5 +13,5 @@ html5ever = "0.35"
 
 [dev-dependencies]
 pretty_assertions = "1"
-rstest = "0.25"
+rstest = "0.26"
 indoc = "2"

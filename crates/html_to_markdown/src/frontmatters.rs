@@ -27,10 +27,10 @@ pub fn get_frontmatter_extractors(keys: &[&str]) -> Vec<(&'static str, &'static 
     let mut result = Vec::new();
 
     for &key in keys {
-        if seen.insert(key) {
-            if let Some(&extractor) = FRONTMATTER_MAP.get(key) {
-                result.push((extractor.key(), extractor));
-            }
+        if seen.insert(key)
+            && let Some(&extractor) = FRONTMATTER_MAP.get(key)
+        {
+            result.push((extractor.key(), extractor));
         }
     }
     result

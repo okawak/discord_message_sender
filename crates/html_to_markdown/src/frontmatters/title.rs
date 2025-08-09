@@ -44,12 +44,11 @@ fn extract_meta_content(dom: &Dom, attr_name: &str, attr_value: &str) -> Option<
             continue;
         };
 
-        if let NodeData::Element { attrs, .. } = &node.data {
-            if let (Some(value), Some(content)) = (attrs.get(attr_name), attrs.get("content")) {
-                if value == attr_value {
-                    return normalize_html_text(content, false).map(cow_to_string);
-                }
-            }
+        if let NodeData::Element { attrs, .. } = &node.data
+            && let (Some(value), Some(content)) = (attrs.get(attr_name), attrs.get("content"))
+            && value == attr_value
+        {
+            return normalize_html_text(content, false).map(cow_to_string);
         }
     }
     None

@@ -106,18 +106,18 @@ impl CodeBlock {
             return Ok(String::new());
         };
 
-        if let NodeData::Element { tag, .. } = &node.data {
-            if tag.local.as_ref() == "code" {
-                return Ok(Self::extract_text_content(dom, id));
-            }
+        if let NodeData::Element { tag, .. } = &node.data
+            && tag.local.as_ref() == "code"
+        {
+            return Ok(Self::extract_text_content(dom, id));
         }
 
         // recursively find code content in children
         for &child_id in dom.iter_children(id)? {
-            if let Ok(content) = Self::find_code_content(dom, child_id) {
-                if !content.trim().is_empty() {
-                    return Ok(content);
-                }
+            if let Ok(content) = Self::find_code_content(dom, child_id)
+                && !content.trim().is_empty()
+            {
+                return Ok(content);
             }
         }
 
@@ -234,10 +234,10 @@ impl Renderer for CodeBlock {
             "pre" => true,
             "code" => {
                 // <code> in <pre> should not be rendered as inline code
-                if let Ok(Some(parent_id)) = dom.get_parent(id) {
-                    if let Ok((parent_tag, _)) = dom.get_element_data(parent_id) {
-                        return parent_tag.local.as_ref() != "pre";
-                    }
+                if let Ok(Some(parent_id)) = dom.get_parent(id)
+                    && let Ok((parent_tag, _)) = dom.get_element_data(parent_id)
+                {
+                    return parent_tag.local.as_ref() != "pre";
                 }
                 true
             }

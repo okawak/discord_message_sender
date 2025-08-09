@@ -63,12 +63,11 @@ impl List {
 
         // Find the previous <li> element (skip text nodes)
         for &&prev_child_id in children[..current_index].iter().rev() {
-            if let Some(prev_node) = dom.node(prev_child_id) {
-                if let NodeData::Element { tag, .. } = &prev_node.data {
-                    if tag.local.as_ref() == "li" {
-                        return self.previous_item_ends_with_block_element(dom, &prev_child_id);
-                    }
-                }
+            if let Some(prev_node) = dom.node(prev_child_id)
+                && let NodeData::Element { tag, .. } = &prev_node.data
+                && tag.local.as_ref() == "li"
+            {
+                return self.previous_item_ends_with_block_element(dom, &prev_child_id);
             }
         }
 

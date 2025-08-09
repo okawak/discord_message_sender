@@ -117,12 +117,11 @@ pub fn render_node(
     };
 
     // Check if the node is an element and has a registered renderer
-    if let NodeData::Element { tag, .. } = &node.data {
-        if let Some(&renderer) = TAG_RENDERERS.get(tag.local.as_ref()) {
-            if renderer.matches(dom, id) {
-                return renderer.render(url, dom, id, ctx);
-            }
-        }
+    if let NodeData::Element { tag, .. } = &node.data
+        && let Some(&renderer) = TAG_RENDERERS.get(tag.local.as_ref())
+        && renderer.matches(dom, id)
+    {
+        return renderer.render(url, dom, id, ctx);
     }
 
     // generic renderers: check all registered renderers

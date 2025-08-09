@@ -79,7 +79,7 @@ impl Dom {
         }
     }
 
-    pub fn iter_children(&self, id: NodeId) -> Result<std::slice::Iter<NodeId>, ConvertError> {
+    pub fn iter_children(&self, id: NodeId) -> Result<std::slice::Iter<'_, NodeId>, ConvertError> {
         Ok(self.get_node(id)?.children.iter())
     }
 
@@ -124,10 +124,10 @@ impl Dom {
     pub fn find_element_by_tag(&self, start_id: NodeId, tag_name: &str) -> Option<NodeId> {
         let node = self.node(start_id)?;
 
-        if let NodeData::Element { tag, .. } = &node.data {
-            if tag.local.as_ref() == tag_name {
-                return Some(start_id);
-            }
+        if let NodeData::Element { tag, .. } = &node.data
+            && tag.local.as_ref() == tag_name
+        {
+            return Some(start_id);
         }
 
         for &child_id in &node.children {
@@ -154,10 +154,10 @@ impl Dom {
             return;
         };
 
-        if let NodeData::Element { tag, .. } = &node.data {
-            if tag.local.as_ref() == tag_name {
-                results.push(node_id);
-            }
+        if let NodeData::Element { tag, .. } = &node.data
+            && tag.local.as_ref() == tag_name
+        {
+            results.push(node_id);
         }
 
         for &child_id in &node.children {
@@ -205,17 +205,17 @@ impl Dom {
             return;
         };
 
-        if let NodeData::Element { attrs, .. } = &node.data {
-            if let Some(value) = attrs.get(attr_name) {
-                match attr_value {
-                    Some(expected) => {
-                        if value == expected {
-                            results.push(node_id);
-                        }
-                    }
-                    None => {
+        if let NodeData::Element { attrs, .. } = &node.data
+            && let Some(value) = attrs.get(attr_name)
+        {
+            match attr_value {
+                Some(expected) => {
+                    if value == expected {
                         results.push(node_id);
                     }
+                }
+                None => {
+                    results.push(node_id);
                 }
             }
         }
