@@ -19,12 +19,12 @@
     "test": "cargo test"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.1.4",
+    "@biomejs/biome": "^2.2.0",
     "@rollup/plugin-wasm": "^6.2.2",
-    "@types/bun": "^1.2.19",
+    "@types/bun": "^1.2.20",
     "obsidian": "^1.8.7",
     "typescript": "^5.9.2",
-    "vite": "^7.1.1"
+    "vite": "^7.1.2"
   },
   "dependencies": {},
   "engines": {
