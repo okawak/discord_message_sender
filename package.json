@@ -19,9 +19,9 @@
     "test": "cargo test"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.0",
+    "@biomejs/biome": "^2.2.2",
     "@rollup/plugin-wasm": "^6.2.2",
-    "@types/bun": "^1.2.20",
+    "@types/bun": "^1.2.21",
     "obsidian": "^1.8.7",
     "typescript": "^5.9.2",
     "vite": "^7.1.3"
