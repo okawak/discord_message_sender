@@ -24,7 +24,7 @@
     "@types/bun": "^1.2.22",
     "obsidian": "^1.8.7",
     "typescript": "^5.9.2",
-    "vite": "^7.1.6"
+    "vite": "^7.1.7"
   },
   "dependencies": {},
   "engines": {
