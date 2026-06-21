@@ -1,5 +1,5 @@
 import { Notice, requestUrl } from "obsidian";
-import type { DiscordMessage, DiscordPluginSettings } from "./settings";
+import type { DiscordMessage } from "./settings";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 const RATE_LIMIT_STATUS_CODE = 429;
@@ -8,32 +8,35 @@ const MAX_RETRIES = 3;
 
 // Get message from Discord
 export async function fetchMessages(
-  settings: DiscordPluginSettings,
+  botToken: string,
+  channelId: string,
   after?: string,
 ): Promise<DiscordMessage[]> {
-  const path = `/channels/${
-    settings.channelId
-  }/messages?limit=${MESSAGES_PER_REQUEST}${after ? `&after=${after}` : ""}`;
-  const res = await discordRequest(settings, "GET", path);
+  const path = `/channels/${channelId}/messages?limit=${MESSAGES_PER_REQUEST}${
+    after ? `&after=${after}` : ""
+  }`;
+  const res = await discordRequest(botToken, "GET", path);
   return JSON.parse(res.text);
 }
 
 // Post message to Discord
 export async function postNotification(
-  settings: DiscordPluginSettings,
+  botToken: string,
+  channelId: string,
   text: string,
-): Promise<void> {
-  const path = `/channels/${settings.channelId}/messages`;
-  await discordRequest(
-    settings,
+): Promise<DiscordMessage> {
+  const path = `/channels/${channelId}/messages`;
+  const res = await discordRequest(
+    botToken,
     "POST",
     path,
     JSON.stringify({ content: text }),
   );
+  return JSON.parse(res.text);
 }
 
 async function discordRequest(
-  settings: DiscordPluginSettings,
+  botToken: string,
   method: "GET" | "POST",
   path: string,
   body?: string,
@@ -43,7 +46,7 @@ async function discordRequest(
       url: DISCORD_API_BASE_URL + path,
       method,
       headers: {
-        Authorization: `Bot ${settings.botToken}`,
+        Authorization: `Bot ${botToken}`,
         "User-Agent": "DiscordBot (Discord Message Sender)",
         ...(body ? { "Content-Type": "application/json" } : {}),
       },

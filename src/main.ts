@@ -1,10 +1,12 @@
 import { Notice, Plugin } from "obsidian";
+import { createChannelDirectory, getChannelDisplayName } from "./channelPaths";
 import { fetchMessages, postNotification } from "./discordApi";
 import { cleanupGlobalNamespace } from "./global";
 import {
-  DEFAULT_SETTINGS,
+  type DiscordChannelSettings,
   type DiscordMessage,
   type DiscordPluginSettings,
+  normalizeSettings,
   type ProcessedMessage,
 } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
@@ -57,7 +59,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     if (!this.validateSettings()) {
       new Notice(
-        "Discord message sender: bot token or channel ID is not configured.",
+        "Discord message sender: bot token or channel is not configured.",
       );
       return;
     }
@@ -65,50 +67,83 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     this.syncing = true;
     new Notice("Starting Discord sync.");
 
-    let lastMessageId = this.settings.lastProcessedMessageId;
-    let processedMessageCount = 0;
-    let newestMessageIdProcessed: string | undefined;
+    let totalProcessedMessageCount = 0;
 
     try {
-      while (true) {
-        const messages = await fetchMessages(this.settings, lastMessageId);
-        if (messages.length === 0) {
-          break;
-        }
-
-        const newestMessageId = messages[0]?.id;
-
-        for (const message of messages.reverse()) {
-          const wasProcessed = await this.processDiscordMessage(message);
-          if (wasProcessed) {
-            processedMessageCount++;
-            newestMessageIdProcessed = message.id;
-          }
-          await sleep(MESSAGE_PROCESSING_DELAY);
-        }
-
-        lastMessageId = newestMessageId;
-        await sleep(REQUEST_INTERVAL_DELAY);
+      for (const channel of this.configuredChannels()) {
+        const processedMessageCount = await this.syncChannelMessages(channel);
+        totalProcessedMessageCount += processedMessageCount;
       }
-      await postNotification(
-        this.settings,
-        processedMessageCount === 0
-          ? "⚠️ No new messages."
-          : `✅ ${processedMessageCount} messages saved.`,
+      new Notice(
+        totalProcessedMessageCount === 0
+          ? "Discord sync finished. No new messages."
+          : `Discord sync finished. ${totalProcessedMessageCount} messages saved.`,
       );
     } catch (error) {
       console.error("Discord sync failed:", error);
       new Notice("Discord sync failed. See console for details.");
     } finally {
-      if (newestMessageIdProcessed) {
-        await this.updateLastProcessedMessage(newestMessageIdProcessed);
-      }
       this.syncing = false;
     }
   }
 
+  private async syncChannelMessages(
+    channel: DiscordChannelSettings,
+  ): Promise<number> {
+    let lastMessageId = channel.lastProcessedMessageId;
+    let processedMessageCount = 0;
+    let newestMessageIdFetched: string | undefined;
+
+    while (true) {
+      const messages = await fetchMessages(
+        this.settings.botToken,
+        channel.id,
+        lastMessageId,
+      );
+      if (messages.length === 0) {
+        break;
+      }
+
+      const newestMessageId = messages[0]?.id;
+      if (newestMessageId) {
+        newestMessageIdFetched = newestMessageId;
+      }
+
+      for (const message of messages.reverse()) {
+        const wasProcessed = await this.processDiscordMessage(message, channel);
+        if (wasProcessed) {
+          processedMessageCount++;
+        }
+        await sleep(MESSAGE_PROCESSING_DELAY);
+      }
+
+      lastMessageId = newestMessageId;
+      await sleep(REQUEST_INTERVAL_DELAY);
+    }
+
+    const notification = await postNotification(
+      this.settings.botToken,
+      channel.id,
+      processedMessageCount === 0
+        ? "⚠️ No new messages."
+        : `✅ ${processedMessageCount} messages saved.`,
+    );
+
+    const nextLastProcessedMessageId =
+      notification.id || newestMessageIdFetched;
+    if (nextLastProcessedMessageId) {
+      await this.updateLastProcessedMessage(
+        channel,
+        nextLastProcessedMessageId,
+      );
+    }
+
+    return processedMessageCount;
+  }
+
   private async processDiscordMessage(
     message: DiscordMessage,
+    channel: DiscordChannelSettings,
   ): Promise<boolean> {
     if (message.author?.bot) {
       return false;
@@ -131,8 +166,8 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     await saveToVault(
       this.app.vault,
-      this.settings.messageDirectoryName,
-      this.settings.clippingDirectoryName,
+      createChannelDirectory(this.settings.messageDirectoryName, channel),
+      createChannelDirectory(this.settings.clippingDirectoryName, channel),
       processedMessage,
     );
     return true;
@@ -163,21 +198,33 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     }
   }
 
-  private async updateLastProcessedMessage(id: string) {
-    this.settings.lastProcessedMessageId = id;
+  private async updateLastProcessedMessage(
+    channel: DiscordChannelSettings,
+    id: string,
+  ): Promise<void> {
+    channel.lastProcessedMessageId = id;
     try {
       await this.saveSettings();
     } catch (e) {
-      console.warn("Could not persist lastProcessedMessageId:", e);
+      console.warn(
+        `Could not persist lastProcessedMessageId for ${getChannelDisplayName(
+          channel,
+        )}:`,
+        e,
+      );
     }
   }
 
   private validateSettings(): boolean {
-    return !!(this.settings.botToken && this.settings.channelId);
+    return !!(this.settings.botToken && this.configuredChannels().length > 0);
+  }
+
+  private configuredChannels(): DiscordChannelSettings[] {
+    return this.settings.channels.filter((channel) => channel.id);
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = normalizeSettings(await this.loadData());
   }
 
   async saveSettings(): Promise<void> {
