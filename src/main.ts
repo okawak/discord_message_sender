@@ -2,6 +2,7 @@ import { Notice, Plugin } from "obsidian";
 import { createChannelDirectory, getChannelDisplayName } from "./channelPaths";
 import { fetchMessages, postNotification } from "./discordApi";
 import { cleanupGlobalNamespace } from "./global";
+import { renderNotificationTemplate } from "./notificationTemplates";
 import {
   type DiscordChannelSettings,
   type DiscordMessage,
@@ -121,12 +122,16 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       await sleep(REQUEST_INTERVAL_DELAY);
     }
 
+    const notificationText = renderNotificationTemplate(
+      processedMessageCount === 0
+        ? this.settings.notificationTemplates.noNew
+        : this.settings.notificationTemplates.saved,
+      { channel, count: processedMessageCount },
+    );
     const notification = await postNotification(
       this.settings.botToken,
       channel.id,
-      processedMessageCount === 0
-        ? "⚠️ No new messages."
-        : `✅ ${processedMessageCount} messages saved.`,
+      notificationText,
     );
 
     const nextLastProcessedMessageId =
