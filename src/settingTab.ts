@@ -5,7 +5,10 @@ import {
   type TextComponent,
 } from "obsidian";
 import type DiscordMessageSenderPlugin from "./main";
-import type { DiscordChannelSettings } from "./settings";
+import {
+  DEFAULT_NOTIFICATION_TEMPLATES,
+  type DiscordChannelSettings,
+} from "./settings";
 
 export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   plugin: DiscordMessageSenderPlugin;
@@ -21,6 +24,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
 
     this.createDirectorySettings(containerEl);
     this.createDiscordSettings(containerEl);
+    this.createNotificationSettings(containerEl);
     this.createBehaviorSettings(containerEl);
   }
 
@@ -158,6 +162,34 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
       );
   }
 
+  private createNotificationSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName("Notifications").setHeading();
+
+    this.addTextAreaSetting(containerEl, {
+      name: "Saved messages template",
+      description:
+        "Discord message sent when one or more messages are saved. Available variables: {count}, {channelName}, {channelId}",
+      placeholder: DEFAULT_NOTIFICATION_TEMPLATES.saved,
+      getValue: () => this.plugin.settings.notificationTemplates.saved,
+      setValue: (value) => {
+        this.plugin.settings.notificationTemplates.saved =
+          value || DEFAULT_NOTIFICATION_TEMPLATES.saved;
+      },
+    });
+
+    this.addTextAreaSetting(containerEl, {
+      name: "No new messages template",
+      description:
+        "Discord message sent when there are no new messages. Available variables: {count}, {channelName}, {channelId}",
+      placeholder: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
+      getValue: () => this.plugin.settings.notificationTemplates.noNew,
+      setValue: (value) => {
+        this.plugin.settings.notificationTemplates.noNew =
+          value || DEFAULT_NOTIFICATION_TEMPLATES.noNew;
+      },
+    });
+  }
+
   // =============================================
   // Utility Methods for Settings
   // =============================================
@@ -231,5 +263,32 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
     });
+  }
+
+  private addTextAreaSetting(
+    containerEl: HTMLElement,
+    options: {
+      name: string;
+      description?: string;
+      placeholder: string;
+      getValue: () => string;
+      setValue: (value: string) => void;
+    },
+  ): void {
+    const setting = new Setting(containerEl).setName(options.name);
+
+    if (options.description) {
+      setting.setDesc(options.description);
+    }
+
+    setting.addTextArea((text) =>
+      text
+        .setPlaceholder(options.placeholder)
+        .setValue(options.getValue())
+        .onChange(async (value) => {
+          options.setValue(value.trim());
+          await this.plugin.saveSettings();
+        }),
+    );
   }
 }
