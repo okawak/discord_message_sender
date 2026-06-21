@@ -13,43 +13,38 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/checkout@v7
 
       - name: Extract version from tag
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-      - name: Update version in package.json
-        run: |
-          sed -i 's/"version": "[^"]*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' package.json
-
-      - name: Update version in manifest.json
-        run: |
-          sed -i 's/"version": "[^"]*"/"version": "${{ steps.get_version.outputs.VERSION }}"/' manifest.json
-
-      - name: Update version in Cargo.toml
-        run: |
-          sed -i '/^\[workspace\.package\]/,/^\[/ s/^version = "[^"]*"/version = "${{ steps.get_version.outputs.VERSION }}"/' Cargo.toml
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           target: wasm32-unknown-unknown
           cache-workspaces: |
-            parse_message
+            .
 
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
+
+      - name: Verify release version
+        run: |
+          PACKAGE_VERSION="$(bun -e "const p = await Bun.file('package.json').json(); console.log(p.version)")"
+          MANIFEST_VERSION="$(bun -e "const p = await Bun.file('manifest.json').json(); console.log(p.version)")"
+          CARGO_VERSION="$(sed -n '/^\[workspace\.package\]/,/^\[/ s/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          test "$PACKAGE_VERSION" = "${{ steps.get_version.outputs.VERSION }}"
+          test "$MANIFEST_VERSION" = "${{ steps.get_version.outputs.VERSION }}"
+          test "$CARGO_VERSION" = "${{ steps.get_version.outputs.VERSION }}"
 
       - name: Test plugin
         run: bun run test
@@ -57,21 +52,13 @@ jobs:
       - name: Build plugin
         run: bun run build
 
-      - name: Commit and Push Version Updates
-        run: |
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git add .
-          git commit -m "Update version to ${{ steps.get_version.outputs.VERSION }}" || exit 0
-          git push origin HEAD:main
-
       - name: Create release archive
         run: |
           cd dist
           zip -r ../discord-message-sender-${{ github.ref_name }}.zip .
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           files: |
             discord-message-sender-${{ github.ref_name }}.zip

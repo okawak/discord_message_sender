@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => {
       outDir: prod ? "dist" : "dev",
       emptyOutDir: true,
       sourcemap: !prod,
+      codeSplitting: false,
       rollupOptions: {
         external: [
           "obsidian",
@@ -40,9 +41,6 @@ export default defineConfig(({ mode }) => {
           "node:fs/promises",
           "node:path",
         ],
-        output: {
-          inlineDynamicImports: true,
-        },
         plugins: [
           wasm({
             targetEnv: "auto-inline",

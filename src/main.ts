@@ -18,7 +18,7 @@ const MESSAGE_PROCESSING_DELAY = 50; // ms
 const REQUEST_INTERVAL_DELAY = 1000; // ms
 
 export default class DiscordMessageSenderPlugin extends Plugin {
-  settings!: DiscordPluginSettings;
+  override settings: DiscordPluginSettings = normalizeSettings(undefined);
   private syncing = false;
 
   override async onload() {
