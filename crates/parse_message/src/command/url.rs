@@ -2,6 +2,8 @@ use crate::{error::MessageError, message};
 use html_to_markdown::convert;
 use wasm_bindgen::prelude::*;
 
+const FRONTMATTER_KEYS: &[&str] = &["title", "source"];
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = ["window", "discordMsgSync"], js_name = fetchUrlContent)]
@@ -18,13 +20,8 @@ pub async fn handle(arg: Option<&str>, timestamp: &str) -> Result<(String, bool,
     let url_content_js = fetch_url_content(url_str).await;
     let url_content = url_content_js.as_string().unwrap_or_default();
 
-    // frontmatter keys, now for test
-    // TODO: get from TypeScript Settings
-    let keys = vec!["title", "source"];
-
-    let processed_md =
-        convert(url_str, &url_content, &keys).map_err(|_| MessageError::ConversionError)?;
-    // TODO: retrieve site name from front-matter
+    let processed_md = convert(url_str, &url_content, FRONTMATTER_KEYS)
+        .map_err(|_| MessageError::ConversionError)?;
     let title = message::format_name(timestamp);
 
     Ok((processed_md, true, title))

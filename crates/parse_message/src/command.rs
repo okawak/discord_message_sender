@@ -7,10 +7,12 @@ pub async fn handle_command(
     rest: &str,
     timestamp: &str,
 ) -> Result<(String, bool, String), JsValue> {
-    let mut parts = rest.splitn(3, ' ');
-    let cmd = parts.next().unwrap_or("");
+    let (cmd, arg) = rest
+        .split_once(char::is_whitespace)
+        .map_or((rest, None), |(cmd, arg)| (cmd, Some(arg.trim_start())));
+
     match cmd {
-        "url" => url::handle(parts.next(), timestamp).await,
+        "url" => url::handle(arg, timestamp).await,
         // add more commands here as needed
         _ => Err(MessageError::UnknownCommand.into()),
     }

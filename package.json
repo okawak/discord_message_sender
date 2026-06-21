@@ -13,10 +13,12 @@
     "build": "bun run wasm:build && bunx vite build --mode production && bun run copy:manifest",
     "clean:files": "bun -e \"import fs from 'fs'; import {glob} from 'glob'; ['dist','dev','pkg','main.js','main.js.map',...await glob('*.wasm')].forEach(p => fs.rmSync(p, {recursive:true, force:true}))\"",
     "clean": "cargo clean && bun run clean:files",
-    "check": "bunx biome check && cargo clippy",
+    "check": "bunx biome check && cargo clippy --workspace --all-targets",
     "check:fix": "bunx biome check --write",
     "type-check": "tsc --noEmit",
-    "test": "cargo test"
+    "test": "bun run test:ts && bun run test:rust",
+    "test:rust": "cargo test --workspace",
+    "test:ts": "bun test"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
