@@ -5,6 +5,7 @@ import {
   type TextComponent,
 } from "obsidian";
 import type DiscordMessageSenderPlugin from "./main";
+import type { DiscordChannelSettings } from "./settings";
 
 export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   plugin: DiscordMessageSenderPlugin;
@@ -61,15 +62,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
       },
     });
 
-    this.addPasswordSetting(containerEl, {
-      name: "Channel ID",
-      description: "Discord channel ID to sync messages from",
-      placeholder: "123456789012345678",
-      getValue: () => this.plugin.settings.channelId,
-      setValue: (value) => {
-        this.plugin.settings.channelId = value;
-      },
-    });
+    this.createChannelSettings(containerEl);
 
     this.addTextSetting(containerEl, {
       name: "Message prefix",
@@ -80,6 +73,73 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         this.plugin.settings.messagePrefix = value || "!";
       },
     });
+  }
+
+  private createChannelSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName("Channels")
+      .setDesc("Discord channels to sync messages from")
+      .addButton((button) =>
+        button
+          .setButtonText("Add channel")
+          .setCta()
+          .onClick(async () => {
+            this.plugin.settings.channels.push({ id: "", name: "" });
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
+
+    if (this.plugin.settings.channels.length === 0) {
+      new Setting(containerEl).setName("No channels configured");
+      return;
+    }
+
+    this.plugin.settings.channels.forEach((channel, index) => {
+      this.addChannelSetting(containerEl, channel, index);
+    });
+  }
+
+  private addChannelSetting(
+    containerEl: HTMLElement,
+    channel: DiscordChannelSettings,
+    index: number,
+  ): void {
+    new Setting(containerEl)
+      .setName(`Channel ${index + 1}`)
+      .setDesc(
+        channel.lastProcessedMessageId
+          ? `Last processed: ${channel.lastProcessedMessageId}`
+          : "New channel",
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("Name (optional)")
+          .setValue(channel.name)
+          .onChange(async (value) => {
+            channel.name = value.trim();
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("Channel ID")
+          .setValue(channel.id)
+          .onChange(async (value) => {
+            channel.id = value.trim();
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addExtraButton((button) =>
+        button
+          .setIcon("trash")
+          .setTooltip("Remove channel")
+          .onClick(async () => {
+            this.plugin.settings.channels.splice(index, 1);
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
   }
 
   private createBehaviorSettings(containerEl: HTMLElement): void {
