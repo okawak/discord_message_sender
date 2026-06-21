@@ -1,6 +1,8 @@
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::Serialize;
 
+const JST_OFFSET_SECONDS: i32 = 9 * 3600;
+
 #[derive(Serialize)]
 pub struct ParseMessageResult {
     pub md: String,
@@ -14,12 +16,9 @@ pub fn format_name(timestamp: &str) -> String {
     let dt_utc = DateTime::parse_from_rfc3339(timestamp).map(|dt| dt.with_timezone(&Utc));
 
     match dt_utc {
-        Ok(dt) => {
-            // JST (+09:00)
-            let jst = FixedOffset::east_opt(9 * 3600).unwrap();
-            let dt_jst = dt.with_timezone(&jst);
-            dt_jst.format("%Y%m%d_%H%M%S").to_string()
-        }
+        Ok(dt) => FixedOffset::east_opt(JST_OFFSET_SECONDS)
+            .map(|jst| dt.with_timezone(&jst).format("%Y%m%d_%H%M%S").to_string())
+            .unwrap_or_else(|| timestamp.to_owned()),
         Err(_) => timestamp.to_owned(),
     }
 }
