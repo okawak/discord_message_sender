@@ -10,6 +10,8 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
 
 - Automatically converts Discord messages into Obsidian Markdown files and saves them
 - Automatically clips web page contents from URLs and saves them as Markdown by using `!url` command
+- Syncs multiple Discord channels and stores each channel in its own subfolder
+- Lets you customize the Discord notification messages sent after sync
 - Can be triggered on Obsidian desktop startup or via the command palette
 
 ## Usage Flow
@@ -17,11 +19,11 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
 1. **Prepare Your Discord Environment**
     - Create a dedicated Discord server for Obsidian integration
     - Create a bot and invite it to your server
-    - Specify the integration channel (using its channel ID)
+    - Specify one or more integration channels (using their channel IDs)
 
 2. **Message Processing**
     - When you launch Obsidian, the plugin fetches messages from Discord via the API
-    - Regular messages → Saved as Markdown files, organized by date
+    - Regular messages → Saved as Markdown files under channel-specific folders
     - Special commands (messages starting with the prefix) → Processed with custom handlers
     - After processing, a completion notification is sent to Discord
 
@@ -55,17 +57,20 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
     - Add Reactions
 4. Use the generated URL to invite your bot
 
-### 3. Get the Channel ID
+### 3. Get Channel IDs
 
 1. In Discord settings, enable **Developer Mode** (in Advanced settings)
-2. Right-click the channel you want to use → **Copy Channel ID**
+2. Right-click each channel you want to sync → **Copy Channel ID**
 
 ### 4. Required Plugin Settings
 
 Please enter the following information in the plugin settings:
 
 - **Bot Token**
-- **Channel ID**
+- **Channels**: Add each Discord channel ID. A channel name is optional and is used for the Obsidian subfolder.
+- **Notification templates**: Optional templates for the Discord messages sent after sync. Available variables: `{count}`, `{channelName}`, `{channelId}`
+
+By default, messages are saved under `DiscordLogs/<channel name or ID>/`, and URL clippings are saved under `DiscordClippings/<channel name or ID>/`.
 
 ## Command List
 
@@ -83,7 +88,7 @@ Messages starting with the configured prefix (default: `!`) are treated as speci
 
 - Fetches the contents of the specified URL
 - Saves it as a Markdown file
-- Save location: Directory specified in the settings (default: **DiscordClippings**)
+- Save location: Channel-specific directory under the clipping directory (default: **DiscordClippings**)
 
 ### Roadmap
 
