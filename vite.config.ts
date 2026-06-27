@@ -17,7 +17,14 @@ const fixWasmImportMetaUrlForCommonJs = () => ({
 
     // Vite inlines the WASM URL before this hook. CommonJS output has no
     // import.meta.url, but URL still requires a syntactically valid base.
-    return code.replaceAll("import.meta.url", JSON.stringify("file:///"));
+    const importMetaUrl = "import.meta.url";
+    const commonJsBaseUrl = JSON.stringify("file:///").padEnd(
+      importMetaUrl.length,
+    );
+    return {
+      code: code.replaceAll(importMetaUrl, commonJsBaseUrl),
+      map: this.getCombinedSourcemap(),
+    };
   },
 });
 
