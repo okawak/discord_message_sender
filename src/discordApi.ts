@@ -1,4 +1,8 @@
-import { Notice, requestUrl } from "obsidian";
+import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
+import {
+  createDiscordApiError,
+  type DiscordRequestMethod,
+} from "./discordApiError";
 import type { DiscordMessage } from "./settings";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
@@ -37,10 +41,10 @@ export async function postNotification(
 
 async function discordRequest(
   botToken: string,
-  method: "GET" | "POST",
+  method: DiscordRequestMethod,
   path: string,
   body?: string,
-) {
+): Promise<RequestUrlResponse> {
   for (let i = 0; i <= MAX_RETRIES; i++) {
     const res = await requestUrl({
       url: DISCORD_API_BASE_URL + path,
@@ -51,10 +55,15 @@ async function discordRequest(
         ...(body ? { "Content-Type": "application/json" } : {}),
       },
       ...(body ? { body } : {}),
+      throw: false,
     });
 
     // Handle rate limiting
     if (res.status === RATE_LIMIT_STATUS_CODE) {
+      if (i === MAX_RETRIES) {
+        throw createDiscordApiError(res.status, method, path, res.text);
+      }
+
       const wait = Number(res.headers["Retry-After"] ?? 1) * 1000 * (i + 1);
       new Notice(`Rate-limited. Retry after ${Math.ceil(wait / 1000)}s`);
       await sleep(wait);
@@ -62,12 +71,15 @@ async function discordRequest(
     }
 
     if (res.status >= 200 && res.status < 300) return res;
-    console.error(`Discord API error ${res.status}:`, res.text);
 
-    if (i === MAX_RETRIES) {
-      throw new Error(`Discord API failed: ${res.status}`);
+    const error = createDiscordApiError(res.status, method, path, res.text);
+
+    if (res.status < 500 || i === MAX_RETRIES) {
+      throw error;
     }
+
     await sleep(1000 * (i + 1));
   }
+
   throw new Error("Discord request: unrecoverable error");
 }

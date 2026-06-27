@@ -1,12 +1,19 @@
 import { Notice, Plugin } from "obsidian";
 import { createChannelDirectory, getChannelDisplayName } from "./channelPaths";
+import {
+  getChannelSyncFailureNotice,
+  getSyncCompletionNotice,
+  syncChannelsSequentially,
+} from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
+import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
 import { cleanupGlobalNamespace } from "./global";
 import { renderNotificationTemplate } from "./notificationTemplates";
 import {
   type DiscordChannelSettings,
   type DiscordMessage,
   type DiscordPluginSettings,
+  migrateSettings,
   normalizeSettings,
   type ProcessedMessage,
 } from "./settings";
@@ -68,21 +75,31 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     this.syncing = true;
     new Notice("Starting Discord sync.");
 
-    let totalProcessedMessageCount = 0;
-
     try {
-      for (const channel of this.configuredChannels()) {
-        const processedMessageCount = await this.syncChannelMessages(channel);
-        totalProcessedMessageCount += processedMessageCount;
-      }
-      new Notice(
-        totalProcessedMessageCount === 0
-          ? "Discord sync finished. No new messages."
-          : `Discord sync finished. ${totalProcessedMessageCount} messages saved.`,
+      const summary = await syncChannelsSequentially(
+        this.configuredChannels(),
+        (channel) => this.syncChannelMessages(channel),
       );
+
+      for (const failure of summary.failures) {
+        console.error(
+          `Discord sync failed for ${getChannelDisplayName(failure.channel)}:`,
+          failure.error,
+        );
+        new Notice(getChannelSyncFailureNotice(failure));
+      }
+
+      new Notice(getSyncCompletionNotice(summary));
     } catch (error) {
       console.error("Discord sync failed:", error);
-      new Notice("Discord sync failed. See console for details.");
+
+      if (error instanceof DiscordApiError) {
+        new Notice(
+          `Discord sync failed: ${getDiscordApiFailureNotice(error)}.`,
+        );
+      } else {
+        new Notice("Discord sync failed. See console for details.");
+      }
     } finally {
       this.syncing = false;
     }
@@ -93,7 +110,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   ): Promise<number> {
     let lastMessageId = channel.lastProcessedMessageId;
     let processedMessageCount = 0;
-    let newestMessageIdFetched: string | undefined;
 
     while (true) {
       const messages = await fetchMessages(
@@ -106,9 +122,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       }
 
       const newestMessageId = messages[0]?.id;
-      if (newestMessageId) {
-        newestMessageIdFetched = newestMessageId;
-      }
 
       for (const message of messages.reverse()) {
         const wasProcessed = await this.processDiscordMessage(message, channel);
@@ -119,6 +132,9 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       }
 
       lastMessageId = newestMessageId;
+      if (newestMessageId) {
+        await this.updateLastProcessedMessage(channel, newestMessageId);
+      }
       await sleep(REQUEST_INTERVAL_DELAY);
     }
 
@@ -134,13 +150,8 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       notificationText,
     );
 
-    const nextLastProcessedMessageId =
-      notification.id || newestMessageIdFetched;
-    if (nextLastProcessedMessageId) {
-      await this.updateLastProcessedMessage(
-        channel,
-        nextLastProcessedMessageId,
-      );
+    if (notification.id) {
+      await this.updateLastProcessedMessage(channel, notification.id);
     }
 
     return processedMessageCount;
@@ -229,7 +240,16 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = normalizeSettings(await this.loadData());
+    const migration = migrateSettings(await this.loadData());
+    this.settings = migration.settings;
+
+    if (migration.didMigrate) {
+      try {
+        await this.saveSettings();
+      } catch (error) {
+        console.warn("Could not persist migrated Discord settings:", error);
+      }
+    }
   }
 
   async saveSettings(): Promise<void> {

@@ -5,7 +5,11 @@ import {
   getChannelPathSegment,
 } from "../src/channelPaths";
 import { renderNotificationTemplate } from "../src/notificationTemplates";
-import { normalizeSettings } from "../src/settings";
+import {
+  CURRENT_SETTINGS_VERSION,
+  migrateSettings,
+  normalizeSettings,
+} from "../src/settings";
 
 describe("normalizeSettings", () => {
   test("migrates legacy channel fields into channels", () => {
@@ -26,7 +30,9 @@ describe("normalizeSettings", () => {
         lastProcessedMessageId: "9876543210",
       },
     ]);
-    expect(settings.channelId).toBe("1234567890");
+    expect(settings.settingsVersion).toBe(CURRENT_SETTINGS_VERSION);
+    expect(Object.hasOwn(settings, "channelId")).toBe(false);
+    expect(Object.hasOwn(settings, "lastProcessedMessageId")).toBe(false);
     expect(settings.enableAutoSyncOnStartup).toBe(false);
   });
 
@@ -43,7 +49,6 @@ describe("normalizeSettings", () => {
       { id: "111", name: "inbox" },
       { id: "222", name: "", lastProcessedMessageId: "999" },
     ]);
-    expect(settings.channelId).toBe("111");
   });
 
   test("fills default notification templates", () => {
@@ -57,6 +62,66 @@ describe("normalizeSettings", () => {
       "Saved {count} from {channelName}",
     );
     expect(settings.notificationTemplates.noNew).toBe("⚠️ No new messages.");
+  });
+});
+
+describe("migrateSettings", () => {
+  test("rewrites v0.2.8 settings into the current schema", () => {
+    const migration = migrateSettings({
+      messageDirectoryName: "DiscordLogs",
+      clippingDirectoryName: "DiscordClippings",
+      botToken: "token",
+      channelId: "123",
+      messagePrefix: "!",
+      enableAutoSyncOnStartup: true,
+      lastProcessedMessageId: "456",
+    });
+
+    expect(migration.didMigrate).toBe(true);
+    expect(migration.settings).toMatchObject({
+      settingsVersion: CURRENT_SETTINGS_VERSION,
+      channels: [
+        {
+          id: "123",
+          name: "",
+          lastProcessedMessageId: "456",
+        },
+      ],
+    });
+    expect(Object.hasOwn(migration.settings, "channelId")).toBe(false);
+    expect(Object.hasOwn(migration.settings, "lastProcessedMessageId")).toBe(
+      false,
+    );
+  });
+
+  test("is idempotent after migrated settings are persisted", () => {
+    const first = migrateSettings({
+      channelId: "123",
+      lastProcessedMessageId: "456",
+    });
+    const second = migrateSettings(first.settings);
+
+    expect(first.didMigrate).toBe(true);
+    expect(second.didMigrate).toBe(false);
+    expect(second.settings).toEqual(first.settings);
+  });
+
+  test("removes stale legacy fields from an existing channels schema", () => {
+    const migration = migrateSettings({
+      settingsVersion: CURRENT_SETTINGS_VERSION,
+      channels: [{ id: "new-channel", name: "new" }],
+      channelId: "stale-channel",
+      lastProcessedMessageId: "stale-cursor",
+    });
+
+    expect(migration.didMigrate).toBe(true);
+    expect(migration.settings.channels).toEqual([
+      { id: "new-channel", name: "new" },
+    ]);
+    expect(Object.hasOwn(migration.settings, "channelId")).toBe(false);
+    expect(Object.hasOwn(migration.settings, "lastProcessedMessageId")).toBe(
+      false,
+    );
   });
 });
 

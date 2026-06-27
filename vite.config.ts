@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import { resolve } from "node:path";
 import { wasm } from "@rollup/plugin-wasm";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
-const fixWasmImportMetaUrlForCommonJs = () => ({
+const fixWasmImportMetaUrlForCommonJs = (): Plugin => ({
   name: "fix-wasm-import-meta-url-for-commonjs",
   enforce: "post" as const,
   transform(code: string, id: string) {
