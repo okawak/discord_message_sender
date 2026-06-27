@@ -3,6 +3,24 @@ import { resolve } from "node:path";
 import { wasm } from "@rollup/plugin-wasm";
 import { defineConfig } from "vite";
 
+const fixWasmImportMetaUrlForCommonJs = () => ({
+  name: "fix-wasm-import-meta-url-for-commonjs",
+  enforce: "post" as const,
+  transform(code: string, id: string) {
+    if (!id.endsWith("/pkg/parse_message.js")) {
+      return null;
+    }
+
+    if (!code.includes("data:application/wasm;base64,")) {
+      throw new Error("Expected Vite to inline the wasm-bindgen binary.");
+    }
+
+    // Vite inlines the WASM URL before this hook. CommonJS output has no
+    // import.meta.url, but URL still requires a syntactically valid base.
+    return code.replaceAll("import.meta.url", JSON.stringify("file:///"));
+  },
+});
+
 export default defineConfig(({ mode }) => {
   // define mode by `vite build --mode production`
   const prod = mode === "production";
@@ -49,7 +67,10 @@ export default defineConfig(({ mode }) => {
         ],
       },
     },
-    plugins: [!prod && copyMainToRoot()].filter(Boolean),
+    plugins: [
+      fixWasmImportMetaUrlForCommonJs(),
+      !prod && copyMainToRoot(),
+    ].filter(Boolean),
     optimizeDeps: {
       exclude: ["node:fs/promises", "node:path"],
     },

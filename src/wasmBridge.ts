@@ -9,13 +9,11 @@ let wasmReady: Promise<InitOutput> | null = null;
 
 export async function initWasmBridge(): Promise<InitOutput> {
   if (!wasmReady) {
-    try {
-      wasmReady = initWasm();
-    } catch (error) {
+    wasmReady = initWasm().catch((error: unknown) => {
       wasmReady = null; // reset on error
       new Notice("WASM initialization failed.");
-      throw new Error(`WASM initialization failed: ${error}`);
-    }
+      throw new Error("WASM initialization failed.", { cause: error });
+    });
   }
   return wasmReady;
 }
