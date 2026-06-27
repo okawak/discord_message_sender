@@ -13,6 +13,7 @@ import {
   type DiscordChannelSettings,
   type DiscordMessage,
   type DiscordPluginSettings,
+  migrateSettings,
   normalizeSettings,
   type ProcessedMessage,
 } from "./settings";
@@ -239,7 +240,16 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = normalizeSettings(await this.loadData());
+    const migration = migrateSettings(await this.loadData());
+    this.settings = migration.settings;
+
+    if (migration.didMigrate) {
+      try {
+        await this.saveSettings();
+      } catch (error) {
+        console.warn("Could not persist migrated Discord settings:", error);
+      }
+    }
   }
 
   async saveSettings(): Promise<void> {

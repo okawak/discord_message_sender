@@ -10,18 +10,22 @@ export interface NotificationTemplates {
   noNew: string;
 }
 
+export const CURRENT_SETTINGS_VERSION = 1;
+
 export interface DiscordPluginSettings {
+  settingsVersion: typeof CURRENT_SETTINGS_VERSION;
   messageDirectoryName: string;
   clippingDirectoryName: string;
   botToken: string;
   channels: DiscordChannelSettings[];
-  /** @deprecated Use channels instead. Kept during the v0.3 migration. */
-  channelId: string;
   messagePrefix: string;
   enableAutoSyncOnStartup: boolean;
   notificationTemplates: NotificationTemplates;
-  /** @deprecated Use channels[].lastProcessedMessageId instead. */
-  lastProcessedMessageId?: string;
+}
+
+export interface SettingsMigrationResult {
+  settings: DiscordPluginSettings;
+  didMigrate: boolean;
 }
 
 // Messages from Discord API
@@ -46,15 +50,23 @@ export const DEFAULT_NOTIFICATION_TEMPLATES: NotificationTemplates = {
 
 // Default settings for the Discord plugin
 export const DEFAULT_SETTINGS: DiscordPluginSettings = {
+  settingsVersion: CURRENT_SETTINGS_VERSION,
   messageDirectoryName: "DiscordLogs",
   clippingDirectoryName: "DiscordClippings",
   botToken: "",
   channels: [],
-  channelId: "",
   messagePrefix: "!",
   enableAutoSyncOnStartup: true,
   notificationTemplates: DEFAULT_NOTIFICATION_TEMPLATES,
 };
+
+export function migrateSettings(data: unknown): SettingsMigrationResult {
+  const raw = isRecord(data) ? data : undefined;
+  return {
+    settings: normalizeSettings(raw),
+    didMigrate: raw ? needsMigration(raw) : false,
+  };
+}
 
 export function normalizeSettings(data: unknown): DiscordPluginSettings {
   const raw = isRecord(data) ? data : {};
@@ -69,6 +81,7 @@ export function normalizeSettings(data: unknown): DiscordPluginSettings {
   });
 
   return {
+    settingsVersion: CURRENT_SETTINGS_VERSION,
     messageDirectoryName:
       readString(raw, "messageDirectoryName") ||
       DEFAULT_SETTINGS.messageDirectoryName,
@@ -77,7 +90,6 @@ export function normalizeSettings(data: unknown): DiscordPluginSettings {
       DEFAULT_SETTINGS.clippingDirectoryName,
     botToken: readString(raw, "botToken"),
     channels,
-    channelId: legacyChannelId || channels[0]?.id || "",
     messagePrefix:
       readString(raw, "messagePrefix") || DEFAULT_SETTINGS.messagePrefix,
     enableAutoSyncOnStartup: readBoolean(
@@ -86,10 +98,15 @@ export function normalizeSettings(data: unknown): DiscordPluginSettings {
       DEFAULT_SETTINGS.enableAutoSyncOnStartup,
     ),
     notificationTemplates: normalizeNotificationTemplates(raw),
-    ...(legacyLastProcessedMessageId
-      ? { lastProcessedMessageId: legacyLastProcessedMessageId }
-      : {}),
   };
+}
+
+function needsMigration(raw: Record<string, unknown>): boolean {
+  return (
+    raw.settingsVersion !== CURRENT_SETTINGS_VERSION ||
+    Object.hasOwn(raw, "channelId") ||
+    Object.hasOwn(raw, "lastProcessedMessageId")
+  );
 }
 
 function normalizeChannels(
