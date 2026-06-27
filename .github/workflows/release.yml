@@ -20,7 +20,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: wasm32-unknown-unknown
           cache-workspaces: |
@@ -30,7 +30,7 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2.2.0
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -58,7 +58,7 @@ jobs:
           zip -r ../discord-message-sender-${{ github.ref_name }}.zip .
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3.0.1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             discord-message-sender-${{ github.ref_name }}.zip
