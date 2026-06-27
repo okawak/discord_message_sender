@@ -113,7 +113,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
       .setName(`Channel ${index + 1}`)
       .setDesc(
         channel.lastProcessedMessageId
-          ? `Last processed: ${channel.lastProcessedMessageId}`
+          ? `Last processed message ID: ${channel.lastProcessedMessageId}`
           : "New channel",
       )
       .addText((text) =>
