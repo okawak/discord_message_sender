@@ -3,6 +3,7 @@ import initWasm, {
   type InitOutput,
   process_message as processMessage,
 } from "../pkg/parse_message.js";
+import { type ProcessedMessage, parseWasmMessageResult } from "./messages";
 
 // flag to indicate if the WASM module is ready
 let wasmReady: Promise<InitOutput> | null = null;
@@ -26,11 +27,12 @@ export async function parseMessageWasm(
   content: string,
   prefix: string,
   timestamp: string,
-) {
+): Promise<ProcessedMessage> {
   try {
     await initWasmBridge();
-    return await processMessage(content, prefix, timestamp);
+    const result: unknown = await processMessage(content, prefix, timestamp);
+    return parseWasmMessageResult(result);
   } catch (error) {
-    throw new Error(`Failed to parse message: ${error}`);
+    throw new Error("Failed to parse message.", { cause: error });
   }
 }

@@ -3,26 +3,22 @@ import { createChannelDirectory, getChannelDisplayName } from "./channelPaths";
 import {
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
+  syncChannelMessages,
   syncChannelsSequentially,
 } from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
 import { cleanupGlobalNamespace } from "./global";
-import { renderNotificationTemplate } from "./notificationTemplates";
+import type { DiscordMessage, ProcessedMessage } from "./messages";
 import {
   type DiscordChannelSettings,
-  type DiscordMessage,
   type DiscordPluginSettings,
   migrateSettings,
   normalizeSettings,
-  type ProcessedMessage,
 } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
 import { saveToVault } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
-
-const MESSAGE_PROCESSING_DELAY = 50; // ms
-const REQUEST_INTERVAL_DELAY = 1000; // ms
 
 export default class DiscordMessageSenderPlugin extends Plugin {
   override settings: DiscordPluginSettings = normalizeSettings(undefined);
@@ -78,7 +74,23 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     try {
       const summary = await syncChannelsSequentially(
         this.configuredChannels(),
-        (channel) => this.syncChannelMessages(channel),
+        (channel) =>
+          syncChannelMessages(
+            {
+              botToken: this.settings.botToken,
+              channel,
+              notificationTemplates: this.settings.notificationTemplates,
+            },
+            {
+              fetchMessages,
+              postNotification,
+              processMessage: (message, currentChannel) =>
+                this.processDiscordMessage(message, currentChannel),
+              persistCursor: (currentChannel, messageId) =>
+                this.updateLastProcessedMessage(currentChannel, messageId),
+              sleep,
+            },
+          ),
       );
 
       for (const failure of summary.failures) {
@@ -105,58 +117,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     }
   }
 
-  private async syncChannelMessages(
-    channel: DiscordChannelSettings,
-  ): Promise<number> {
-    let lastMessageId = channel.lastProcessedMessageId;
-    let processedMessageCount = 0;
-
-    while (true) {
-      const messages = await fetchMessages(
-        this.settings.botToken,
-        channel.id,
-        lastMessageId,
-      );
-      if (messages.length === 0) {
-        break;
-      }
-
-      const newestMessageId = messages[0]?.id;
-
-      for (const message of messages.reverse()) {
-        const wasProcessed = await this.processDiscordMessage(message, channel);
-        if (wasProcessed) {
-          processedMessageCount++;
-        }
-        await sleep(MESSAGE_PROCESSING_DELAY);
-      }
-
-      lastMessageId = newestMessageId;
-      if (newestMessageId) {
-        await this.updateLastProcessedMessage(channel, newestMessageId);
-      }
-      await sleep(REQUEST_INTERVAL_DELAY);
-    }
-
-    const notificationText = renderNotificationTemplate(
-      processedMessageCount === 0
-        ? this.settings.notificationTemplates.noNew
-        : this.settings.notificationTemplates.saved,
-      { channel, count: processedMessageCount },
-    );
-    const notification = await postNotification(
-      this.settings.botToken,
-      channel.id,
-      notificationText,
-    );
-
-    if (notification.id) {
-      await this.updateLastProcessedMessage(channel, notification.id);
-    }
-
-    return processedMessageCount;
-  }
-
   private async processDiscordMessage(
     message: DiscordMessage,
     channel: DiscordChannelSettings,
@@ -167,8 +127,9 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     let processedMessage: ProcessedMessage;
     try {
-      processedMessage = await this.parseMessage(
+      processedMessage = await parseMessageWasm(
         message.content,
+        this.settings.messagePrefix,
         message.timestamp,
       );
     } catch (error) {
@@ -187,31 +148,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       processedMessage,
     );
     return true;
-  }
-
-  private async parseMessage(
-    content: string,
-    timestamp: string,
-  ): Promise<ProcessedMessage> {
-    if (!this.manifest.dir) {
-      throw new Error("Plugin directory not found.");
-    }
-
-    try {
-      const result = await parseMessageWasm(
-        content,
-        this.settings.messagePrefix,
-        timestamp,
-      );
-      const { md, is_clip, name } = result;
-      return {
-        markdown: md,
-        isClipping: is_clip,
-        fileName: name,
-      };
-    } catch (error) {
-      throw new Error(String(error));
-    }
   }
 
   private async updateLastProcessedMessage(

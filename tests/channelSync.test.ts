@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
+  syncChannelMessages,
   syncChannelsSequentially,
 } from "../src/channelSync";
 import { createDiscordApiError, DiscordApiError } from "../src/discordApiError";
@@ -76,6 +77,114 @@ describe("syncChannelsSequentially", () => {
 
     expect(caught).toBe(unauthorized);
     expect(synced).toEqual(["111"]);
+  });
+});
+
+describe("syncChannelMessages", () => {
+  test("processes messages oldest first and persists both cursors", async () => {
+    const channel = { id: "111", name: "first" };
+    const processed: string[] = [];
+    const cursors: string[] = [];
+    const delays: number[] = [];
+    const fetches = [
+      [
+        {
+          id: "newest",
+          content: "second",
+          timestamp: "2026-06-27T00:00:02Z",
+        },
+        {
+          id: "oldest",
+          content: "first",
+          timestamp: "2026-06-27T00:00:01Z",
+        },
+      ],
+      [],
+    ];
+
+    const count = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel,
+        notificationTemplates: {
+          saved: "{count} saved from {channelName}",
+          noNew: "none",
+        },
+      },
+      {
+        fetchMessages: async () => fetches.shift() ?? [],
+        postNotification: async (_token, _channelId, text) => {
+          expect(text).toBe("2 saved from first");
+          return {
+            id: "notification",
+            content: text,
+            timestamp: "2026-06-27T00:00:03Z",
+          };
+        },
+        processMessage: async (message) => {
+          processed.push(message.id);
+          return true;
+        },
+        persistCursor: async (_currentChannel, messageId) => {
+          cursors.push(messageId);
+        },
+        sleep: async (milliseconds) => {
+          delays.push(milliseconds);
+        },
+      },
+    );
+
+    expect(count).toBe(2);
+    expect(processed).toEqual(["oldest", "newest"]);
+    expect(cursors).toEqual(["newest", "notification"]);
+    expect(delays).toEqual([50, 50, 1000]);
+  });
+
+  test("persists the fetched cursor before a notification failure", async () => {
+    const channel = { id: "111", name: "first" };
+    const cursors: string[] = [];
+    let fetchCount = 0;
+
+    let caught: unknown;
+    try {
+      await syncChannelMessages(
+        {
+          botToken: "token",
+          channel,
+          notificationTemplates: {
+            saved: "saved",
+            noNew: "none",
+          },
+        },
+        {
+          fetchMessages: async () => {
+            fetchCount++;
+            return fetchCount === 1
+              ? [
+                  {
+                    id: "message",
+                    content: "content",
+                    timestamp: "2026-06-27T00:00:00Z",
+                  },
+                ]
+              : [];
+          },
+          postNotification: async () => {
+            throw new Error("Missing Send Messages");
+          },
+          processMessage: async () => true,
+          persistCursor: async (_currentChannel, messageId) => {
+            cursors.push(messageId);
+          },
+          sleep: async () => {},
+        },
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect(cursors).toEqual(["message"]);
   });
 });
 

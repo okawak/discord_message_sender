@@ -1,5 +1,5 @@
 import { TFolder, type Vault } from "obsidian";
-import type { ProcessedMessage } from "./settings";
+import type { ProcessedMessage } from "./messages";
 
 // Save to Obsidian vault
 export async function saveToVault(

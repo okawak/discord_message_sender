@@ -3,7 +3,7 @@ import {
   createDiscordApiError,
   type DiscordRequestMethod,
 } from "./discordApiError";
-import type { DiscordMessage } from "./settings";
+import type { DiscordMessage } from "./messages";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 const RATE_LIMIT_STATUS_CODE = 429;

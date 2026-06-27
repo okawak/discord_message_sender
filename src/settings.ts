@@ -28,21 +28,6 @@ export interface SettingsMigrationResult {
   didMigrate: boolean;
 }
 
-// Messages from Discord API
-export interface DiscordMessage {
-  id: string;
-  content: string;
-  timestamp: string;
-  author?: { bot?: boolean };
-}
-
-// Interface for WASM processing
-export interface ProcessedMessage {
-  markdown: string;
-  isClipping: boolean;
-  fileName: string;
-}
-
 export const DEFAULT_NOTIFICATION_TEMPLATES: NotificationTemplates = {
   saved: "✅ {count} messages saved.",
   noNew: "⚠️ No new messages.",
