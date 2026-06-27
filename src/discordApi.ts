@@ -1,25 +1,14 @@
 import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
+import {
+  createDiscordApiError,
+  type DiscordRequestMethod,
+} from "./discordApiError";
 import type { DiscordMessage } from "./settings";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 const RATE_LIMIT_STATUS_CODE = 429;
 const MESSAGES_PER_REQUEST = 100;
 const MAX_RETRIES = 3;
-
-type DiscordRequestMethod = "GET" | "POST";
-
-export class DiscordApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly method: DiscordRequestMethod,
-    readonly path: string,
-    readonly responseText: string,
-  ) {
-    super(message);
-    this.name = "DiscordApiError";
-  }
-}
 
 // Get message from Discord
 export async function fetchMessages(
@@ -72,7 +61,7 @@ async function discordRequest(
     // Handle rate limiting
     if (res.status === RATE_LIMIT_STATUS_CODE) {
       if (i === MAX_RETRIES) {
-        throw createDiscordApiError(res, method, path);
+        throw createDiscordApiError(res.status, method, path, res.text);
       }
 
       const wait = Number(res.headers["Retry-After"] ?? 1) * 1000 * (i + 1);
@@ -83,8 +72,7 @@ async function discordRequest(
 
     if (res.status >= 200 && res.status < 300) return res;
 
-    const error = createDiscordApiError(res, method, path);
-    console.error(error.message, res.text);
+    const error = createDiscordApiError(res.status, method, path, res.text);
 
     if (res.status < 500 || i === MAX_RETRIES) {
       throw error;
@@ -94,59 +82,4 @@ async function discordRequest(
   }
 
   throw new Error("Discord request: unrecoverable error");
-}
-
-function createDiscordApiError(
-  res: RequestUrlResponse,
-  method: DiscordRequestMethod,
-  path: string,
-): DiscordApiError {
-  return new DiscordApiError(
-    getDiscordApiErrorMessage(res.status, method, path, res.text),
-    res.status,
-    method,
-    path,
-    res.text,
-  );
-}
-
-function getDiscordApiErrorMessage(
-  status: number,
-  method: DiscordRequestMethod,
-  path: string,
-  responseText: string,
-): string {
-  const detail = getDiscordErrorDetail(responseText);
-
-  switch (status) {
-    case 401:
-      return `Discord API ${method} ${path} failed with 401 Unauthorized. Check the bot token.${detail}`;
-    case 403:
-      return `Discord API ${method} ${path} failed with 403 Forbidden. Check that the bot is invited to the server and has the required channel permissions.${detail}`;
-    case 404:
-      return `Discord API ${method} ${path} failed with 404 Not Found. Check the channel ID.${detail}`;
-    default:
-      return `Discord API ${method} ${path} failed with ${status}.${detail}`;
-  }
-}
-
-function getDiscordErrorDetail(responseText: string): string {
-  if (!responseText) {
-    return "";
-  }
-
-  try {
-    const payload: unknown = JSON.parse(responseText);
-    if (isRecord(payload) && typeof payload.message === "string") {
-      return ` Discord says: ${payload.message}`;
-    }
-  } catch {
-    // Use the raw response text below.
-  }
-
-  return ` Discord response: ${responseText}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }

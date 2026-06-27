@@ -1,6 +1,12 @@
 import { Notice, Plugin } from "obsidian";
 import { createChannelDirectory, getChannelDisplayName } from "./channelPaths";
-import { DiscordApiError, fetchMessages, postNotification } from "./discordApi";
+import {
+  getChannelSyncFailureNotice,
+  getSyncCompletionNotice,
+  syncChannelsSequentially,
+} from "./channelSync";
+import { fetchMessages, postNotification } from "./discordApi";
+import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
 import { cleanupGlobalNamespace } from "./global";
 import { renderNotificationTemplate } from "./notificationTemplates";
 import {
@@ -16,26 +22,6 @@ import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 
 const MESSAGE_PROCESSING_DELAY = 50; // ms
 const REQUEST_INTERVAL_DELAY = 1000; // ms
-
-function getDiscordApiFailureNotice(error: DiscordApiError): string {
-  if (error.status === 403) {
-    const permission =
-      error.method === "GET"
-        ? "View Channel / Read Message History"
-        : "Send Messages";
-    return `Discord sync failed: missing Discord permission (${permission}).`;
-  }
-
-  if (error.status === 401) {
-    return "Discord sync failed: invalid Discord bot token.";
-  }
-
-  if (error.status === 404) {
-    return "Discord sync failed: Discord channel was not found.";
-  }
-
-  return `Discord sync failed: Discord API returned ${error.status}.`;
-}
 
 export default class DiscordMessageSenderPlugin extends Plugin {
   override settings: DiscordPluginSettings = normalizeSettings(undefined);
@@ -88,23 +74,28 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     this.syncing = true;
     new Notice("Starting Discord sync.");
 
-    let totalProcessedMessageCount = 0;
-
     try {
-      for (const channel of this.configuredChannels()) {
-        const processedMessageCount = await this.syncChannelMessages(channel);
-        totalProcessedMessageCount += processedMessageCount;
-      }
-      new Notice(
-        totalProcessedMessageCount === 0
-          ? "Discord sync finished. No new messages."
-          : `Discord sync finished. ${totalProcessedMessageCount} messages saved.`,
+      const summary = await syncChannelsSequentially(
+        this.configuredChannels(),
+        (channel) => this.syncChannelMessages(channel),
       );
+
+      for (const failure of summary.failures) {
+        console.error(
+          `Discord sync failed for ${getChannelDisplayName(failure.channel)}:`,
+          failure.error,
+        );
+        new Notice(getChannelSyncFailureNotice(failure));
+      }
+
+      new Notice(getSyncCompletionNotice(summary));
     } catch (error) {
       console.error("Discord sync failed:", error);
 
       if (error instanceof DiscordApiError) {
-        new Notice(getDiscordApiFailureNotice(error));
+        new Notice(
+          `Discord sync failed: ${getDiscordApiFailureNotice(error)}.`,
+        );
       } else {
         new Notice("Discord sync failed. See console for details.");
       }
@@ -118,7 +109,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   ): Promise<number> {
     let lastMessageId = channel.lastProcessedMessageId;
     let processedMessageCount = 0;
-    let newestMessageIdFetched: string | undefined;
 
     while (true) {
       const messages = await fetchMessages(
@@ -131,9 +121,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       }
 
       const newestMessageId = messages[0]?.id;
-      if (newestMessageId) {
-        newestMessageIdFetched = newestMessageId;
-      }
 
       for (const message of messages.reverse()) {
         const wasProcessed = await this.processDiscordMessage(message, channel);
@@ -144,6 +131,9 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       }
 
       lastMessageId = newestMessageId;
+      if (newestMessageId) {
+        await this.updateLastProcessedMessage(channel, newestMessageId);
+      }
       await sleep(REQUEST_INTERVAL_DELAY);
     }
 
@@ -159,13 +149,8 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       notificationText,
     );
 
-    const nextLastProcessedMessageId =
-      notification.id || newestMessageIdFetched;
-    if (nextLastProcessedMessageId) {
-      await this.updateLastProcessedMessage(
-        channel,
-        nextLastProcessedMessageId,
-      );
+    if (notification.id) {
+      await this.updateLastProcessedMessage(channel, notification.id);
     }
 
     return processedMessageCount;
