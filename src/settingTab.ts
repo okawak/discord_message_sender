@@ -1,9 +1,11 @@
 import {
   type App,
+  Notice,
   PluginSettingTab,
   Setting,
   type TextComponent,
 } from "obsidian";
+import { getChannelNameValidationError } from "./channelPaths";
 import type DiscordMessageSenderPlugin from "./main";
 import {
   DEFAULT_NOTIFICATION_TEMPLATES,
@@ -117,7 +119,14 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           .setPlaceholder("Name (optional)")
           .setValue(channel.name)
           .onChange(async (value) => {
-            channel.name = value.trim();
+            const name = value.trim();
+            const error = getChannelNameValidationError(name);
+            if (error) {
+              new Notice(error);
+              text.setValue(channel.name);
+              return;
+            }
+            channel.name = name;
             await this.plugin.saveSettings();
           }),
       )

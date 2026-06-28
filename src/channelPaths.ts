@@ -1,10 +1,24 @@
 import type { DiscordChannelSettings } from "./settings";
 
 const UNSAFE_PATH_SEGMENT_CHARS = /[\\/:*?"<>|#^]+/g;
+const FORBIDDEN_CHANNEL_NAME_CHARS = /[\\/:*?"<>|#^[\]]/;
 const WHITESPACE = /\s+/g;
+
+export const INVALID_CHANNEL_NAME_MESSAGE =
+  'Channel name is invalid. Forbidden characters are: \\ / : * ? " < > | # ^ [ ]. The names "." and ".." are also not allowed.';
 
 export function getChannelDisplayName(channel: DiscordChannelSettings): string {
   return channel.name || channel.id;
+}
+
+export function getChannelNameValidationError(
+  name: string,
+): string | undefined {
+  return FORBIDDEN_CHANNEL_NAME_CHARS.test(name) ||
+    name === "." ||
+    name === ".."
+    ? INVALID_CHANNEL_NAME_MESSAGE
+    : undefined;
 }
 
 export function getChannelPathSegment(channel: DiscordChannelSettings): string {

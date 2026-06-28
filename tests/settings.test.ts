@@ -3,7 +3,9 @@ import {
   createChannelDirectory,
   findDuplicateChannelPathSegment,
   getChannelDisplayName,
+  getChannelNameValidationError,
   getChannelPathSegment,
+  INVALID_CHANNEL_NAME_MESSAGE,
 } from "../src/channelPaths";
 import { renderNotificationTemplate } from "../src/notificationTemplates";
 import {
@@ -173,6 +175,35 @@ describe("channel paths", () => {
 
   test("falls back to the channel id for unsafe traversal names", () => {
     expect(getChannelPathSegment({ id: "333", name: ".." })).toBe("333");
+  });
+
+  test("rejects forbidden and reserved channel names", () => {
+    for (const name of [
+      "\\",
+      "/",
+      ":",
+      "*",
+      "?",
+      '"',
+      "<",
+      ">",
+      "|",
+      "#",
+      "^",
+      "[",
+      "]",
+    ]) {
+      expect(getChannelNameValidationError(`name${name}`)).toBe(
+        INVALID_CHANNEL_NAME_MESSAGE,
+      );
+    }
+    expect(getChannelNameValidationError(".")).toBe(
+      INVALID_CHANNEL_NAME_MESSAGE,
+    );
+    expect(getChannelNameValidationError("..")).toBe(
+      INVALID_CHANNEL_NAME_MESSAGE,
+    );
+    expect(getChannelNameValidationError("inbox")).toBeUndefined();
   });
 
   test("detects duplicate sanitized channel folders", () => {

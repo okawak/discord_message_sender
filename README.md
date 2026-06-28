@@ -72,6 +72,8 @@ Please enter the following information in the plugin settings:
 
 By default, messages are saved under `DiscordLogs/<channel name or ID>/`, and URL clippings are saved under `DiscordClippings/<channel name or ID>/`. Sync stops with an error when multiple channels resolve to the same folder name.
 
+Channel names cannot contain `\ / : * ? " < > | # ^ [ ]`. The names `.` and `..` are also not allowed. Invalid names are not saved.
+
 ## Command List
 
 Messages starting with the configured prefix (default: `!`) are treated as special commands.

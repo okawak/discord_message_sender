@@ -3,6 +3,7 @@ import {
   createChannelDirectory,
   findDuplicateChannelPathSegment,
   getChannelDisplayName,
+  getChannelNameValidationError,
 } from "./channelPaths";
 import {
   getChannelSyncFailureNotice,
@@ -64,6 +65,14 @@ export default class DiscordMessageSenderPlugin extends Plugin {
         "Discord message sender: bot token or channel is not configured.",
       );
       return;
+    }
+
+    for (const channel of channels) {
+      const error = getChannelNameValidationError(channel.name);
+      if (error) {
+        new Notice(error);
+        return;
+      }
     }
 
     const duplicatePath = findDuplicateChannelPathSegment(channels);
