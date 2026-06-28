@@ -1,21 +1,33 @@
 import { Notice, Plugin } from "obsidian";
-import { fetchMessages, postNotification } from "./discordApi";
-import { cleanupGlobalNamespace } from "./global";
 import {
-  DEFAULT_SETTINGS,
-  type DiscordMessage,
+  createChannelDirectory,
+  findDuplicateChannelPathSegment,
+  getChannelDisplayName,
+  getChannelNameValidationError,
+} from "./channelPaths";
+import {
+  getChannelSyncFailureNotice,
+  getSyncCompletionNotice,
+  syncChannelMessages,
+  syncChannelsSequentially,
+} from "./channelSync";
+import { fetchMessages, postNotification } from "./discordApi";
+import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
+import { cleanupGlobalNamespace } from "./global";
+import type { DiscordMessage } from "./messages";
+import {
+  type DiscordChannelSettings,
   type DiscordPluginSettings,
-  type ProcessedMessage,
+  getConfiguredChannels,
+  migrateSettings,
+  normalizeSettings,
 } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
 import { saveToVault } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 
-const MESSAGE_PROCESSING_DELAY = 50; // ms
-const REQUEST_INTERVAL_DELAY = 1000; // ms
-
 export default class DiscordMessageSenderPlugin extends Plugin {
-  settings!: DiscordPluginSettings;
+  override settings: DiscordPluginSettings = normalizeSettings(undefined);
   private syncing = false;
 
   override async onload() {
@@ -26,27 +38,19 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     await initWasmBridge();
     await this.loadSettings();
-    this.registerCommands();
-    this.setupAutoSync();
-    this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
-  }
-
-  override onunload(): void {
-    cleanupGlobalNamespace();
-  }
-
-  private registerCommands(): void {
     this.addCommand({
       id: "sync-discord-messages",
       name: "Sync Discord messages",
       callback: () => this.syncDiscordMessages(),
     });
-  }
-
-  private setupAutoSync(): void {
     if (this.settings.enableAutoSyncOnStartup) {
       this.syncDiscordMessages().catch(console.error);
     }
+    this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
+  }
+
+  override onunload(): void {
+    cleanupGlobalNamespace();
   }
 
   private async syncDiscordMessages(): Promise<void> {
@@ -55,9 +59,26 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
-    if (!this.validateSettings()) {
+    const channels = getConfiguredChannels(this.settings.channels);
+    if (!this.settings.botToken || channels.length === 0) {
       new Notice(
-        "Discord message sender: bot token or channel ID is not configured.",
+        "Discord message sender: bot token or channel is not configured.",
+      );
+      return;
+    }
+
+    for (const channel of channels) {
+      const error = getChannelNameValidationError(channel.name);
+      if (error) {
+        new Notice(error);
+        return;
+      }
+    }
+
+    const duplicatePath = findDuplicateChannelPathSegment(channels);
+    if (duplicatePath) {
+      new Notice(
+        `Discord message sender: duplicate channel folder "${duplicatePath}". Use unique channel names.`,
       );
       return;
     }
@@ -65,65 +86,63 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     this.syncing = true;
     new Notice("Starting Discord sync.");
 
-    let lastMessageId = this.settings.lastProcessedMessageId;
-    let processedMessageCount = 0;
-    let newestMessageIdProcessed: string | undefined;
-
     try {
-      while (true) {
-        const messages = await fetchMessages(this.settings, lastMessageId);
-        if (messages.length === 0) {
-          break;
-        }
+      const summary = await syncChannelsSequentially(channels, (channel) => {
+        const snapshot = { ...channel };
+        return syncChannelMessages(
+          {
+            botToken: this.settings.botToken,
+            channel: snapshot,
+            notificationTemplates: this.settings.notificationTemplates,
+          },
+          {
+            fetchMessages,
+            postNotification,
+            processMessage: (message, currentChannel) =>
+              this.processDiscordMessage(message, currentChannel),
+            persistCursor: (_currentChannel, messageId) =>
+              this.updateLastProcessedMessage(channel, snapshot.id, messageId),
+            sleep,
+          },
+        );
+      });
 
-        const newestMessageId = messages[0]?.id;
-
-        for (const message of messages.reverse()) {
-          const wasProcessed = await this.processDiscordMessage(message);
-          if (wasProcessed) {
-            processedMessageCount++;
-            newestMessageIdProcessed = message.id;
-          }
-          await sleep(MESSAGE_PROCESSING_DELAY);
-        }
-
-        lastMessageId = newestMessageId;
-        await sleep(REQUEST_INTERVAL_DELAY);
+      for (const failure of summary.failures) {
+        console.error(
+          `Discord sync failed for ${getChannelDisplayName(failure.channel)}:`,
+          failure.error,
+        );
+        new Notice(getChannelSyncFailureNotice(failure));
       }
-      await postNotification(
-        this.settings,
-        processedMessageCount === 0
-          ? "⚠️ No new messages."
-          : `✅ ${processedMessageCount} messages saved.`,
-      );
+
+      new Notice(getSyncCompletionNotice(summary));
     } catch (error) {
       console.error("Discord sync failed:", error);
-      new Notice("Discord sync failed. See console for details.");
-    } finally {
-      if (newestMessageIdProcessed) {
-        await this.updateLastProcessedMessage(newestMessageIdProcessed);
+
+      if (error instanceof DiscordApiError) {
+        new Notice(
+          `Discord sync failed: ${getDiscordApiFailureNotice(error)}.`,
+        );
+      } else {
+        new Notice("Discord sync failed. See console for details.");
       }
+    } finally {
       this.syncing = false;
     }
   }
 
   private async processDiscordMessage(
     message: DiscordMessage,
+    channel: DiscordChannelSettings,
   ): Promise<boolean> {
     if (message.author?.bot) {
       return false;
     }
 
-    let processedMessage: ProcessedMessage;
-    try {
-      processedMessage = await this.parseMessage(
-        message.content,
-        message.timestamp,
-      );
-    } catch (error) {
-      console.error("parseMessage error:", error);
-      return false;
-    }
+    const processedMessage = await parseMessageWasm(
+      message,
+      this.settings.messagePrefix,
+    );
 
     if (!processedMessage.markdown) {
       return false;
@@ -131,53 +150,45 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     await saveToVault(
       this.app.vault,
-      this.settings.messageDirectoryName,
-      this.settings.clippingDirectoryName,
+      createChannelDirectory(this.settings.messageDirectoryName, channel),
+      createChannelDirectory(this.settings.clippingDirectoryName, channel),
       processedMessage,
     );
     return true;
   }
 
-  private async parseMessage(
-    content: string,
-    timestamp: string,
-  ): Promise<ProcessedMessage> {
-    if (!this.manifest.dir) {
-      throw new Error("Plugin directory not found.");
+  private async updateLastProcessedMessage(
+    channel: DiscordChannelSettings,
+    expectedChannelId: string,
+    id: string,
+  ): Promise<void> {
+    if (channel.id !== expectedChannelId) {
+      return;
     }
-
-    try {
-      const result = await parseMessageWasm(
-        content,
-        this.settings.messagePrefix,
-        timestamp,
-      );
-      const { md, is_clip, name } = result;
-      return {
-        markdown: md,
-        isClipping: is_clip,
-        fileName: name,
-      };
-    } catch (error) {
-      throw new Error(String(error));
-    }
-  }
-
-  private async updateLastProcessedMessage(id: string) {
-    this.settings.lastProcessedMessageId = id;
+    channel.lastProcessedMessageId = id;
     try {
       await this.saveSettings();
     } catch (e) {
-      console.warn("Could not persist lastProcessedMessageId:", e);
+      console.warn(
+        `Could not persist lastProcessedMessageId for ${getChannelDisplayName(
+          channel,
+        )}:`,
+        e,
+      );
     }
   }
 
-  private validateSettings(): boolean {
-    return !!(this.settings.botToken && this.settings.channelId);
-  }
-
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const migration = migrateSettings(await this.loadData());
+    this.settings = migration.settings;
+
+    if (migration.didMigrate) {
+      try {
+        await this.saveSettings();
+      } catch (error) {
+        console.warn("Could not persist migrated Discord settings:", error);
+      }
+    }
   }
 
   async saveSettings(): Promise<void> {

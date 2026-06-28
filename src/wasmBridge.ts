@@ -3,32 +3,41 @@ import initWasm, {
   type InitOutput,
   process_message as processMessage,
 } from "../pkg/parse_message.js";
+import {
+  type DiscordMessage,
+  type ProcessedMessage,
+  parseWasmMessageResult,
+} from "./messages";
 
 // flag to indicate if the WASM module is ready
 let wasmReady: Promise<InitOutput> | null = null;
 
 export async function initWasmBridge(): Promise<InitOutput> {
-  if (!wasmReady) {
-    try {
-      wasmReady = initWasm();
-    } catch (error) {
-      wasmReady = null; // reset on error
-      new Notice("WASM initialization failed.");
-      throw new Error(`WASM initialization failed: ${error}`);
-    }
-  }
+  wasmReady ??= initWasm().catch((error: unknown) => {
+    wasmReady = null;
+    new Notice("WASM initialization failed.");
+    throw new Error("WASM initialization failed.", { cause: error });
+  });
   return wasmReady;
 }
 
 export async function parseMessageWasm(
-  content: string,
+  message: DiscordMessage,
   prefix: string,
-  timestamp: string,
-) {
+): Promise<ProcessedMessage> {
   try {
     await initWasmBridge();
-    return await processMessage(content, prefix, timestamp);
+    const result: unknown = await processMessage(message.content, prefix);
+    return parseWasmMessageResult(result, message.timestamp, message.id);
   } catch (error) {
-    throw new Error(`Failed to parse message: ${error}`);
+    console.error(
+      "Failed to parse message; saving the original content:",
+      error,
+    );
+    return parseWasmMessageResult(
+      [message.content, false],
+      message.timestamp,
+      message.id,
+    );
   }
 }

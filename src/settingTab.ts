@@ -1,10 +1,20 @@
 import {
   type App,
+  Notice,
   PluginSettingTab,
   Setting,
   type TextComponent,
 } from "obsidian";
+import {
+  findDuplicateChannelPathSegment,
+  getChannelNameValidationError,
+} from "./channelPaths";
 import type DiscordMessageSenderPlugin from "./main";
+import {
+  DEFAULT_NOTIFICATION_TEMPLATES,
+  type DiscordChannelSettings,
+  updateChannelId,
+} from "./settings";
 
 export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   plugin: DiscordMessageSenderPlugin;
@@ -14,12 +24,13 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
+  override display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
     this.createDirectorySettings(containerEl);
     this.createDiscordSettings(containerEl);
+    this.createNotificationSettings(containerEl);
     this.createBehaviorSettings(containerEl);
   }
 
@@ -61,15 +72,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
       },
     });
 
-    this.addPasswordSetting(containerEl, {
-      name: "Channel ID",
-      description: "Discord channel ID to sync messages from",
-      placeholder: "123456789012345678",
-      getValue: () => this.plugin.settings.channelId,
-      setValue: (value) => {
-        this.plugin.settings.channelId = value;
-      },
-    });
+    this.createChannelSettings(containerEl);
 
     this.addTextSetting(containerEl, {
       name: "Message prefix",
@@ -80,6 +83,86 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         this.plugin.settings.messagePrefix = value || "!";
       },
     });
+  }
+
+  private createChannelSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName("Channels")
+      .setDesc("Discord channels to sync messages from")
+      .addButton((button) =>
+        button
+          .setButtonText("Add channel")
+          .setCta()
+          .onClick(async () => {
+            this.plugin.settings.channels.push({ id: "", name: "" });
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
+
+    if (this.plugin.settings.channels.length === 0) {
+      new Setting(containerEl).setName("No channels configured");
+      return;
+    }
+
+    this.plugin.settings.channels.forEach((channel, index) => {
+      this.addChannelSetting(containerEl, channel, index);
+    });
+  }
+
+  private addChannelSetting(
+    containerEl: HTMLElement,
+    channel: DiscordChannelSettings,
+    index: number,
+  ): void {
+    new Setting(containerEl)
+      .setName(`Channel ${index + 1}`)
+      .addText((text) =>
+        text
+          .setPlaceholder("Name (optional)")
+          .setValue(channel.name)
+          .onChange(async (value) => {
+            const name = value.trim();
+            const error = getChannelNameValidationError(name);
+            if (error) {
+              new Notice(error);
+              text.setValue(channel.name);
+              return;
+            }
+            const duplicate = findDuplicateChannelPathSegment(
+              this.plugin.settings.channels.map((candidate) =>
+                candidate === channel ? { ...candidate, name } : candidate,
+              ),
+            );
+            if (duplicate) {
+              new Notice(
+                `Channel name is already in use as folder "${duplicate}". Enter a unique channel name.`,
+              );
+              return;
+            }
+            channel.name = name;
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("Channel ID")
+          .setValue(channel.id)
+          .onChange(async (value) => {
+            updateChannelId(channel, value.trim());
+            await this.plugin.saveSettings();
+          }),
+      )
+      .addExtraButton((button) =>
+        button
+          .setIcon("trash")
+          .setTooltip("Remove channel")
+          .onClick(async () => {
+            this.plugin.settings.channels.splice(index, 1);
+            await this.plugin.saveSettings();
+            this.display();
+          }),
+      );
   }
 
   private createBehaviorSettings(containerEl: HTMLElement): void {
@@ -96,6 +179,34 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
+  }
+
+  private createNotificationSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName("Notifications").setHeading();
+
+    this.addTextAreaSetting(containerEl, {
+      name: "Saved messages template",
+      description:
+        "Discord message sent when one or more messages are saved. Available variables: {count}, {channelName}, {channelId}",
+      placeholder: DEFAULT_NOTIFICATION_TEMPLATES.saved,
+      getValue: () => this.plugin.settings.notificationTemplates.saved,
+      setValue: (value) => {
+        this.plugin.settings.notificationTemplates.saved =
+          value || DEFAULT_NOTIFICATION_TEMPLATES.saved;
+      },
+    });
+
+    this.addTextAreaSetting(containerEl, {
+      name: "No new messages template",
+      description:
+        "Discord message sent when there are no new messages. Available variables: {count}, {channelName}, {channelId}",
+      placeholder: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
+      getValue: () => this.plugin.settings.notificationTemplates.noNew,
+      setValue: (value) => {
+        this.plugin.settings.notificationTemplates.noNew =
+          value || DEFAULT_NOTIFICATION_TEMPLATES.noNew;
+      },
+    });
   }
 
   // =============================================
@@ -171,5 +282,32 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
     });
+  }
+
+  private addTextAreaSetting(
+    containerEl: HTMLElement,
+    options: {
+      name: string;
+      description?: string;
+      placeholder: string;
+      getValue: () => string;
+      setValue: (value: string) => void;
+    },
+  ): void {
+    const setting = new Setting(containerEl).setName(options.name);
+
+    if (options.description) {
+      setting.setDesc(options.description);
+    }
+
+    setting.addTextArea((text) =>
+      text
+        .setPlaceholder(options.placeholder)
+        .setValue(options.getValue())
+        .onChange(async (value) => {
+          options.setValue(value.trim());
+          await this.plugin.saveSettings();
+        }),
+    );
   }
 }

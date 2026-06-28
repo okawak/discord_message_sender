@@ -1,33 +1,31 @@
-use crate::{error::MessageError, message};
 use html_to_markdown::convert;
 use wasm_bindgen::prelude::*;
 
+const FRONTMATTER_KEYS: &[&str] = &["title", "source"];
+
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "discordMsgSync"], js_name = fetchUrlContent)]
-    async fn fetch_url_content(url: &str) -> JsValue;
+    #[wasm_bindgen(catch, js_namespace = ["window", "discordMsgSync"], js_name = fetchUrlContent)]
+    async fn fetch_url_content(url: &str) -> Result<JsValue, JsValue>;
 }
 
-pub async fn handle(arg: Option<&str>, timestamp: &str) -> Result<(String, bool, String), JsValue> {
-    let url_str = arg.ok_or(MessageError::InvalidUrl)?;
+pub async fn handle(arg: Option<&str>) -> Result<(String, bool), JsValue> {
+    let invalid_url = || JsValue::from_str("Invalid URL");
+    let url_str = arg.ok_or_else(invalid_url)?;
     if !is_valid_url(url_str) {
-        return Err(MessageError::InvalidUrl.into());
+        return Err(invalid_url());
     }
 
     // Using TypeScript's fetchUrlContent function to get the content of the URL
-    let url_content_js = fetch_url_content(url_str).await;
-    let url_content = url_content_js.as_string().unwrap_or_default();
+    let url_content = fetch_url_content(url_str)
+        .await
+        .map_err(|_| JsValue::from_str("Network request failed"))?
+        .as_string()
+        .ok_or_else(|| JsValue::from_str("URL response must be text"))?;
 
-    // frontmatter keys, now for test
-    // TODO: get from TypeScript Settings
-    let keys = vec!["title", "source"];
-
-    let processed_md =
-        convert(url_str, &url_content, &keys).map_err(|_| MessageError::ConversionError)?;
-    // TODO: retrieve site name from front-matter
-    let title = message::format_name(timestamp);
-
-    Ok((processed_md, true, title))
+    let processed_md = convert(url_str, &url_content, FRONTMATTER_KEYS)
+        .map_err(|_| JsValue::from_str("HTML conversion error"))?;
+    Ok((processed_md, true))
 }
 
 fn is_valid_url(url: &str) -> bool {
