@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createChannelDirectory,
+  findDuplicateChannelPathSegment,
   getChannelDisplayName,
   getChannelPathSegment,
 } from "../src/channelPaths";
@@ -157,9 +158,9 @@ describe("channel paths", () => {
     const channel = { id: "123", name: "notes/inbox #1" };
 
     expect(getChannelDisplayName(channel)).toBe("notes/inbox #1");
-    expect(getChannelPathSegment(channel)).toBe("notes-inbox -1-123");
+    expect(getChannelPathSegment(channel)).toBe("notes-inbox -1");
     expect(createChannelDirectory("DiscordLogs/", channel)).toBe(
-      "DiscordLogs/notes-inbox -1-123",
+      "DiscordLogs/notes-inbox -1",
     );
   });
 
@@ -170,10 +171,26 @@ describe("channel paths", () => {
     expect(createChannelDirectory("", channel)).toBe("123");
   });
 
-  test("keeps colliding and traversal-like names in distinct safe folders", () => {
-    expect(getChannelPathSegment({ id: "111", name: "a/b" })).toBe("a-b-111");
-    expect(getChannelPathSegment({ id: "222", name: "a:b" })).toBe("a-b-222");
-    expect(getChannelPathSegment({ id: "333", name: ".." })).toBe("..-333");
+  test("falls back to the channel id for unsafe traversal names", () => {
+    expect(getChannelPathSegment({ id: "333", name: ".." })).toBe("333");
+  });
+
+  test("detects duplicate sanitized channel folders", () => {
+    expect(
+      findDuplicateChannelPathSegment([
+        { id: "111", name: "a/b" },
+        { id: "222", name: "A:B" },
+      ]),
+    ).toBe("A-B");
+  });
+
+  test("allows distinct channel folders", () => {
+    expect(
+      findDuplicateChannelPathSegment([
+        { id: "111", name: "first" },
+        { id: "222", name: "second" },
+      ]),
+    ).toBeUndefined();
   });
 });
 

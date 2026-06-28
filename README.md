@@ -67,10 +67,10 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
 Please enter the following information in the plugin settings:
 
 - **Bot Token**
-- **Channels**: Add each Discord channel ID. A channel name is optional and is included in the Obsidian subfolder name.
+- **Channels**: Add each Discord channel ID. A channel name is optional and is used as the Obsidian subfolder name. Channel names must resolve to unique folder names.
 - **Notification templates**: Optional templates for the Discord messages sent after sync. Available variables: `{count}`, `{channelName}`, `{channelId}`
 
-By default, messages are saved under `DiscordLogs/<channel name>-<channel ID>/`, and URL clippings are saved under `DiscordClippings/<channel name>-<channel ID>/`. If no channel name is set, only the channel ID is used.
+By default, messages are saved under `DiscordLogs/<channel name or ID>/`, and URL clippings are saved under `DiscordClippings/<channel name or ID>/`. Sync stops with an error when multiple channels resolve to the same folder name.
 
 ## Command List
 

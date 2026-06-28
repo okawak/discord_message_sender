@@ -10,7 +10,22 @@ export function getChannelDisplayName(channel: DiscordChannelSettings): string {
 export function getChannelPathSegment(channel: DiscordChannelSettings): string {
   const id = sanitizePathSegment(channel.id) || "channel";
   const name = sanitizePathSegment(channel.name);
-  return name ? `${name}-${id}` : id;
+  return name && name !== "." && name !== ".." ? name : id;
+}
+
+export function findDuplicateChannelPathSegment(
+  channels: readonly DiscordChannelSettings[],
+): string | undefined {
+  const paths = new Set<string>();
+  for (const channel of channels) {
+    const path = getChannelPathSegment(channel);
+    const key = path.normalize("NFC").toLowerCase();
+    if (paths.has(key)) {
+      return path;
+    }
+    paths.add(key);
+  }
+  return undefined;
 }
 
 function sanitizePathSegment(value: string): string {

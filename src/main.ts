@@ -1,5 +1,9 @@
 import { Notice, Plugin } from "obsidian";
-import { createChannelDirectory, getChannelDisplayName } from "./channelPaths";
+import {
+  createChannelDirectory,
+  findDuplicateChannelPathSegment,
+  getChannelDisplayName,
+} from "./channelPaths";
 import {
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
@@ -58,6 +62,14 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     if (!this.settings.botToken || channels.length === 0) {
       new Notice(
         "Discord message sender: bot token or channel is not configured.",
+      );
+      return;
+    }
+
+    const duplicatePath = findDuplicateChannelPathSegment(channels);
+    if (duplicatePath) {
+      new Notice(
+        `Discord message sender: duplicate channel folder "${duplicatePath}". Use unique channel names.`,
       );
       return;
     }
