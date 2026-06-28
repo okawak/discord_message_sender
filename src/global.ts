@@ -9,7 +9,9 @@ declare global {
   }
 }
 
-const fetchUrlContentImpl = async (url: string): Promise<string> => {
+window.discordMsgSync ??= {};
+const namespace = window.discordMsgSync;
+namespace.fetchUrlContent ??= async (url: string): Promise<string> => {
   try {
     const res = await requestUrl({
       url,
@@ -23,21 +25,6 @@ const fetchUrlContentImpl = async (url: string): Promise<string> => {
   }
 };
 
-function getNamespace(): DiscordMsgSyncNS {
-  if (!window.discordMsgSync) {
-    window.discordMsgSync = {};
-  }
-  return window.discordMsgSync;
-}
-
-const ns = getNamespace();
-if (!ns.fetchUrlContent) {
-  ns.fetchUrlContent = fetchUrlContentImpl;
-}
-
 export function cleanupGlobalNamespace(): void {
-  if (window.discordMsgSync) {
-    window.discordMsgSync.fetchUrlContent = undefined;
-    window.discordMsgSync = undefined;
-  }
+  delete window.discordMsgSync;
 }

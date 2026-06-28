@@ -1,4 +1,3 @@
-use crate::{error::MessageError, message};
 use html_to_markdown::convert;
 use wasm_bindgen::prelude::*;
 
@@ -10,10 +9,11 @@ extern "C" {
     async fn fetch_url_content(url: &str) -> JsValue;
 }
 
-pub async fn handle(arg: Option<&str>, timestamp: &str) -> Result<(String, bool, String), JsValue> {
-    let url_str = arg.ok_or(MessageError::InvalidUrl)?;
+pub async fn handle(arg: Option<&str>) -> Result<(String, bool), JsValue> {
+    let invalid_url = || JsValue::from_str("Invalid URL");
+    let url_str = arg.ok_or_else(invalid_url)?;
     if !is_valid_url(url_str) {
-        return Err(MessageError::InvalidUrl.into());
+        return Err(invalid_url());
     }
 
     // Using TypeScript's fetchUrlContent function to get the content of the URL
@@ -21,10 +21,8 @@ pub async fn handle(arg: Option<&str>, timestamp: &str) -> Result<(String, bool,
     let url_content = url_content_js.as_string().unwrap_or_default();
 
     let processed_md = convert(url_str, &url_content, FRONTMATTER_KEYS)
-        .map_err(|_| MessageError::ConversionError)?;
-    let title = message::format_name(timestamp);
-
-    Ok((processed_md, true, title))
+        .map_err(|_| JsValue::from_str("HTML conversion error"))?;
+    Ok((processed_md, true))
 }
 
 fn is_valid_url(url: &str) -> bool {

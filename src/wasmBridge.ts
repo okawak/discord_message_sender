@@ -9,17 +9,11 @@ import { type ProcessedMessage, parseWasmMessageResult } from "./messages";
 let wasmReady: Promise<InitOutput> | null = null;
 
 export async function initWasmBridge(): Promise<InitOutput> {
-  if (!wasmReady) {
-    wasmReady = (async () => {
-      try {
-        return await initWasm();
-      } catch (error: unknown) {
-        wasmReady = null; // reset on error
-        new Notice("WASM initialization failed.");
-        throw new Error("WASM initialization failed.", { cause: error });
-      }
-    })();
-  }
+  wasmReady ??= initWasm().catch((error: unknown) => {
+    wasmReady = null;
+    new Notice("WASM initialization failed.");
+    throw new Error("WASM initialization failed.", { cause: error });
+  });
   return wasmReady;
 }
 
@@ -30,8 +24,8 @@ export async function parseMessageWasm(
 ): Promise<ProcessedMessage> {
   try {
     await initWasmBridge();
-    const result: unknown = await processMessage(content, prefix, timestamp);
-    return parseWasmMessageResult(result);
+    const result: unknown = await processMessage(content, prefix);
+    return parseWasmMessageResult(result, timestamp);
   } catch (error) {
     throw new Error("Failed to parse message.", { cause: error });
   }

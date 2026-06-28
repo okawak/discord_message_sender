@@ -32,27 +32,19 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
     await initWasmBridge();
     await this.loadSettings();
-    this.registerCommands();
-    this.setupAutoSync();
-    this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
-  }
-
-  override onunload(): void {
-    cleanupGlobalNamespace();
-  }
-
-  private registerCommands(): void {
     this.addCommand({
       id: "sync-discord-messages",
       name: "Sync Discord messages",
       callback: () => this.syncDiscordMessages(),
     });
-  }
-
-  private setupAutoSync(): void {
     if (this.settings.enableAutoSyncOnStartup) {
       this.syncDiscordMessages().catch(console.error);
     }
+    this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
+  }
+
+  override onunload(): void {
+    cleanupGlobalNamespace();
   }
 
   private async syncDiscordMessages(): Promise<void> {
@@ -61,7 +53,8 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
-    if (!this.validateSettings()) {
+    const channels = this.settings.channels.filter((channel) => channel.id);
+    if (!this.settings.botToken || channels.length === 0) {
       new Notice(
         "Discord message sender: bot token or channel is not configured.",
       );
@@ -72,25 +65,23 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     new Notice("Starting Discord sync.");
 
     try {
-      const summary = await syncChannelsSequentially(
-        this.configuredChannels(),
-        (channel) =>
-          syncChannelMessages(
-            {
-              botToken: this.settings.botToken,
-              channel,
-              notificationTemplates: this.settings.notificationTemplates,
-            },
-            {
-              fetchMessages,
-              postNotification,
-              processMessage: (message, currentChannel) =>
-                this.processDiscordMessage(message, currentChannel),
-              persistCursor: (currentChannel, messageId) =>
-                this.updateLastProcessedMessage(currentChannel, messageId),
-              sleep,
-            },
-          ),
+      const summary = await syncChannelsSequentially(channels, (channel) =>
+        syncChannelMessages(
+          {
+            botToken: this.settings.botToken,
+            channel,
+            notificationTemplates: this.settings.notificationTemplates,
+          },
+          {
+            fetchMessages,
+            postNotification,
+            processMessage: (message, currentChannel) =>
+              this.processDiscordMessage(message, currentChannel),
+            persistCursor: (currentChannel, messageId) =>
+              this.updateLastProcessedMessage(currentChannel, messageId),
+            sleep,
+          },
+        ),
       );
 
       for (const failure of summary.failures) {
@@ -165,14 +156,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
         e,
       );
     }
-  }
-
-  private validateSettings(): boolean {
-    return !!(this.settings.botToken && this.configuredChannels().length > 0);
-  }
-
-  private configuredChannels(): DiscordChannelSettings[] {
-    return this.settings.channels.filter((channel) => channel.id);
   }
 
   async loadSettings(): Promise<void> {

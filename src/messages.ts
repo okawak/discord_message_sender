@@ -11,23 +11,31 @@ export interface ProcessedMessage {
   fileName: string;
 }
 
-export function parseWasmMessageResult(value: unknown): ProcessedMessage {
+export function parseWasmMessageResult(
+  value: unknown,
+  timestamp: string,
+): ProcessedMessage {
   if (
-    !isRecord(value) ||
-    typeof value.md !== "string" ||
-    typeof value.is_clip !== "boolean" ||
-    typeof value.name !== "string"
+    !Array.isArray(value) ||
+    typeof value[0] !== "string" ||
+    typeof value[1] !== "boolean"
   ) {
     throw new TypeError("WASM returned an invalid processed message.");
   }
 
   return {
-    markdown: value.md,
-    isClipping: value.is_clip,
-    fileName: value.name,
+    markdown: value[0],
+    isClipping: value[1],
+    fileName: formatMessageFileName(timestamp),
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
+function formatMessageFileName(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString();
+  return `${jst.slice(0, 10).replaceAll("-", "")}_${jst.slice(11, 19).replaceAll(":", "")}`;
 }

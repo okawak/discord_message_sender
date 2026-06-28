@@ -5,7 +5,7 @@ import {
   syncChannelMessages,
   syncChannelsSequentially,
 } from "../src/channelSync";
-import { createDiscordApiError, DiscordApiError } from "../src/discordApiError";
+import { DiscordApiError } from "../src/discordApiError";
 import type { DiscordChannelSettings } from "../src/settings";
 
 const firstChannel = { id: "111", name: "first" };
@@ -20,7 +20,7 @@ const channels = [
 describe("syncChannelsSequentially", () => {
   test("continues syncing after a channel-specific API failure", async () => {
     const synced: string[] = [];
-    const forbidden = createDiscordApiError(
+    const forbidden = new DiscordApiError(
       403,
       "GET",
       "/channels/222/messages",
@@ -58,7 +58,7 @@ describe("syncChannelsSequentially", () => {
 
   test("stops immediately when the bot token is invalid", async () => {
     const synced: string[] = [];
-    const unauthorized = createDiscordApiError(
+    const unauthorized = new DiscordApiError(
       401,
       "GET",
       "/channels/111/messages",
@@ -190,7 +190,7 @@ describe("syncChannelMessages", () => {
 
 describe("DiscordApiError", () => {
   test("includes Discord response details without losing typed fields", () => {
-    const error = createDiscordApiError(
+    const error = new DiscordApiError(
       403,
       "POST",
       "/channels/222/messages",
