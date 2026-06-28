@@ -70,7 +70,7 @@ Please enter the following information in the plugin settings:
 - **Channels**: Add each Discord channel ID. A channel name is optional and is used as the Obsidian subfolder name. Channel names must resolve to unique folder names.
 - **Notification templates**: Optional templates for the Discord messages sent after sync. Available variables: `{count}`, `{channelName}`, `{channelId}`
 
-By default, messages are saved under `DiscordLogs/<channel name or ID>/`, and URL clippings are saved under `DiscordClippings/<channel name or ID>/`. Sync stops with an error when multiple channels resolve to the same folder name.
+By default, messages are saved under `DiscordLogs/<channel name or ID>/`, and URL clippings are saved under `DiscordClippings/<channel name or ID>/`. Duplicate folder names are rejected in settings, and sync also stops if manually edited settings contain a duplicate.
 
 Channel names cannot contain `\ / : * ? " < > | # ^ [ ]`. The names `.` and `..` are also not allowed. Invalid names are not saved.
 

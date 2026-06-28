@@ -5,7 +5,10 @@ import {
   Setting,
   type TextComponent,
 } from "obsidian";
-import { getChannelNameValidationError } from "./channelPaths";
+import {
+  findDuplicateChannelPathSegment,
+  getChannelNameValidationError,
+} from "./channelPaths";
 import type DiscordMessageSenderPlugin from "./main";
 import {
   DEFAULT_NOTIFICATION_TEMPLATES,
@@ -124,6 +127,17 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             if (error) {
               new Notice(error);
               text.setValue(channel.name);
+              return;
+            }
+            const duplicate = findDuplicateChannelPathSegment(
+              this.plugin.settings.channels.map((candidate) =>
+                candidate === channel ? { ...candidate, name } : candidate,
+              ),
+            );
+            if (duplicate) {
+              new Notice(
+                `Channel name is already in use as folder "${duplicate}". Enter a unique channel name.`,
+              );
               return;
             }
             channel.name = name;
