@@ -1,33 +1,22 @@
 pub mod command;
-mod error;
-mod message;
 
 use command::handle_command;
-use message::ParseMessageResult;
-use serde_wasm_bindgen::to_value;
+use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub async fn process_message(
-    input: String,
-    prefix: String,
-    timestamp: String,
-) -> Result<JsValue, JsValue> {
+pub async fn process_message(input: String, prefix: String) -> Result<Array, JsValue> {
     let input = input.trim();
     let prefix = prefix.trim();
 
-    // "!foo hoge".strip_prefix("!") -> "foo hoge"
-    if let Some(rest) = input.strip_prefix(prefix) {
-        let (md, is_clip, name) = handle_command(rest.trim_start(), &timestamp).await?;
-        let result = ParseMessageResult { md, is_clip, name };
-        to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
+    let (markdown, is_clipping) = if let Some(rest) = input.strip_prefix(prefix) {
+        handle_command(rest.trim_start()).await?
     } else {
-        let name = message::format_name(&timestamp);
-        let result = ParseMessageResult {
-            md: input.to_string(),
-            is_clip: false,
-            name,
-        };
-        to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
-    }
+        (input.to_owned(), false)
+    };
+
+    Ok(Array::of2(
+        &JsValue::from_str(&markdown),
+        &JsValue::from_bool(is_clipping),
+    ))
 }

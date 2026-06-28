@@ -1,23 +1,55 @@
 name: Release Plugin
 
 on:
-  push:
-    tags:
-      - "*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without a v prefix (for example, 0.3.0)
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
+    env:
+      VERSION: ${{ inputs.version }}
 
     steps:
+      - name: Validate release request
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Run the release workflow from the main branch."
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Version must use the x.y.z format without a v prefix."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
 
-      - name: Extract version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Validate existing tag
+        run: |
+          git fetch --tags origin
+          if git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+            TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{}")"
+            HEAD_SHA="$(git rev-parse HEAD)"
+            if [[ "$TAG_SHA" != "$HEAD_SHA" ]]; then
+              echo "::error::Tag $VERSION already points to $TAG_SHA instead of current main $HEAD_SHA."
+              exit 1
+            fi
+          fi
 
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -37,31 +69,80 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Prepare release version
+        run: bun scripts/prepare-release.ts "$VERSION"
+
       - name: Verify release version
         run: |
           PACKAGE_VERSION="$(bun -e "const p = await Bun.file('package.json').json(); console.log(p.version)")"
           MANIFEST_VERSION="$(bun -e "const p = await Bun.file('manifest.json').json(); console.log(p.version)")"
           CARGO_VERSION="$(sed -n '/^\[workspace\.package\]/,/^\[/ s/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
-          test "$PACKAGE_VERSION" = "${{ steps.get_version.outputs.VERSION }}"
-          test "$MANIFEST_VERSION" = "${{ steps.get_version.outputs.VERSION }}"
-          test "$CARGO_VERSION" = "${{ steps.get_version.outputs.VERSION }}"
+          MIN_APP_VERSION="$(bun -e "const versions = await Bun.file('versions.json').json(); console.log(versions[process.env.VERSION] ?? '')")"
+          test "$PACKAGE_VERSION" = "$VERSION"
+          test "$MANIFEST_VERSION" = "$VERSION"
+          test "$CARGO_VERSION" = "$VERSION"
+          test -n "$MIN_APP_VERSION"
 
-      - name: Test plugin
-        run: bun run test
+      - name: Check plugin
+        run: |
+          bun run type-check
+          bun run check
+          bun run test
 
       - name: Build plugin
         run: bun run build
 
+      - name: Commit release version
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json manifest.json Cargo.toml Cargo.lock versions.json
+
+          if git diff --cached --quiet; then
+            EXPECTED_MESSAGE="chore: release $VERSION"
+            ACTUAL_MESSAGE="$(git log -1 --format=%s)"
+            if [[ "$ACTUAL_MESSAGE" != "$EXPECTED_MESSAGE" ]]; then
+              echo "::error::Version files already contain $VERSION, but current main is not its release commit."
+              exit 1
+            fi
+            echo "Reusing the existing release commit for $VERSION."
+          else
+            git commit -m "chore: release $VERSION"
+            git push origin HEAD:main
+          fi
+
+          echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        env:
+          RELEASE_SHA: ${{ steps.commit.outputs.release_sha }}
+        run: |
+          git fetch --tags origin
+          if git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+            TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{}")"
+            if [[ "$TAG_SHA" != "$RELEASE_SHA" ]]; then
+              echo "::error::Tag $VERSION already points to $TAG_SHA instead of $RELEASE_SHA."
+              exit 1
+            fi
+            echo "Tag $VERSION already points to the release commit."
+          else
+            git tag -a "$VERSION" -m "Release $VERSION" "$RELEASE_SHA"
+            git push origin "$VERSION"
+          fi
+
       - name: Create release archive
         run: |
           cd dist
-          zip -r ../discord-message-sender-${{ github.ref_name }}.zip .
+          zip -r "../discord-message-sender-$VERSION.zip" .
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.version }}
+          target_commitish: ${{ steps.commit.outputs.release_sha }}
           files: |
-            discord-message-sender-${{ github.ref_name }}.zip
+            discord-message-sender-${{ inputs.version }}.zip
             dist/manifest.json
             dist/main.js
           draft: false

@@ -94,6 +94,10 @@ Messages starting with the configured prefix (default: `!`) are treated as speci
 
 Additional useful commands will be added in future releases.
 
+## Development
+
+- [Release procedure](docs/releasing.md)
+
 ## References
 
 This plugin was inspired by the following project(s):

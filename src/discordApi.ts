@@ -1,9 +1,6 @@
 import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
-import {
-  createDiscordApiError,
-  type DiscordRequestMethod,
-} from "./discordApiError";
-import type { DiscordMessage } from "./settings";
+import { DiscordApiError, type DiscordRequestMethod } from "./discordApiError";
+import type { DiscordMessage } from "./messages";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 const RATE_LIMIT_STATUS_CODE = 429;
@@ -61,7 +58,7 @@ async function discordRequest(
     // Handle rate limiting
     if (res.status === RATE_LIMIT_STATUS_CODE) {
       if (i === MAX_RETRIES) {
-        throw createDiscordApiError(res.status, method, path, res.text);
+        throw new DiscordApiError(res.status, method, path, res.text);
       }
 
       const wait = Number(res.headers["Retry-After"] ?? 1) * 1000 * (i + 1);
@@ -72,7 +69,7 @@ async function discordRequest(
 
     if (res.status >= 200 && res.status < 300) return res;
 
-    const error = createDiscordApiError(res.status, method, path, res.text);
+    const error = new DiscordApiError(res.status, method, path, res.text);
 
     if (res.status < 500 || i === MAX_RETRIES) {
       throw error;

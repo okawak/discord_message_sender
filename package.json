@@ -1,6 +1,6 @@
 {
   "name": "discord-message-sender",
-  "version": "0.3.0",
+  "version": "0.2.8",
   "description": "Send messages to Obsidian from Discord.",
   "type": "module",
   "private": true,
@@ -15,6 +15,7 @@
     "clean": "cargo clean && bun run clean:files",
     "check": "bunx biome check && cargo clippy --workspace --all-targets",
     "check:fix": "bunx biome check --write",
+    "release:prepare": "bun scripts/prepare-release.ts",
     "type-check": "tsc --noEmit",
     "test": "bun run test:ts && bun run test:rust",
     "test:rust": "cargo test --workspace",

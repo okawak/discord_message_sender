@@ -2,30 +2,14 @@ export type DiscordRequestMethod = "GET" | "POST";
 
 export class DiscordApiError extends Error {
   constructor(
-    message: string,
     readonly status: number,
     readonly method: DiscordRequestMethod,
-    readonly path: string,
-    readonly responseText: string,
+    path: string,
+    responseText: string,
   ) {
-    super(message);
+    super(getDiscordApiErrorMessage(status, method, path, responseText));
     this.name = "DiscordApiError";
   }
-}
-
-export function createDiscordApiError(
-  status: number,
-  method: DiscordRequestMethod,
-  path: string,
-  responseText: string,
-): DiscordApiError {
-  return new DiscordApiError(
-    getDiscordApiErrorMessage(status, method, path, responseText),
-    status,
-    method,
-    path,
-    responseText,
-  );
 }
 
 export function getDiscordApiFailureNotice(error: DiscordApiError): string {
