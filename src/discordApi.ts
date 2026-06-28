@@ -1,5 +1,6 @@
 import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
 import { DiscordApiError, type DiscordRequestMethod } from "./discordApiError";
+import { getRateLimitDelay } from "./discordRateLimit";
 import type { DiscordMessage } from "./messages";
 
 const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
@@ -43,17 +44,28 @@ async function discordRequest(
   body?: string,
 ): Promise<RequestUrlResponse> {
   for (let i = 0; i <= MAX_RETRIES; i++) {
-    const res = await requestUrl({
-      url: DISCORD_API_BASE_URL + path,
-      method,
-      headers: {
-        Authorization: `Bot ${botToken}`,
-        "User-Agent": "DiscordBot (Discord Message Sender)",
-        ...(body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(body ? { body } : {}),
-      throw: false,
-    });
+    let res: RequestUrlResponse;
+    try {
+      res = await requestUrl({
+        url: DISCORD_API_BASE_URL + path,
+        method,
+        headers: {
+          Authorization: `Bot ${botToken}`,
+          "User-Agent": "DiscordBot (Discord Message Sender)",
+          ...(body ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(body ? { body } : {}),
+        throw: false,
+      });
+    } catch (error) {
+      if (i === MAX_RETRIES) {
+        throw new Error(`Discord API ${method} ${path} request failed.`, {
+          cause: error,
+        });
+      }
+      await sleep(1000 * (i + 1));
+      continue;
+    }
 
     // Handle rate limiting
     if (res.status === RATE_LIMIT_STATUS_CODE) {
@@ -61,7 +73,7 @@ async function discordRequest(
         throw new DiscordApiError(res.status, method, path, res.text);
       }
 
-      const wait = Number(res.headers["Retry-After"] ?? 1) * 1000 * (i + 1);
+      const wait = getRateLimitDelay(res.headers, res.text);
       new Notice(`Rate-limited. Retry after ${Math.ceil(wait / 1000)}s`);
       await sleep(wait);
       continue;

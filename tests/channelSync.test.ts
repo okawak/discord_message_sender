@@ -81,7 +81,7 @@ describe("syncChannelsSequentially", () => {
 });
 
 describe("syncChannelMessages", () => {
-  test("processes messages oldest first and persists both cursors", async () => {
+  test("processes messages oldest first without checkpointing the notification", async () => {
     const channel = { id: "111", name: "first" };
     const processed: string[] = [];
     const cursors: string[] = [];
@@ -136,7 +136,7 @@ describe("syncChannelMessages", () => {
 
     expect(count).toBe(2);
     expect(processed).toEqual(["oldest", "newest"]);
-    expect(cursors).toEqual(["newest", "notification"]);
+    expect(cursors).toEqual(["newest"]);
     expect(delays).toEqual([50, 50, 1000]);
   });
 

@@ -86,6 +86,29 @@ export function normalizeSettings(data: unknown): DiscordPluginSettings {
   };
 }
 
+export function getConfiguredChannels(
+  channels: readonly DiscordChannelSettings[],
+): DiscordChannelSettings[] {
+  const ids = new Set<string>();
+  return channels.filter((channel) => {
+    if (!channel.id || ids.has(channel.id)) {
+      return false;
+    }
+    ids.add(channel.id);
+    return true;
+  });
+}
+
+export function updateChannelId(
+  channel: DiscordChannelSettings,
+  id: string,
+): void {
+  if (id !== channel.id) {
+    channel.id = id;
+    delete channel.lastProcessedMessageId;
+  }
+}
+
 function needsMigration(raw: Record<string, unknown>): boolean {
   return (
     raw.settingsVersion !== CURRENT_SETTINGS_VERSION ||
@@ -100,7 +123,7 @@ function normalizeChannels(
 ): DiscordChannelSettings[] {
   const channels = raw.channels;
   if (Array.isArray(channels)) {
-    return channels
+    const normalized = channels
       .filter(isRecord)
       .map((channel) => {
         const id = readString(channel, "id");
@@ -119,6 +142,7 @@ function normalizeChannels(
         };
       })
       .filter((channel): channel is DiscordChannelSettings => !!channel);
+    return getConfiguredChannels(normalized);
   }
 
   if (!legacy.channelId) {

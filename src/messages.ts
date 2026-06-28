@@ -14,6 +14,7 @@ export interface ProcessedMessage {
 export function parseWasmMessageResult(
   value: unknown,
   timestamp: string,
+  messageId: string,
 ): ProcessedMessage {
   if (
     !Array.isArray(value) ||
@@ -26,7 +27,7 @@ export function parseWasmMessageResult(
   return {
     markdown: value[0],
     isClipping: value[1],
-    fileName: formatMessageFileName(timestamp),
+    fileName: `${formatMessageFileName(timestamp)}_${messageId}`,
   };
 }
 

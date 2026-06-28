@@ -8,16 +8,19 @@ export function getChannelDisplayName(channel: DiscordChannelSettings): string {
 }
 
 export function getChannelPathSegment(channel: DiscordChannelSettings): string {
-  const displayName = getChannelDisplayName(channel);
-  const sanitized = displayName
+  const id = sanitizePathSegment(channel.id) || "channel";
+  const name = sanitizePathSegment(channel.name);
+  return name ? `${name}-${id}` : id;
+}
+
+function sanitizePathSegment(value: string): string {
+  return value
     .trim()
     .replaceAll("[", "-")
     .replaceAll("]", "-")
     .replace(UNSAFE_PATH_SEGMENT_CHARS, "-")
     .replace(WHITESPACE, " ")
     .replace(/^-+|-+$/g, "");
-
-  return sanitized || channel.id;
 }
 
 export function createChannelDirectory(

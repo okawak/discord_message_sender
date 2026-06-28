@@ -80,7 +80,7 @@ export async function syncChannelMessages(
     processedMessageCount === 0
       ? notificationTemplates.noNew
       : notificationTemplates.saved;
-  const notification = await dependencies.postNotification(
+  await dependencies.postNotification(
     botToken,
     channel.id,
     renderNotificationTemplate(template, {
@@ -88,7 +88,6 @@ export async function syncChannelMessages(
       count: processedMessageCount,
     }),
   );
-  await dependencies.persistCursor(channel, notification.id);
 
   return processedMessageCount;
 }

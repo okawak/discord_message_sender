@@ -8,6 +8,7 @@ import type DiscordMessageSenderPlugin from "./main";
 import {
   DEFAULT_NOTIFICATION_TEMPLATES,
   type DiscordChannelSettings,
+  updateChannelId,
 } from "./settings";
 
 export class DiscordMessageSenderSettingTab extends PluginSettingTab {
@@ -125,7 +126,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           .setPlaceholder("Channel ID")
           .setValue(channel.id)
           .onChange(async (value) => {
-            channel.id = value.trim();
+            updateChannelId(channel, value.trim());
             await this.plugin.saveSettings();
           }),
       )

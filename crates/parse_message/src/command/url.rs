@@ -5,8 +5,8 @@ const FRONTMATTER_KEYS: &[&str] = &["title", "source"];
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = ["window", "discordMsgSync"], js_name = fetchUrlContent)]
-    async fn fetch_url_content(url: &str) -> JsValue;
+    #[wasm_bindgen(catch, js_namespace = ["window", "discordMsgSync"], js_name = fetchUrlContent)]
+    async fn fetch_url_content(url: &str) -> Result<JsValue, JsValue>;
 }
 
 pub async fn handle(arg: Option<&str>) -> Result<(String, bool), JsValue> {
@@ -17,8 +17,11 @@ pub async fn handle(arg: Option<&str>) -> Result<(String, bool), JsValue> {
     }
 
     // Using TypeScript's fetchUrlContent function to get the content of the URL
-    let url_content_js = fetch_url_content(url_str).await;
-    let url_content = url_content_js.as_string().unwrap_or_default();
+    let url_content = fetch_url_content(url_str)
+        .await
+        .map_err(|_| JsValue::from_str("Network request failed"))?
+        .as_string()
+        .ok_or_else(|| JsValue::from_str("URL response must be text"))?;
 
     let processed_md = convert(url_str, &url_content, FRONTMATTER_KEYS)
         .map_err(|_| JsValue::from_str("HTML conversion error"))?;

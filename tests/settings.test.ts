@@ -7,8 +7,11 @@ import {
 import { renderNotificationTemplate } from "../src/notificationTemplates";
 import {
   CURRENT_SETTINGS_VERSION,
+  type DiscordChannelSettings,
+  getConfiguredChannels,
   migrateSettings,
   normalizeSettings,
+  updateChannelId,
 } from "../src/settings";
 
 describe("normalizeSettings", () => {
@@ -49,6 +52,30 @@ describe("normalizeSettings", () => {
       { id: "111", name: "inbox" },
       { id: "222", name: "", lastProcessedMessageId: "999" },
     ]);
+  });
+
+  test("keeps only the first configured channel for each id", () => {
+    const first = { id: "111", name: "first" };
+    expect(
+      getConfiguredChannels([
+        first,
+        { id: "", name: "blank" },
+        { id: "111", name: "duplicate" },
+        { id: "222", name: "second" },
+      ]),
+    ).toEqual([first, { id: "222", name: "second" }]);
+  });
+
+  test("clears the sync cursor when a channel id changes", () => {
+    const channel: DiscordChannelSettings = {
+      id: "111",
+      name: "inbox",
+      lastProcessedMessageId: "999",
+    };
+
+    updateChannelId(channel, "222");
+
+    expect(channel).toEqual({ id: "222", name: "inbox" });
   });
 
   test("fills default notification templates", () => {
@@ -130,9 +157,9 @@ describe("channel paths", () => {
     const channel = { id: "123", name: "notes/inbox #1" };
 
     expect(getChannelDisplayName(channel)).toBe("notes/inbox #1");
-    expect(getChannelPathSegment(channel)).toBe("notes-inbox -1");
+    expect(getChannelPathSegment(channel)).toBe("notes-inbox -1-123");
     expect(createChannelDirectory("DiscordLogs/", channel)).toBe(
-      "DiscordLogs/notes-inbox -1",
+      "DiscordLogs/notes-inbox -1-123",
     );
   });
 
@@ -141,6 +168,12 @@ describe("channel paths", () => {
 
     expect(getChannelDisplayName(channel)).toBe("123");
     expect(createChannelDirectory("", channel)).toBe("123");
+  });
+
+  test("keeps colliding and traversal-like names in distinct safe folders", () => {
+    expect(getChannelPathSegment({ id: "111", name: "a/b" })).toBe("a-b-111");
+    expect(getChannelPathSegment({ id: "222", name: "a:b" })).toBe("a-b-222");
+    expect(getChannelPathSegment({ id: "333", name: ".." })).toBe("..-333");
   });
 });
 

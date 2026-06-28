@@ -9,10 +9,11 @@ import {
 import { fetchMessages, postNotification } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
 import { cleanupGlobalNamespace } from "./global";
-import type { DiscordMessage, ProcessedMessage } from "./messages";
+import type { DiscordMessage } from "./messages";
 import {
   type DiscordChannelSettings,
   type DiscordPluginSettings,
+  getConfiguredChannels,
   migrateSettings,
   normalizeSettings,
 } from "./settings";
@@ -53,7 +54,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
-    const channels = this.settings.channels.filter((channel) => channel.id);
+    const channels = getConfiguredChannels(this.settings.channels);
     if (!this.settings.botToken || channels.length === 0) {
       new Notice(
         "Discord message sender: bot token or channel is not configured.",
@@ -65,11 +66,12 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     new Notice("Starting Discord sync.");
 
     try {
-      const summary = await syncChannelsSequentially(channels, (channel) =>
-        syncChannelMessages(
+      const summary = await syncChannelsSequentially(channels, (channel) => {
+        const snapshot = { ...channel };
+        return syncChannelMessages(
           {
             botToken: this.settings.botToken,
-            channel,
+            channel: snapshot,
             notificationTemplates: this.settings.notificationTemplates,
           },
           {
@@ -77,12 +79,12 @@ export default class DiscordMessageSenderPlugin extends Plugin {
             postNotification,
             processMessage: (message, currentChannel) =>
               this.processDiscordMessage(message, currentChannel),
-            persistCursor: (currentChannel, messageId) =>
-              this.updateLastProcessedMessage(currentChannel, messageId),
+            persistCursor: (_currentChannel, messageId) =>
+              this.updateLastProcessedMessage(channel, snapshot.id, messageId),
             sleep,
           },
-        ),
-      );
+        );
+      });
 
       for (const failure of summary.failures) {
         console.error(
@@ -116,17 +118,10 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return false;
     }
 
-    let processedMessage: ProcessedMessage;
-    try {
-      processedMessage = await parseMessageWasm(
-        message.content,
-        this.settings.messagePrefix,
-        message.timestamp,
-      );
-    } catch (error) {
-      console.error("parseMessage error:", error);
-      return false;
-    }
+    const processedMessage = await parseMessageWasm(
+      message,
+      this.settings.messagePrefix,
+    );
 
     if (!processedMessage.markdown) {
       return false;
@@ -143,8 +138,12 @@ export default class DiscordMessageSenderPlugin extends Plugin {
 
   private async updateLastProcessedMessage(
     channel: DiscordChannelSettings,
+    expectedChannelId: string,
     id: string,
   ): Promise<void> {
+    if (channel.id !== expectedChannelId) {
+      return;
+    }
     channel.lastProcessedMessageId = id;
     try {
       await this.saveSettings();

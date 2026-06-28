@@ -19,7 +19,8 @@
     "type-check": "tsc --noEmit",
     "test": "bun run test:ts && bun run test:rust",
     "test:rust": "cargo test --workspace",
-    "test:ts": "bun test"
+    "test:ts": "bun test",
+    "test:wasm": "bun tests/wasm.smoke.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.1",

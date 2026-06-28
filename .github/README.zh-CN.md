@@ -65,10 +65,10 @@
 
 请在插件设置中输入以下信息：
 - **机器人令牌**
-- **频道**：添加每个 Discord 频道 ID。频道名称为可选项，会用于 Obsidian 中的子文件夹名称。
+- **频道**：添加每个 Discord 频道 ID。频道名称为可选项，会包含在 Obsidian 中的子文件夹名称中。
 - **通知模板**：可自定义同步后发送到 Discord 的消息。可用变量：`{count}`、`{channelName}`、`{channelId}`
 
-默认情况下，普通消息会保存到 `DiscordLogs/<频道名称或ID>/`，URL 剪藏会保存到 `DiscordClippings/<频道名称或ID>/`。
+默认情况下，普通消息会保存到 `DiscordLogs/<频道名称>-<频道ID>/`，URL 剪藏会保存到 `DiscordClippings/<频道名称>-<频道ID>/`。如果未设置频道名称，则仅使用频道 ID。
 
 ## 命令列表
 

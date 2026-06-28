@@ -3,7 +3,11 @@ import initWasm, {
   type InitOutput,
   process_message as processMessage,
 } from "../pkg/parse_message.js";
-import { type ProcessedMessage, parseWasmMessageResult } from "./messages";
+import {
+  type DiscordMessage,
+  type ProcessedMessage,
+  parseWasmMessageResult,
+} from "./messages";
 
 // flag to indicate if the WASM module is ready
 let wasmReady: Promise<InitOutput> | null = null;
@@ -18,15 +22,22 @@ export async function initWasmBridge(): Promise<InitOutput> {
 }
 
 export async function parseMessageWasm(
-  content: string,
+  message: DiscordMessage,
   prefix: string,
-  timestamp: string,
 ): Promise<ProcessedMessage> {
   try {
     await initWasmBridge();
-    const result: unknown = await processMessage(content, prefix);
-    return parseWasmMessageResult(result, timestamp);
+    const result: unknown = await processMessage(message.content, prefix);
+    return parseWasmMessageResult(result, message.timestamp, message.id);
   } catch (error) {
-    throw new Error("Failed to parse message.", { cause: error });
+    console.error(
+      "Failed to parse message; saving the original content:",
+      error,
+    );
+    return parseWasmMessageResult(
+      [message.content, false],
+      message.timestamp,
+      message.id,
+    );
   }
 }

@@ -12,17 +12,15 @@ declare global {
 window.discordMsgSync ??= {};
 const namespace = window.discordMsgSync;
 namespace.fetchUrlContent ??= async (url: string): Promise<string> => {
-  try {
-    const res = await requestUrl({
-      url,
-      method: "GET",
-      headers: { "User-Agent": "Obsidian Discord Sender" },
-    });
-    return res.text;
-  } catch (err) {
-    console.error("fetchUrlContent error:", err);
-    return `<!-- Failed to fetch ${url}: ${err} -->`;
+  if (new URL(url).protocol !== "https:") {
+    throw new Error("Only HTTPS URLs are supported.");
   }
+  const res = await requestUrl({
+    url,
+    method: "GET",
+    headers: { "User-Agent": "Obsidian Discord Sender" },
+  });
+  return res.text;
 };
 
 export function cleanupGlobalNamespace(): void {
