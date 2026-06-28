@@ -34,7 +34,7 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
@@ -52,7 +52,7 @@ jobs:
           fi
 
       - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: wasm32-unknown-unknown
           cache-workspaces: |
@@ -62,7 +62,7 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2.2.0
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -137,7 +137,7 @@ jobs:
           zip -r "../discord-message-sender-$VERSION.zip" .
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3.0.1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.version }}
           target_commitish: ${{ steps.commit.outputs.release_sha }}
