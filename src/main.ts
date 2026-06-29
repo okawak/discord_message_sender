@@ -93,6 +93,7 @@ export default class DiscordMessageSenderPlugin extends Plugin {
           {
             botToken: this.settings.botToken,
             channel: snapshot,
+            sendSyncNotifications: this.settings.sendSyncNotifications,
             notificationTemplates: this.settings.notificationTemplates,
           },
           {

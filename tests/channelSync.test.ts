@@ -106,6 +106,7 @@ describe("syncChannelMessages", () => {
       {
         botToken: "token",
         channel,
+        sendSyncNotifications: true,
         notificationTemplates: {
           saved: "{count} saved from {channelName}",
           noNew: "none",
@@ -151,6 +152,7 @@ describe("syncChannelMessages", () => {
         {
           botToken: "token",
           channel,
+          sendSyncNotifications: true,
           notificationTemplates: {
             saved: "saved",
             noNew: "none",
@@ -185,6 +187,51 @@ describe("syncChannelMessages", () => {
 
     expect(caught).toBeInstanceOf(Error);
     expect(cursors).toEqual(["message"]);
+  });
+
+  test("does not post a notification when notifications are disabled", async () => {
+    const cursors: string[] = [];
+    let fetchCount = 0;
+    let notificationCount = 0;
+
+    const count = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel: { id: "111", name: "first" },
+        sendSyncNotifications: false,
+        notificationTemplates: {
+          saved: "saved",
+          noNew: "none",
+        },
+      },
+      {
+        fetchMessages: async () => {
+          fetchCount++;
+          return fetchCount === 1
+            ? [
+                {
+                  id: "message",
+                  content: "content",
+                  timestamp: "2026-06-27T00:00:00Z",
+                },
+              ]
+            : [];
+        },
+        postNotification: async () => {
+          notificationCount++;
+          throw new Error("Notification should not be sent.");
+        },
+        processMessage: async () => true,
+        persistCursor: async (_currentChannel, messageId) => {
+          cursors.push(messageId);
+        },
+        sleep: async () => {},
+      },
+    );
+
+    expect(count).toBe(1);
+    expect(cursors).toEqual(["message"]);
+    expect(notificationCount).toBe(0);
   });
 });
 

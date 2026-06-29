@@ -10,6 +10,7 @@ const REQUEST_INTERVAL_DELAY = 1000;
 export interface SingleChannelSyncOptions {
   botToken: string;
   channel: DiscordChannelSettings;
+  sendSyncNotifications: boolean;
   notificationTemplates: NotificationTemplates;
 }
 
@@ -49,7 +50,8 @@ export async function syncChannelMessages(
   options: SingleChannelSyncOptions,
   dependencies: SingleChannelSyncDependencies,
 ): Promise<number> {
-  const { botToken, channel, notificationTemplates } = options;
+  const { botToken, channel, sendSyncNotifications, notificationTemplates } =
+    options;
   let lastMessageId = channel.lastProcessedMessageId;
   let processedMessageCount = 0;
 
@@ -76,18 +78,20 @@ export async function syncChannelMessages(
     await dependencies.sleep(REQUEST_INTERVAL_DELAY);
   }
 
-  const template =
-    processedMessageCount === 0
-      ? notificationTemplates.noNew
-      : notificationTemplates.saved;
-  await dependencies.postNotification(
-    botToken,
-    channel.id,
-    renderNotificationTemplate(template, {
-      channel,
-      count: processedMessageCount,
-    }),
-  );
+  if (sendSyncNotifications) {
+    const template =
+      processedMessageCount === 0
+        ? notificationTemplates.noNew
+        : notificationTemplates.saved;
+    await dependencies.postNotification(
+      botToken,
+      channel.id,
+      renderNotificationTemplate(template, {
+        channel,
+        count: processedMessageCount,
+      }),
+    );
+  }
 
   return processedMessageCount;
 }
