@@ -10,7 +10,7 @@
 - 自动将 Discord 消息转换为 Obsidian 的 Markdown 文件并保存
 - 自动剪藏 URL 内容并保存为 Markdown
 - 可同步多个 Discord 频道，并按频道保存到不同子文件夹
-- 可自定义同步完成后发送到 Discord 的通知消息
+- 可禁用或自定义同步完成后发送到 Discord 的通知消息
 - 可在启动 Obsidian 桌面版时或通过命令面板执行
 
 ## 使用流程
@@ -24,7 +24,7 @@
    - 启动 Obsidian 时，插件会通过 Discord API 获取消息
    - 普通消息 → 保存到对应频道的 Markdown 文件夹
    - 特殊命令（以前缀开头的消息）→ 进行特殊处理
-   - 处理完成后，向 Discord 发送完成通知
+   - 处理完成后，根据设置向 Discord 发送完成通知
 
 ## ⚠️ 注意事项
 
@@ -51,7 +51,7 @@
 2. 在 **Scopes** 中选择 `bot`
 3. 在 **Bot Permissions** 中启用以下权限：
    - 查看频道（View Channels）
-   - 发送消息（Send Messages）
+   - 发送消息（Send Messages，仅在启用同步通知时需要）
    - 读取消息历史（Read Message History）
    - 添加表情（Add Reactions）
 4. 使用生成的 URL 邀请机器人
@@ -66,6 +66,7 @@
 请在插件设置中输入以下信息：
 - **机器人令牌**
 - **频道**：添加每个 Discord 频道 ID。频道名称为可选项，会用作 Obsidian 中的子文件夹名称。请使用不会产生重复保存目录的名称。
+- **发送同步通知**：禁用后，插件不会向 Discord 发送同步完成消息。
 - **通知模板**：可自定义同步后发送到 Discord 的消息。可用变量：`{count}`、`{channelName}`、`{channelId}`
 
 默认情况下，普通消息会保存到 `DiscordLogs/<频道名称或ID>/`，URL 剪藏会保存到 `DiscordClippings/<频道名称或ID>/`。设置时会拒绝重复的保存目录名称；手动编辑设置文件造成的重复也会在同步前被检测。

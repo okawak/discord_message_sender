@@ -184,6 +184,18 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   private createNotificationSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName("Notifications").setHeading();
 
+    new Setting(containerEl)
+      .setName("Send sync notifications")
+      .setDesc("Send a Discord message after each channel is synced")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.sendSyncNotifications)
+          .onChange(async (value) => {
+            this.plugin.settings.sendSyncNotifications = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
     this.addTextAreaSetting(containerEl, {
       name: "Saved messages template",
       description:
