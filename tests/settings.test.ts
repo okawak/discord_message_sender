@@ -40,6 +40,7 @@ describe("normalizeSettings", () => {
     expect(Object.hasOwn(settings, "channelId")).toBe(false);
     expect(Object.hasOwn(settings, "lastProcessedMessageId")).toBe(false);
     expect(settings.enableAutoSyncOnStartup).toBe(false);
+    expect(settings.sendSyncNotifications).toBe(true);
   });
 
   test("keeps valid channels and drops blank channel ids", () => {
@@ -93,9 +94,26 @@ describe("normalizeSettings", () => {
     );
     expect(settings.notificationTemplates.noNew).toBe("⚠️ No new messages.");
   });
+
+  test("keeps disabled sync notifications", () => {
+    expect(
+      normalizeSettings({ sendSyncNotifications: false }).sendSyncNotifications,
+    ).toBe(false);
+  });
 });
 
 describe("migrateSettings", () => {
+  test("enables sync notifications when migrating v1 settings", () => {
+    const migration = migrateSettings({
+      settingsVersion: 1,
+      channels: [{ id: "123", name: "inbox" }],
+    });
+
+    expect(migration.didMigrate).toBe(true);
+    expect(migration.settings.settingsVersion).toBe(CURRENT_SETTINGS_VERSION);
+    expect(migration.settings.sendSyncNotifications).toBe(true);
+  });
+
   test("rewrites v0.2.8 settings into the current schema", () => {
     const migration = migrateSettings({
       messageDirectoryName: "DiscordLogs",

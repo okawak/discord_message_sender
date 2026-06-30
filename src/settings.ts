@@ -10,7 +10,7 @@ export interface NotificationTemplates {
   noNew: string;
 }
 
-export const CURRENT_SETTINGS_VERSION = 1;
+export const CURRENT_SETTINGS_VERSION = 2;
 
 export interface DiscordPluginSettings {
   settingsVersion: typeof CURRENT_SETTINGS_VERSION;
@@ -20,6 +20,7 @@ export interface DiscordPluginSettings {
   channels: DiscordChannelSettings[];
   messagePrefix: string;
   enableAutoSyncOnStartup: boolean;
+  sendSyncNotifications: boolean;
   notificationTemplates: NotificationTemplates;
 }
 
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: DiscordPluginSettings = {
   channels: [],
   messagePrefix: "!",
   enableAutoSyncOnStartup: true,
+  sendSyncNotifications: true,
   notificationTemplates: DEFAULT_NOTIFICATION_TEMPLATES,
 };
 
@@ -81,6 +83,11 @@ export function normalizeSettings(data: unknown): DiscordPluginSettings {
       raw,
       "enableAutoSyncOnStartup",
       DEFAULT_SETTINGS.enableAutoSyncOnStartup,
+    ),
+    sendSyncNotifications: readBoolean(
+      raw,
+      "sendSyncNotifications",
+      DEFAULT_SETTINGS.sendSyncNotifications,
     ),
     notificationTemplates: normalizeNotificationTemplates(raw),
   };

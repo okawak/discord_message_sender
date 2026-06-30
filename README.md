@@ -11,7 +11,7 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
 - Automatically converts Discord messages into Obsidian Markdown files and saves them
 - Automatically clips web page contents from URLs and saves them as Markdown by using `!url` command
 - Syncs multiple Discord channels and stores each channel in its own subfolder
-- Lets you customize the Discord notification messages sent after sync
+- Lets you disable or customize the Discord notification messages sent after sync
 - Can be triggered on Obsidian desktop startup or via the command palette
 
 ## Usage Flow
@@ -25,7 +25,7 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
     - When you launch Obsidian, the plugin fetches messages from Discord via the API
     - Regular messages → Saved as Markdown files under channel-specific folders
     - Special commands (messages starting with the prefix) → Processed with custom handlers
-    - After processing, a completion notification is sent to Discord
+    - After processing, a completion notification is optionally sent to Discord
 
 ## ⚠️ Notes
 
@@ -52,7 +52,7 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
 2. Under **Scopes**, select `bot`
 3. Under **Bot Permissions**, enable:
     - View Channels
-    - Send Messages
+    - Send Messages (only required when sync notifications are enabled)
     - Read Message History
     - Add Reactions
 4. Use the generated URL to invite your bot
@@ -68,6 +68,7 @@ Please enter the following information in the plugin settings:
 
 - **Bot Token**
 - **Channels**: Add each Discord channel ID. A channel name is optional and is used as the Obsidian subfolder name. Channel names must resolve to unique folder names.
+- **Send sync notifications**: Disable this to prevent the plugin from posting completion messages to Discord.
 - **Notification templates**: Optional templates for the Discord messages sent after sync. Available variables: `{count}`, `{channelName}`, `{channelId}`
 
 By default, messages are saved under `DiscordLogs/<channel name or ID>/`, and URL clippings are saved under `DiscordClippings/<channel name or ID>/`. Duplicate folder names are rejected in settings, and sync also stops if manually edited settings contain a duplicate.
