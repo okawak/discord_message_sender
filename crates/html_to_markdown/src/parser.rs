@@ -1,21 +1,17 @@
 use crate::dom::{Dom, NodeData, NodeId};
 use crate::error::ConvertError;
 use html5ever::{
-    ExpandedName,
     interface::{Attribute, QualName},
     tendril::{StrTendril, TendrilSink},
     tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink},
 };
 use std::borrow::Cow;
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{Ref, RefCell};
 use std::default::Default;
 
 pub fn parse_html(html: &str) -> Result<Dom, ConvertError> {
     let sink = VecSink {
         dom: RefCell::new(Dom::new()),
-        // Store leaked QualName references for efficient elem_name lookups
-        element_names: RefCell::new(HashMap::new()),
     };
     let sink = html5ever::parse_document(sink, Default::default())
         .from_utf8()
@@ -27,9 +23,6 @@ pub fn parse_html(html: &str) -> Result<Dom, ConvertError> {
 struct VecSink {
     /// RefCell wrapper for DOM manipulation during parsing
     dom: RefCell<Dom>,
-    /// Cache of leaked QualName references for efficient elem_name implementation
-    /// Following the approach demonstrated in html5ever's official examples
-    element_names: RefCell<HashMap<NodeId, &'static QualName>>,
 }
 
 impl VecSink {
@@ -42,7 +35,7 @@ impl VecSink {
 impl TreeSink for VecSink {
     type Handle = NodeId;
     type Output = Self;
-    type ElemName<'a> = ExpandedName<'a>;
+    type ElemName<'a> = Ref<'a, QualName>;
 
     fn finish(self) -> Self {
         self
@@ -60,22 +53,18 @@ impl TreeSink for VecSink {
         a == b
     }
 
-    fn elem_name<'a>(&'a self, id: &NodeId) -> ExpandedName<'a> {
-        self.element_names
-            .borrow()
-            .get(id)
-            .unwrap_or_else(|| panic!("Node {id} is not an element"))
-            .expanded()
+    fn elem_name<'a>(&'a self, id: &NodeId) -> Self::ElemName<'a> {
+        Ref::map(self.dom.borrow(), |dom| {
+            let node = dom
+                .node(*id)
+                .unwrap_or_else(|| panic!("Node {id} does not exist"));
+            match &node.data {
+                NodeData::Element { tag, .. } => tag,
+                _ => panic!("Node {id} is not an element"),
+            }
+        })
     }
 
-    /// Creates a new element node in the DOM.
-    ///
-    /// Note: This implementation intentionally leaks memory to minimize implementation
-    /// complexity, following the approach demonstrated in html5ever's official examples.
-    /// For Discord Message Sender's use case (short-lived parsing operations), this
-    /// approach provides a good balance between implementation simplicity and performance.
-    ///
-    /// Reference: https://github.com/servo/html5ever/blob/main/examples/noop-tree-builder.rs
     fn create_element(
         &self,
         name: QualName,
@@ -88,20 +77,10 @@ impl TreeSink for VecSink {
                 .map(|a| (a.name.local.to_string(), a.value.to_string()))
                 .collect();
 
-            // Intentionally leak the QualName to obtain a 'static reference
-            // This approach is used in html5ever's official examples to handle
-            // the lifetime constraints of the TreeSink trait
-            let leaked_name: &'static QualName = Box::leak(Box::new(name.clone()));
-
-            let id = dom.create_without_parent(NodeData::Element {
+            dom.create_without_parent(NodeData::Element {
                 tag: name,
                 attrs: attrs_map,
-            });
-
-            // Store the leaked reference for efficient elem_name lookups
-            self.element_names.borrow_mut().insert(id, leaked_name);
-
-            id
+            })
         })
     }
 

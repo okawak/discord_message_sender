@@ -1,13 +1,17 @@
 import { Notice } from "obsidian";
 import initWasm, {
+  convert_html as convertHtml,
   type InitOutput,
-  process_message as processMessage,
+  parse_message as parseMessage,
 } from "../pkg/parse_message.js";
 import {
+  createProcessedMessage,
   type DiscordMessage,
+  type MessageInstruction,
   type ProcessedMessage,
-  parseWasmMessageResult,
+  parseWasmMessageInstruction,
 } from "./messages";
+import { fetchUrlContent } from "./urlFetcher";
 
 // flag to indicate if the WASM module is ready
 let wasmReady: Promise<InitOutput> | null = null;
@@ -25,19 +29,34 @@ export async function parseMessageWasm(
   message: DiscordMessage,
   prefix: string,
 ): Promise<ProcessedMessage> {
+  await initWasmBridge();
+
+  let instruction: MessageInstruction;
   try {
-    await initWasmBridge();
-    const result: unknown = await processMessage(message.content, prefix);
-    return parseWasmMessageResult(result, message.timestamp, message.id);
+    const result: unknown = parseMessage(message.content, prefix);
+    instruction = parseWasmMessageInstruction(result);
   } catch (error) {
-    console.error(
-      "Failed to parse message; saving the original content:",
-      error,
-    );
-    return parseWasmMessageResult(
-      [message.content, false],
+    throw new Error("Failed to parse Discord message.", { cause: error });
+  }
+
+  if (instruction.kind === "message") {
+    return createProcessedMessage(
+      instruction.markdown,
+      false,
       message.timestamp,
       message.id,
     );
   }
+
+  const html = await fetchUrlContent(instruction.url);
+  let markdown: string;
+  try {
+    markdown = convertHtml(instruction.url, html);
+  } catch (error) {
+    throw new Error("Failed to convert URL content to Markdown.", {
+      cause: error,
+    });
+  }
+
+  return createProcessedMessage(markdown, true, message.timestamp, message.id);
 }

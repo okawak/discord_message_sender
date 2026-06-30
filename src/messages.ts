@@ -11,22 +11,40 @@ export interface ProcessedMessage {
   fileName: string;
 }
 
-export function parseWasmMessageResult(
+export type MessageInstruction =
+  | { kind: "message"; markdown: string }
+  | { kind: "url"; url: string };
+
+export function parseWasmMessageInstruction(
   value: unknown,
-  timestamp: string,
-  messageId: string,
-): ProcessedMessage {
+): MessageInstruction {
   if (
     !Array.isArray(value) ||
     typeof value[0] !== "string" ||
-    typeof value[1] !== "boolean"
+    typeof value[1] !== "string"
   ) {
-    throw new TypeError("WASM returned an invalid processed message.");
+    throw new TypeError("WASM returned an invalid message instruction.");
   }
 
+  switch (value[0]) {
+    case "message":
+      return { kind: "message", markdown: value[1] };
+    case "url":
+      return { kind: "url", url: value[1] };
+    default:
+      throw new TypeError(`WASM returned unknown message kind "${value[0]}".`);
+  }
+}
+
+export function createProcessedMessage(
+  markdown: string,
+  isClipping: boolean,
+  timestamp: string,
+  messageId: string,
+): ProcessedMessage {
   return {
-    markdown: value[0],
-    isClipping: value[1],
+    markdown,
+    isClipping,
     fileName: `${formatMessageFileName(timestamp)}_${messageId}`,
   };
 }

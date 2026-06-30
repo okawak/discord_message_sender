@@ -189,6 +189,50 @@ describe("syncChannelMessages", () => {
     expect(cursors).toEqual(["message"]);
   });
 
+  test("does not persist the cursor when message processing fails", async () => {
+    const cursors: string[] = [];
+    const processingError = new Error("URL fetch failed");
+
+    let caught: unknown;
+    try {
+      await syncChannelMessages(
+        {
+          botToken: "token",
+          channel: { id: "111", name: "first" },
+          sendSyncNotifications: false,
+          notificationTemplates: {
+            saved: "saved",
+            noNew: "none",
+          },
+        },
+        {
+          fetchMessages: async () => [
+            {
+              id: "message",
+              content: "!url https://example.com",
+              timestamp: "2026-06-27T00:00:00Z",
+            },
+          ],
+          postNotification: async () => {
+            throw new Error("Notification should not be sent.");
+          },
+          processMessage: async () => {
+            throw processingError;
+          },
+          persistCursor: async (_currentChannel, messageId) => {
+            cursors.push(messageId);
+          },
+          sleep: async () => {},
+        },
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBe(processingError);
+    expect(cursors).toEqual([]);
+  });
+
   test("does not post a notification when notifications are disabled", async () => {
     const cursors: string[] = [];
     let fetchCount = 0;
