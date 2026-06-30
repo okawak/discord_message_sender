@@ -13,7 +13,6 @@ import {
 } from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
-import { cleanupGlobalNamespace } from "./global";
 import type { DiscordMessage } from "./messages";
 import {
   type DiscordChannelSettings,
@@ -47,10 +46,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       this.syncDiscordMessages().catch(console.error);
     }
     this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
-  }
-
-  override onunload(): void {
-    cleanupGlobalNamespace();
   }
 
   private async syncDiscordMessages(): Promise<void> {

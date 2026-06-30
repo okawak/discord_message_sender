@@ -1,11 +1,45 @@
 import { describe, expect, test } from "bun:test";
-import { parseWasmMessageResult } from "../src/messages";
+import {
+  createProcessedMessage,
+  parseWasmMessageInstruction,
+} from "../src/messages";
 
-describe("parseWasmMessageResult", () => {
-  test("maps the wasm response to the TypeScript domain model", () => {
+describe("parseWasmMessageInstruction", () => {
+  test("parses a regular message instruction", () => {
+    expect(parseWasmMessageInstruction(["message", "# title"])).toEqual({
+      kind: "message",
+      markdown: "# title",
+    });
+  });
+
+  test("parses a URL instruction", () => {
+    expect(parseWasmMessageInstruction(["url", "https://example.com"])).toEqual(
+      {
+        kind: "url",
+        url: "https://example.com",
+      },
+    );
+  });
+
+  test("rejects malformed wasm responses", () => {
+    expect(() => parseWasmMessageInstruction(["message", false])).toThrow(
+      "WASM returned an invalid message instruction.",
+    );
+  });
+
+  test("rejects unknown message kinds", () => {
+    expect(() => parseWasmMessageInstruction(["unknown", "value"])).toThrow(
+      'WASM returned unknown message kind "unknown".',
+    );
+  });
+});
+
+describe("createProcessedMessage", () => {
+  test("maps a message to the TypeScript domain model", () => {
     expect(
-      parseWasmMessageResult(
-        ["# title", true],
+      createProcessedMessage(
+        "# title",
+        true,
         "2026-06-21T03:00:00.000Z",
         "123",
       ),
@@ -16,16 +50,10 @@ describe("parseWasmMessageResult", () => {
     });
   });
 
-  test("rejects malformed wasm responses", () => {
-    expect(() =>
-      parseWasmMessageResult(["# title", "true"], "timestamp", "123"),
-    ).toThrow("WASM returned an invalid processed message.");
-  });
-
   test("uses the original timestamp when it is invalid", () => {
-    expect(
-      parseWasmMessageResult(["message", false], "invalid", "123"),
-    ).toMatchObject({
+    expect(createProcessedMessage("message", false, "invalid", "123")).toEqual({
+      markdown: "message",
+      isClipping: false,
       fileName: "invalid_123",
     });
   });
