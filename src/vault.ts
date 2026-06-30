@@ -1,31 +1,40 @@
-import { TFolder, type Vault } from "obsidian";
+import type { Vault } from "obsidian";
 import type { ProcessedMessage } from "./messages";
 
-// Save to Obsidian vault
-export async function saveToVault(
+export type SaveResult = "saved" | "duplicate";
+
+export function saveProcessedMessage(
   vault: Vault,
-  msgDir: string,
-  clipDir: string,
-  data: ProcessedMessage,
-): Promise<void> {
-  const dir = data.isClipping ? clipDir : msgDir;
-  await ensureDir(vault, dir);
+  messageDirectory: string,
+  clippingDirectory: string,
+  message: ProcessedMessage,
+): Promise<SaveResult> {
+  const directory = message.isClipping ? clippingDirectory : messageDirectory;
+  return saveIndividualMessage(vault, directory, message);
+}
 
-  const fileName = data.fileName || Date.now().toString();
-  const path = `${dir}/${fileName}.md`;
+async function saveIndividualMessage(
+  vault: Vault,
+  directory: string,
+  message: ProcessedMessage,
+): Promise<SaveResult> {
+  await ensureDir(vault, directory);
 
-  // Check if the file already exists
-  if (!vault.getAbstractFileByPath(path)) {
-    await vault.create(path, data.markdown);
+  const path = `${directory}/${message.fileName}.md`;
+  if (vault.getAbstractFileByPath(path)) {
+    return "duplicate";
   }
+
+  await vault.create(path, message.markdown);
+  return "saved";
 }
 
 async function ensureDir(vault: Vault, p: string): Promise<void> {
-  const existing = vault.getAbstractFileByPath(p);
-  if (existing instanceof TFolder) return;
+  if (vault.getFolderByPath(p)) {
+    return;
+  }
 
-  if (existing) {
-    // If it exists but is not a folder, throw an error
+  if (vault.getAbstractFileByPath(p)) {
     throw new Error(
       `Cannot create directory "${p}": a file with the same name already exists`,
     );
@@ -33,7 +42,6 @@ async function ensureDir(vault: Vault, p: string): Promise<void> {
 
   const parent = p.split("/").slice(0, -1).join("/");
   if (parent) {
-    // recursively ensure parent directory exists
     await ensureDir(vault, parent);
   }
   await vault.createFolder(p);

@@ -44,6 +44,8 @@ describe("createProcessedMessage", () => {
         "123",
       ),
     ).toEqual({
+      messageId: "123",
+      timestamp: "2026-06-21T03:00:00.000Z",
       markdown: "# title",
       isClipping: true,
       fileName: "20260621_120000_123",
@@ -52,6 +54,8 @@ describe("createProcessedMessage", () => {
 
   test("uses the original timestamp when it is invalid", () => {
     expect(createProcessedMessage("message", false, "invalid", "123")).toEqual({
+      messageId: "123",
+      timestamp: "invalid",
       markdown: "message",
       isClipping: false,
       fileName: "invalid_123",

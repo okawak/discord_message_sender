@@ -6,6 +6,8 @@ export interface DiscordMessage {
 }
 
 export interface ProcessedMessage {
+  messageId: string;
+  timestamp: string;
   markdown: string;
   isClipping: boolean;
   fileName: string;
@@ -43,6 +45,8 @@ export function createProcessedMessage(
   messageId: string,
 ): ProcessedMessage {
   return {
+    messageId,
+    timestamp,
     markdown,
     isClipping,
     fileName: `${formatMessageFileName(timestamp)}_${messageId}`,
