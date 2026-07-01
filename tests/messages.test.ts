@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createProcessedMessage,
+  type DiscordMessage,
   parseWasmMessageInstruction,
 } from "../src/messages";
 
@@ -36,29 +37,82 @@ describe("parseWasmMessageInstruction", () => {
 
 describe("createProcessedMessage", () => {
   test("maps a message to the TypeScript domain model", () => {
+    const message: DiscordMessage = {
+      id: "123",
+      content: "content",
+      timestamp: "2026-06-21T03:00:00.000Z",
+      author: {
+        id: "author-id",
+        username: "username",
+        global_name: "Global name",
+      },
+      member: { nick: "Nickname" },
+    };
+
     expect(
-      createProcessedMessage(
-        "# title",
-        true,
-        "2026-06-21T03:00:00.000Z",
-        "123",
-      ),
+      createProcessedMessage("# title", true, message, "Asia/Tokyo"),
     ).toEqual({
       messageId: "123",
       timestamp: "2026-06-21T03:00:00.000Z",
+      authorId: "author-id",
+      authorName: "Nickname",
       markdown: "# title",
       isClipping: true,
       fileName: "20260621_120000_123",
     });
   });
 
-  test("uses the original timestamp when it is invalid", () => {
-    expect(createProcessedMessage("message", false, "invalid", "123")).toEqual({
-      messageId: "123",
-      timestamp: "invalid",
-      markdown: "message",
-      isClipping: false,
-      fileName: "invalid_123",
-    });
+  test("falls back through the Discord author fields", () => {
+    const base = {
+      id: "123",
+      content: "content",
+      timestamp: "2026-06-21T03:00:00.000Z",
+    };
+
+    expect(
+      createProcessedMessage(
+        "message",
+        false,
+        {
+          ...base,
+          author: {
+            id: "author-id",
+            username: "username",
+            global_name: "Global name",
+          },
+        },
+        "UTC",
+      ).authorName,
+    ).toBe("Global name");
+    expect(
+      createProcessedMessage(
+        "message",
+        false,
+        {
+          ...base,
+          author: { id: "author-id", username: "username" },
+        },
+        "UTC",
+      ).authorName,
+    ).toBe("username");
+    expect(
+      createProcessedMessage(
+        "message",
+        false,
+        { ...base, author: { id: "author-id" } },
+        "UTC",
+      ).authorName,
+    ).toBe("author-id");
+  });
+
+  test("rejects invalid timestamps", () => {
+    expect(() =>
+      createProcessedMessage(
+        "message",
+        false,
+        { id: "123", content: "content", timestamp: "invalid" },
+        "UTC",
+      ),
+    ).toThrow('Invalid Discord message timestamp: "invalid".');
   });
 });
