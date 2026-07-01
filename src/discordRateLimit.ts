@@ -2,7 +2,7 @@ export function getRateLimitDelay(
   headers: Record<string, string>,
   responseText: string,
 ): number {
-  const header = headers["Retry-After"] ?? headers["retry-after"];
+  const header = readHeader(headers, "Retry-After");
   const headerDelay = secondsToMilliseconds(header);
   if (headerDelay !== undefined) {
     return headerDelay;
@@ -21,6 +21,27 @@ export function getRateLimitDelay(
   }
 
   return 1000;
+}
+
+export function getRateLimitResetDelay(
+  headers: Record<string, string>,
+): number {
+  if (Number(readHeader(headers, "X-RateLimit-Remaining")) !== 0) {
+    return 0;
+  }
+  return (
+    secondsToMilliseconds(readHeader(headers, "X-RateLimit-Reset-After")) ?? 0
+  );
+}
+
+function readHeader(
+  headers: Record<string, string>,
+  name: string,
+): string | undefined {
+  const normalizedName = name.toLowerCase();
+  return Object.entries(headers).find(
+    ([key]) => key.toLowerCase() === normalizedName,
+  )?.[1];
 }
 
 function secondsToMilliseconds(value: unknown): number | undefined {
