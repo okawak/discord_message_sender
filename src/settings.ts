@@ -10,10 +10,10 @@ export interface NotificationTemplates {
   noNew: string;
 }
 
-export const CURRENT_SETTINGS_VERSION = 2;
+export const CURRENT_SETTINGS_SCHEMA_VERSION = 2;
 
 export interface DiscordPluginSettings {
-  settingsVersion: typeof CURRENT_SETTINGS_VERSION;
+  settingsVersion: typeof CURRENT_SETTINGS_SCHEMA_VERSION;
   messageDirectoryName: string;
   clippingDirectoryName: string;
   botToken: string;
@@ -36,7 +36,7 @@ export const DEFAULT_NOTIFICATION_TEMPLATES: NotificationTemplates = {
 
 // Default settings for the Discord plugin
 export const DEFAULT_SETTINGS: DiscordPluginSettings = {
-  settingsVersion: CURRENT_SETTINGS_VERSION,
+  settingsVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
   messageDirectoryName: "DiscordLogs",
   clippingDirectoryName: "DiscordClippings",
   botToken: "",
@@ -68,7 +68,7 @@ export function normalizeSettings(data: unknown): DiscordPluginSettings {
   });
 
   return {
-    settingsVersion: CURRENT_SETTINGS_VERSION,
+    settingsVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
     messageDirectoryName:
       readString(raw, "messageDirectoryName") ||
       DEFAULT_SETTINGS.messageDirectoryName,
@@ -118,7 +118,7 @@ export function updateChannelId(
 
 function needsMigration(raw: Record<string, unknown>): boolean {
   return (
-    raw.settingsVersion !== CURRENT_SETTINGS_VERSION ||
+    raw.settingsVersion !== CURRENT_SETTINGS_SCHEMA_VERSION ||
     Object.hasOwn(raw, "channelId") ||
     Object.hasOwn(raw, "lastProcessedMessageId")
   );

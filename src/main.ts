@@ -22,7 +22,7 @@ import {
   normalizeSettings,
 } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
-import { saveToVault } from "./vault";
+import { saveProcessedMessage } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 
 export default class DiscordMessageSenderPlugin extends Plugin {
@@ -144,13 +144,13 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return false;
     }
 
-    await saveToVault(
+    const saveResult = await saveProcessedMessage(
       this.app.vault,
       createChannelDirectory(this.settings.messageDirectoryName, channel),
       createChannelDirectory(this.settings.clippingDirectoryName, channel),
       processedMessage,
     );
-    return true;
+    return saveResult === "saved";
   }
 
   private async updateLastProcessedMessage(

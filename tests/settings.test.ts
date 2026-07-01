@@ -9,7 +9,7 @@ import {
 } from "../src/channelPaths";
 import { renderNotificationTemplate } from "../src/notificationTemplates";
 import {
-  CURRENT_SETTINGS_VERSION,
+  CURRENT_SETTINGS_SCHEMA_VERSION,
   type DiscordChannelSettings,
   getConfiguredChannels,
   migrateSettings,
@@ -36,7 +36,7 @@ describe("normalizeSettings", () => {
         lastProcessedMessageId: "9876543210",
       },
     ]);
-    expect(settings.settingsVersion).toBe(CURRENT_SETTINGS_VERSION);
+    expect(settings.settingsVersion).toBe(CURRENT_SETTINGS_SCHEMA_VERSION);
     expect(Object.hasOwn(settings, "channelId")).toBe(false);
     expect(Object.hasOwn(settings, "lastProcessedMessageId")).toBe(false);
     expect(settings.enableAutoSyncOnStartup).toBe(false);
@@ -110,7 +110,9 @@ describe("migrateSettings", () => {
     });
 
     expect(migration.didMigrate).toBe(true);
-    expect(migration.settings.settingsVersion).toBe(CURRENT_SETTINGS_VERSION);
+    expect(migration.settings.settingsVersion).toBe(
+      CURRENT_SETTINGS_SCHEMA_VERSION,
+    );
     expect(migration.settings.sendSyncNotifications).toBe(true);
   });
 
@@ -127,7 +129,7 @@ describe("migrateSettings", () => {
 
     expect(migration.didMigrate).toBe(true);
     expect(migration.settings).toMatchObject({
-      settingsVersion: CURRENT_SETTINGS_VERSION,
+      settingsVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
       channels: [
         {
           id: "123",
@@ -156,7 +158,7 @@ describe("migrateSettings", () => {
 
   test("removes stale legacy fields from an existing channels schema", () => {
     const migration = migrateSettings({
-      settingsVersion: CURRENT_SETTINGS_VERSION,
+      settingsVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
       channels: [{ id: "new-channel", name: "new" }],
       channelId: "stale-channel",
       lastProcessedMessageId: "stale-cursor",
