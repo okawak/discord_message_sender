@@ -1,11 +1,10 @@
 import { getChannelDisplayName } from "./channelPaths";
+import type { DiscordMessagePage } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
+import { DISCORD_MESSAGE_PAGE_SIZE } from "./discordRoutes";
 import type { DiscordMessage } from "./messages";
 import { renderNotificationTemplate } from "./notificationTemplates";
 import type { DiscordChannelSettings, NotificationTemplates } from "./settings";
-
-const MESSAGE_PROCESSING_DELAY = 50;
-const REQUEST_INTERVAL_DELAY = 1000;
 
 export interface SingleChannelSyncOptions {
   botToken: string;
@@ -18,8 +17,8 @@ export interface SingleChannelSyncDependencies {
   fetchMessages: (
     botToken: string,
     channelId: string,
-    after?: string,
-  ) => Promise<DiscordMessage[]>;
+    before?: string,
+  ) => Promise<DiscordMessagePage>;
   postNotification: (
     botToken: string,
     channelId: string,
@@ -52,30 +51,51 @@ export async function syncChannelMessages(
 ): Promise<number> {
   const { botToken, channel, sendSyncNotifications, notificationTemplates } =
     options;
-  let lastMessageId = channel.lastProcessedMessageId;
+  const lastMessageId = channel.lastProcessedMessageId;
   let processedMessageCount = 0;
+  const pages: DiscordMessage[][] = [];
+  let before: string | undefined;
 
   while (true) {
-    const messages = await dependencies.fetchMessages(
-      botToken,
-      channel.id,
-      lastMessageId,
-    );
-    const newestMessage = messages[0];
-    if (!newestMessage) {
+    const page = await dependencies.fetchMessages(botToken, channel.id, before);
+    const messages = lastMessageId
+      ? page.messages.filter(
+          (message) => BigInt(message.id) > BigInt(lastMessageId),
+        )
+      : page.messages;
+    if (messages.length > 0) {
+      pages.push(messages);
+    }
+
+    if (
+      !lastMessageId ||
+      page.messages.length < DISCORD_MESSAGE_PAGE_SIZE ||
+      messages.length < page.messages.length
+    ) {
       break;
     }
 
+    const oldestMessage = page.messages.at(-1);
+    if (!oldestMessage) {
+      break;
+    }
+    before = oldestMessage.id;
+    if (page.nextRequestDelayMs > 0) {
+      await dependencies.sleep(page.nextRequestDelayMs);
+    }
+  }
+
+  for (const messages of pages.reverse()) {
     for (const message of [...messages].reverse()) {
       if (await dependencies.processMessage(message, channel)) {
         processedMessageCount++;
       }
-      await dependencies.sleep(MESSAGE_PROCESSING_DELAY);
     }
 
-    lastMessageId = newestMessage.id;
-    await dependencies.persistCursor(channel, newestMessage.id);
-    await dependencies.sleep(REQUEST_INTERVAL_DELAY);
+    const newestMessage = messages[0];
+    if (newestMessage) {
+      await dependencies.persistCursor(channel, newestMessage.id);
+    }
   }
 
   if (sendSyncNotifications) {

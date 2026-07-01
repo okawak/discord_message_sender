@@ -6,6 +6,8 @@ import {
   syncChannelsSequentially,
 } from "../src/channelSync";
 import { DiscordApiError } from "../src/discordApiError";
+import { DISCORD_MESSAGE_PAGE_SIZE } from "../src/discordRoutes";
+import type { DiscordMessage } from "../src/messages";
 import type { DiscordChannelSettings } from "../src/settings";
 
 const firstChannel = { id: "111", name: "first" };
@@ -16,6 +18,36 @@ const channels = [
   secondChannel,
   thirdChannel,
 ] satisfies DiscordChannelSettings[];
+
+function messagePage(messages: DiscordMessage[], nextRequestDelayMs = 0) {
+  return { messages, nextRequestDelayMs };
+}
+
+function createMessage(id: number): DiscordMessage {
+  return {
+    id: id.toString(),
+    content: `message ${id}`,
+    timestamp: "2026-06-27T00:00:00Z",
+  };
+}
+
+function createHistory(
+  cursor: number,
+  newMessageCount: number,
+): DiscordMessage[] {
+  return Array.from({ length: newMessageCount + 121 }, (_, index) =>
+    createMessage(cursor + newMessageCount - index),
+  );
+}
+
+function getHistoryPage(
+  history: DiscordMessage[],
+  before?: string,
+): DiscordMessage[] {
+  return history
+    .filter((message) => !before || BigInt(message.id) < BigInt(before))
+    .slice(0, DISCORD_MESSAGE_PAGE_SIZE);
+}
 
 describe("syncChannelsSequentially", () => {
   test("continues syncing after a channel-specific API failure", async () => {
@@ -86,21 +118,19 @@ describe("syncChannelMessages", () => {
     const processed: string[] = [];
     const cursors: string[] = [];
     const delays: number[] = [];
-    const fetches = [
-      [
-        {
-          id: "newest",
-          content: "second",
-          timestamp: "2026-06-27T00:00:02Z",
-        },
-        {
-          id: "oldest",
-          content: "first",
-          timestamp: "2026-06-27T00:00:01Z",
-        },
-      ],
-      [],
+    const messages = [
+      {
+        id: "2",
+        content: "second",
+        timestamp: "2026-06-27T00:00:02Z",
+      },
+      {
+        id: "1",
+        content: "first",
+        timestamp: "2026-06-27T00:00:01Z",
+      },
     ];
+    let fetchCount = 0;
 
     const count = await syncChannelMessages(
       {
@@ -113,7 +143,10 @@ describe("syncChannelMessages", () => {
         },
       },
       {
-        fetchMessages: async () => fetches.shift() ?? [],
+        fetchMessages: async () => {
+          fetchCount++;
+          return messagePage(messages);
+        },
         postNotification: async (_token, _channelId, text) => {
           expect(text).toBe("2 saved from first");
           return {
@@ -136,15 +169,142 @@ describe("syncChannelMessages", () => {
     );
 
     expect(count).toBe(2);
-    expect(processed).toEqual(["oldest", "newest"]);
-    expect(cursors).toEqual(["newest"]);
-    expect(delays).toEqual([50, 50, 1000]);
+    expect(processed).toEqual(["1", "2"]);
+    expect(cursors).toEqual(["2"]);
+    expect(fetchCount).toBe(1);
+    expect(delays).toEqual([]);
+  });
+
+  test("limits the first sync to the latest 100 messages", async () => {
+    const history = createHistory(10_000, 300);
+    const processed: string[] = [];
+    const requests: (string | undefined)[] = [];
+    const cursors: string[] = [];
+
+    const count = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel: { id: "111", name: "first" },
+        sendSyncNotifications: false,
+        notificationTemplates: { saved: "saved", noNew: "none" },
+      },
+      {
+        fetchMessages: async (_token, _channelId, before) => {
+          requests.push(before);
+          return messagePage(getHistoryPage(history, before));
+        },
+        postNotification: async () => {
+          throw new Error("Notification should not be sent.");
+        },
+        processMessage: async (message) => {
+          processed.push(message.id);
+          return true;
+        },
+        persistCursor: async (_channel, messageId) => {
+          cursors.push(messageId);
+        },
+        sleep: async () => {},
+      },
+    );
+
+    expect(count).toBe(100);
+    expect(requests).toEqual([undefined]);
+    expect(processed).toEqual(
+      Array.from({ length: 100 }, (_, index) => (10_201 + index).toString()),
+    );
+    expect(cursors).toEqual(["10300"]);
+  });
+
+  for (const newMessageCount of [50, 100, 250, 1000]) {
+    test(`syncs ${newMessageCount} new messages without gaps`, async () => {
+      const cursor = 10_000;
+      const history = createHistory(cursor, newMessageCount);
+      const processed: string[] = [];
+      const requests: (string | undefined)[] = [];
+      const cursors: string[] = [];
+
+      const count = await syncChannelMessages(
+        {
+          botToken: "token",
+          channel: {
+            id: "111",
+            name: "first",
+            lastProcessedMessageId: cursor.toString(),
+          },
+          sendSyncNotifications: false,
+          notificationTemplates: { saved: "saved", noNew: "none" },
+        },
+        {
+          fetchMessages: async (_token, _channelId, before) => {
+            requests.push(before);
+            return messagePage(getHistoryPage(history, before));
+          },
+          postNotification: async () => {
+            throw new Error("Notification should not be sent.");
+          },
+          processMessage: async (message) => {
+            processed.push(message.id);
+            return true;
+          },
+          persistCursor: async (_channel, messageId) => {
+            cursors.push(messageId);
+          },
+          sleep: async () => {},
+        },
+      );
+
+      expect(count).toBe(newMessageCount);
+      expect(processed).toEqual(
+        Array.from({ length: newMessageCount }, (_, index) =>
+          (cursor + index + 1).toString(),
+        ),
+      );
+      expect(requests.length).toBe(
+        Math.floor(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE) + 1,
+      );
+      expect(cursors.length).toBe(
+        Math.ceil(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE),
+      );
+      expect(cursors.at(-1)).toBe((cursor + newMessageCount).toString());
+    });
+  }
+
+  test("waits only when the current rate-limit bucket is exhausted", async () => {
+    const cursor = 10_000;
+    const history = createHistory(cursor, 150);
+    const delays: number[] = [];
+
+    await syncChannelMessages(
+      {
+        botToken: "token",
+        channel: {
+          id: "111",
+          name: "first",
+          lastProcessedMessageId: cursor.toString(),
+        },
+        sendSyncNotifications: false,
+        notificationTemplates: { saved: "saved", noNew: "none" },
+      },
+      {
+        fetchMessages: async (_token, _channelId, before) =>
+          messagePage(getHistoryPage(history, before), before ? 0 : 250),
+        postNotification: async () => {
+          throw new Error("Notification should not be sent.");
+        },
+        processMessage: async () => true,
+        persistCursor: async () => {},
+        sleep: async (milliseconds) => {
+          delays.push(milliseconds);
+        },
+      },
+    );
+
+    expect(delays).toEqual([250]);
   });
 
   test("persists the fetched cursor before a notification failure", async () => {
     const channel = { id: "111", name: "first" };
     const cursors: string[] = [];
-    let fetchCount = 0;
 
     let caught: unknown;
     try {
@@ -159,18 +319,14 @@ describe("syncChannelMessages", () => {
           },
         },
         {
-          fetchMessages: async () => {
-            fetchCount++;
-            return fetchCount === 1
-              ? [
-                  {
-                    id: "message",
-                    content: "content",
-                    timestamp: "2026-06-27T00:00:00Z",
-                  },
-                ]
-              : [];
-          },
+          fetchMessages: async () =>
+            messagePage([
+              {
+                id: "message",
+                content: "content",
+                timestamp: "2026-06-27T00:00:00Z",
+              },
+            ]),
           postNotification: async () => {
             throw new Error("Missing Send Messages");
           },
@@ -206,13 +362,14 @@ describe("syncChannelMessages", () => {
           },
         },
         {
-          fetchMessages: async () => [
-            {
-              id: "message",
-              content: "!url https://example.com",
-              timestamp: "2026-06-27T00:00:00Z",
-            },
-          ],
+          fetchMessages: async () =>
+            messagePage([
+              {
+                id: "message",
+                content: "!url https://example.com",
+                timestamp: "2026-06-27T00:00:00Z",
+              },
+            ]),
           postNotification: async () => {
             throw new Error("Notification should not be sent.");
           },
@@ -235,7 +392,6 @@ describe("syncChannelMessages", () => {
 
   test("does not count messages that were already saved", async () => {
     const cursors: string[] = [];
-    let fetchCount = 0;
 
     const count = await syncChannelMessages(
       {
@@ -248,18 +404,14 @@ describe("syncChannelMessages", () => {
         },
       },
       {
-        fetchMessages: async () => {
-          fetchCount++;
-          return fetchCount === 1
-            ? [
-                {
-                  id: "duplicate",
-                  content: "existing",
-                  timestamp: "2026-06-27T00:00:00Z",
-                },
-              ]
-            : [];
-        },
+        fetchMessages: async () =>
+          messagePage([
+            {
+              id: "duplicate",
+              content: "existing",
+              timestamp: "2026-06-27T00:00:00Z",
+            },
+          ]),
         postNotification: async () => {
           throw new Error("Notification should not be sent.");
         },
@@ -277,7 +429,6 @@ describe("syncChannelMessages", () => {
 
   test("does not post a notification when notifications are disabled", async () => {
     const cursors: string[] = [];
-    let fetchCount = 0;
     let notificationCount = 0;
 
     const count = await syncChannelMessages(
@@ -291,18 +442,14 @@ describe("syncChannelMessages", () => {
         },
       },
       {
-        fetchMessages: async () => {
-          fetchCount++;
-          return fetchCount === 1
-            ? [
-                {
-                  id: "message",
-                  content: "content",
-                  timestamp: "2026-06-27T00:00:00Z",
-                },
-              ]
-            : [];
-        },
+        fetchMessages: async () =>
+          messagePage([
+            {
+              id: "message",
+              content: "content",
+              timestamp: "2026-06-27T00:00:00Z",
+            },
+          ]),
         postNotification: async () => {
           notificationCount++;
           throw new Error("Notification should not be sent.");
