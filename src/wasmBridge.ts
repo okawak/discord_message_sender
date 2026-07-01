@@ -28,6 +28,7 @@ export async function initWasmBridge(): Promise<InitOutput> {
 export async function parseMessageWasm(
   message: DiscordMessage,
   prefix: string,
+  timeZone: string,
 ): Promise<ProcessedMessage> {
   await initWasmBridge();
 
@@ -43,8 +44,8 @@ export async function parseMessageWasm(
     return createProcessedMessage(
       instruction.markdown,
       false,
-      message.timestamp,
-      message.id,
+      message,
+      timeZone,
     );
   }
 
@@ -58,5 +59,5 @@ export async function parseMessageWasm(
     });
   }
 
-  return createProcessedMessage(markdown, true, message.timestamp, message.id);
+  return createProcessedMessage(markdown, true, message, timeZone);
 }

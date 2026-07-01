@@ -13,16 +13,19 @@ import {
 } from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
-import type { DiscordMessage } from "./messages";
+import { getLocalTimeZone } from "./localDateTime";
+import type { DiscordMessage, ProcessedMessage } from "./messages";
 import {
+  createMessageSyncSettingsSnapshot,
   type DiscordChannelSettings,
   type DiscordPluginSettings,
   getConfiguredChannels,
+  type MessageSyncSettingsSnapshot,
   migrateSettings,
   normalizeSettings,
 } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
-import { saveProcessedMessage } from "./vault";
+import { saveProcessedMessages } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 
 export default class DiscordMessageSenderPlugin extends Plugin {
@@ -78,6 +81,10 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
+    const settingsSnapshot = createMessageSyncSettingsSnapshot(
+      this.settings,
+      getLocalTimeZone(),
+    );
     this.syncing = true;
     new Notice("Starting Discord sync.");
 
@@ -86,16 +93,20 @@ export default class DiscordMessageSenderPlugin extends Plugin {
         const snapshot = { ...channel };
         return syncChannelMessages(
           {
-            botToken: this.settings.botToken,
+            botToken: settingsSnapshot.botToken,
             channel: snapshot,
-            sendSyncNotifications: this.settings.sendSyncNotifications,
-            notificationTemplates: this.settings.notificationTemplates,
+            sendSyncNotifications: settingsSnapshot.sendSyncNotifications,
+            notificationTemplates: settingsSnapshot.notificationTemplates,
           },
           {
             fetchMessages,
             postNotification,
-            processMessage: (message, currentChannel) =>
-              this.processDiscordMessage(message, currentChannel),
+            processMessages: (messages, currentChannel) =>
+              this.processDiscordMessages(
+                messages,
+                currentChannel,
+                settingsSnapshot,
+              ),
             persistCursor: (_currentChannel, messageId) =>
               this.updateLastProcessedMessage(channel, snapshot.id, messageId),
             sleep,
@@ -127,30 +138,34 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     }
   }
 
-  private async processDiscordMessage(
-    message: DiscordMessage,
+  private async processDiscordMessages(
+    messages: readonly DiscordMessage[],
     channel: DiscordChannelSettings,
-  ): Promise<boolean> {
-    if (message.author?.bot) {
-      return false;
+    settings: MessageSyncSettingsSnapshot,
+  ): Promise<number> {
+    const processedMessages: ProcessedMessage[] = [];
+    for (const message of messages) {
+      if (message.author?.bot) {
+        continue;
+      }
+
+      const processedMessage = await parseMessageWasm(
+        message,
+        settings.messagePrefix,
+        settings.timeZone,
+      );
+      if (processedMessage.markdown) {
+        processedMessages.push(processedMessage);
+      }
     }
 
-    const processedMessage = await parseMessageWasm(
-      message,
-      this.settings.messagePrefix,
-    );
-
-    if (!processedMessage.markdown) {
-      return false;
-    }
-
-    const saveResult = await saveProcessedMessage(
+    return saveProcessedMessages(
       this.app.vault,
-      createChannelDirectory(this.settings.messageDirectoryName, channel),
-      createChannelDirectory(this.settings.clippingDirectoryName, channel),
-      processedMessage,
+      createChannelDirectory(settings.messageDirectoryName, channel),
+      createChannelDirectory(settings.clippingDirectoryName, channel),
+      processedMessages,
+      settings,
     );
-    return saveResult === "saved";
   }
 
   private async updateLastProcessedMessage(

@@ -1,13 +1,23 @@
+import { toLocalDateTime } from "./localDateTime";
+
 export interface DiscordMessage {
   id: string;
   content: string;
   timestamp: string;
-  author?: { bot?: boolean };
+  author?: {
+    id?: string;
+    username?: string;
+    global_name?: string | null;
+    bot?: boolean;
+  };
+  member?: { nick?: string | null };
 }
 
 export interface ProcessedMessage {
   messageId: string;
   timestamp: string;
+  authorId: string;
+  authorName: string;
   markdown: string;
   isClipping: boolean;
   fileName: string;
@@ -41,24 +51,25 @@ export function parseWasmMessageInstruction(
 export function createProcessedMessage(
   markdown: string,
   isClipping: boolean,
-  timestamp: string,
-  messageId: string,
+  message: DiscordMessage,
+  timeZone: string,
 ): ProcessedMessage {
   return {
-    messageId,
-    timestamp,
+    messageId: message.id,
+    timestamp: message.timestamp,
+    authorId: message.author?.id ?? "",
+    authorName:
+      message.member?.nick?.trim() ||
+      message.author?.global_name?.trim() ||
+      message.author?.username?.trim() ||
+      message.author?.id ||
+      "Unknown",
     markdown,
     isClipping,
-    fileName: `${formatMessageFileName(timestamp)}_${messageId}`,
+    fileName: `${formatMessageFileName(message.timestamp, timeZone)}_${message.id}`,
   };
 }
 
-function formatMessageFileName(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return timestamp;
-  }
-
-  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString();
-  return `${jst.slice(0, 10).replaceAll("-", "")}_${jst.slice(11, 19).replaceAll(":", "")}`;
+function formatMessageFileName(timestamp: string, timeZone: string): string {
+  return toLocalDateTime(timestamp, timeZone).fileTimestamp;
 }
