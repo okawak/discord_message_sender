@@ -100,13 +100,19 @@ function createMessage(
   timestamp: string,
   markdown = "hello",
   isClipping = false,
+  timeZone = "Asia/Tokyo",
 ): ProcessedMessage {
-  return createProcessedMessage(markdown, isClipping, {
-    id,
-    content: markdown,
-    timestamp,
-    author: { id: `author-${id}`, username: "Alice" },
-  });
+  return createProcessedMessage(
+    markdown,
+    isClipping,
+    {
+      id,
+      content: markdown,
+      timestamp,
+      author: { id: `author-${id}`, username: "Alice" },
+    },
+    timeZone,
+  );
 }
 
 function storageOptions(
@@ -140,6 +146,58 @@ describe("saveProcessedMessages", () => {
     );
   });
 
+  test("uses local time for new individual message files", async () => {
+    const { vault, files } = createVaultMock();
+    const timeZone = "America/New_York";
+
+    const count = await saveProcessedMessages(
+      vault,
+      "DiscordLogs/general",
+      "DiscordClippings/general",
+      [
+        createMessage(
+          "123",
+          "2026-06-30T15:30:45.000Z",
+          "hello",
+          false,
+          timeZone,
+        ),
+      ],
+      storageOptions("individual", timeZone),
+    );
+
+    expect(count).toBe(1);
+    expect(files.has("DiscordLogs/general/20260630_113045_123.md")).toBe(true);
+  });
+
+  test("does not duplicate legacy JST individual files", async () => {
+    const { vault, files, folders } = createVaultMock();
+    folders.add("DiscordLogs");
+    folders.add("DiscordLogs/general");
+    files.set("DiscordLogs/general/20260701_003045_123.md", "Existing message");
+    const timeZone = "America/New_York";
+
+    const count = await saveProcessedMessages(
+      vault,
+      "DiscordLogs/general",
+      "DiscordClippings/general",
+      [
+        createMessage(
+          "123",
+          "2026-06-30T15:30:45.000Z",
+          "Replacement",
+          false,
+          timeZone,
+        ),
+      ],
+      storageOptions("individual", timeZone),
+    );
+
+    expect(count).toBe(0);
+    expect(files.size).toBe(1);
+    expect(files.has("DiscordLogs/general/20260630_113045_123.md")).toBe(false);
+  });
+
   test("keeps URL clippings as individual files in aggregated modes", async () => {
     const { vault, files } = createVaultMock();
 
@@ -156,6 +214,39 @@ describe("saveProcessedMessages", () => {
       new Map([
         ["DiscordClippings/general/20260621_120000_123.md", "# Example"],
       ]),
+    );
+  });
+
+  test("does not duplicate legacy JST clippings after changing time zone", async () => {
+    const { vault, files, folders } = createVaultMock();
+    folders.add("DiscordClippings");
+    folders.add("DiscordClippings/general");
+    files.set(
+      "DiscordClippings/general/20260701_003045_123.md",
+      "# Existing clipping",
+    );
+    const timeZone = "America/New_York";
+
+    const count = await saveProcessedMessages(
+      vault,
+      "DiscordLogs/general",
+      "DiscordClippings/general",
+      [
+        createMessage(
+          "123",
+          "2026-06-30T15:30:45.000Z",
+          "# Replacement",
+          true,
+          timeZone,
+        ),
+      ],
+      storageOptions("monthly", timeZone),
+    );
+
+    expect(count).toBe(0);
+    expect(files.size).toBe(1);
+    expect(files.has("DiscordClippings/general/20260630_113045_123.md")).toBe(
+      false,
     );
   });
 

@@ -57,6 +57,10 @@ export async function saveProcessedMessages(
     localDateTime: toLocalDateTime(message.timestamp, options.timeZone),
   }));
   const regularMessages = prepared.filter(({ message }) => !message.isClipping);
+  const existingClippingIds = findIndividualMessageIds(
+    vault,
+    clippingDirectory,
+  );
   const existingIds = await findExistingMessageIds(
     vault,
     messageDirectory,
@@ -68,6 +72,10 @@ export async function saveProcessedMessages(
   for (const preparedMessage of prepared) {
     const { message, localDateTime } = preparedMessage;
     if (message.isClipping) {
+      if (existingClippingIds.has(message.messageId)) {
+        continue;
+      }
+      existingClippingIds.add(message.messageId);
       if (
         (await saveIndividualMessage(vault, clippingDirectory, message)) ===
         "saved"
@@ -119,16 +127,7 @@ async function findExistingMessageIds(
   messageDirectory: string,
   messages: readonly PreparedMessage[],
 ): Promise<Set<string>> {
-  const messageIds = new Set<string>();
-  const folder = vault.getFolderByPath(messageDirectory);
-  for (const child of folder?.children ?? []) {
-    const file = vault.getFileByPath(child.path);
-    const messageId = file?.name.match(INDIVIDUAL_MESSAGE_ID_PATTERN)?.[1];
-    if (messageId) {
-      messageIds.add(messageId);
-    }
-  }
-
+  const messageIds = findIndividualMessageIds(vault, messageDirectory);
   const paths = new Set<string>();
   for (const { message } of messages) {
     for (const localDateTime of getPossibleLocalDateTimes(message.timestamp)) {
@@ -150,6 +149,22 @@ async function findExistingMessageIds(
       for (const messageId of getAggregatedMessageIds(content)) {
         messageIds.add(messageId);
       }
+    }
+  }
+  return messageIds;
+}
+
+function findIndividualMessageIds(
+  vault: Vault,
+  directory: string,
+): Set<string> {
+  const messageIds = new Set<string>();
+  const folder = vault.getFolderByPath(directory);
+  for (const child of folder?.children ?? []) {
+    const file = vault.getFileByPath(child.path);
+    const messageId = file?.name.match(INDIVIDUAL_MESSAGE_ID_PATTERN)?.[1];
+    if (messageId) {
+      messageIds.add(messageId);
     }
   }
   return messageIds;

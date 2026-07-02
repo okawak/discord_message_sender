@@ -146,7 +146,8 @@ export default class DiscordMessageSenderPlugin extends Plugin {
   ): Promise<number> {
     return processDiscordMessageBatch(
       messages,
-      (message) => parseMessageWasm(message, settings.messagePrefix),
+      (message) =>
+        parseMessageWasm(message, settings.messagePrefix, settings.timeZone),
       (processedMessages) =>
         saveProcessedMessages(
           this.app.vault,
