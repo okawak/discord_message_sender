@@ -9,6 +9,7 @@ import { DiscordApiError } from "../src/discordApiError";
 import { DISCORD_MESSAGE_PAGE_SIZE } from "../src/discordRoutes";
 import type { DiscordMessage } from "../src/messages";
 import type { DiscordChannelSettings } from "../src/settings";
+import { MessageStorageError } from "../src/vault";
 
 const firstChannel = { id: "111", name: "first" };
 const secondChannel = { id: "222", name: "second" };
@@ -85,6 +86,16 @@ describe("syncChannelsSequentially", () => {
     );
     expect(getSyncCompletionNotice(summary)).toBe(
       "Discord sync finished. 3 messages saved; 1 channel failed.",
+    );
+  });
+
+  test("shows actionable storage failures in the channel notice", () => {
+    const error = new MessageStorageError(
+      '"DiscordLogs/first/2026-06.md" is not a managed log; move or rename it',
+    );
+
+    expect(getChannelSyncFailureNotice({ channel: firstChannel, error })).toBe(
+      'Discord sync skipped "first": "DiscordLogs/first/2026-06.md" is not a managed log; move or rename it.',
     );
   });
 

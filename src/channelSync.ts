@@ -5,6 +5,7 @@ import { DISCORD_MESSAGE_PAGE_SIZE } from "./discordRoutes";
 import type { DiscordMessage } from "./messages";
 import { renderNotificationTemplate } from "./notificationTemplates";
 import type { DiscordChannelSettings, NotificationTemplates } from "./settings";
+import { MessageStorageError } from "./vault";
 
 export interface SingleChannelSyncOptions {
   botToken: string;
@@ -143,7 +144,9 @@ export function getChannelSyncFailureNotice(
   const reason =
     failure.error instanceof DiscordApiError
       ? getDiscordApiFailureNotice(failure.error)
-      : "unexpected error; see console for details";
+      : failure.error instanceof MessageStorageError
+        ? failure.error.message
+        : "unexpected error; see console for details";
 
   return `Discord sync skipped "${channelName}": ${reason}.`;
 }

@@ -21,8 +21,10 @@ export interface AggregatedLogMergeResult {
   addedCount: number;
 }
 
-const MESSAGE_ID_PATTERN = /<!-- discord-message-id: (\d+) -->/g;
-const DATE_HEADING_PATTERN = /^## (\d{4}-\d{2}-\d{2})\r?$/gm;
+const MESSAGE_ID_PATTERN = /^<!-- discord-message-id: (\d+) -->\r?$/gm;
+const DATE_SECTION_PATTERN =
+  /^<!-- discord-message-date: (\d{4}-\d{2}-\d{2}) -->\r?\n## \1\r?$/gm;
+const RESERVED_MARKER_PATTERN = /<!-- discord-message-(id|date):/g;
 
 export function getAggregatedLogMarker(mode: AggregatedStorageMode): string {
   return `<!-- discord-message-sender: ${mode}-log -->`;
@@ -37,7 +39,17 @@ export function createAggregatedLog(
 
 export function isManagedAggregatedLog(content: string): boolean {
   return (["daily", "weekly", "monthly"] as const).some((mode) =>
-    content.startsWith(getAggregatedLogMarker(mode)),
+    hasAggregatedLogMarker(content, mode),
+  );
+}
+
+export function hasAggregatedLogMarker(
+  content: string,
+  mode: AggregatedStorageMode,
+): boolean {
+  return content.startsWith(
+    getAggregatedLogMarker(mode),
+    getMarkerOffset(content),
   );
 }
 
@@ -54,24 +66,41 @@ export function mergeAggregatedLog(
   options: AggregatedLogOptions,
 ): AggregatedLogMergeResult {
   const messageIds = new Set(getAggregatedMessageIds(existingContent));
-  let content = existingContent;
-  let addedCount = 0;
-
-  for (const entry of entries) {
+  const pendingEntries = entries.filter((entry) => {
     if (messageIds.has(entry.messageId)) {
-      continue;
+      return false;
     }
-
-    const block = formatEntry(entry, options);
-    content =
-      options.mode === "daily"
-        ? appendBlock(content, block)
-        : appendToDateSection(content, entry.date, block);
     messageIds.add(entry.messageId);
-    addedCount++;
+    return true;
+  });
+  if (pendingEntries.length === 0) {
+    return { content: existingContent, addedCount: 0 };
   }
 
-  return { content, addedCount };
+  if (options.mode === "daily") {
+    return {
+      content: appendBlock(
+        existingContent,
+        pendingEntries.map((entry) => formatEntry(entry, options)).join("\n\n"),
+      ),
+      addedCount: pendingEntries.length,
+    };
+  }
+
+  const entriesByDate = new Map<string, AggregatedLogEntry[]>();
+  for (const entry of pendingEntries) {
+    const dateEntries = entriesByDate.get(entry.date) ?? [];
+    dateEntries.push(entry);
+    entriesByDate.set(entry.date, dateEntries);
+  }
+  let content = existingContent;
+  for (const [date, dateEntries] of entriesByDate) {
+    const block = dateEntries
+      .map((entry) => formatEntry(entry, options))
+      .join("\n\n");
+    content = appendToDateSection(content, date, block);
+  }
+  return { content, addedCount: pendingEntries.length };
 }
 
 function formatEntry(
@@ -85,9 +114,13 @@ function formatEntry(
     ...(options.showMessageTime ? [entry.time] : []),
   ].join(" · ");
   const marker = `<!-- discord-message-id: ${entry.messageId} -->`;
+  const markdown = entry.markdown.replace(
+    RESERVED_MARKER_PATTERN,
+    "<!-- discord-message-$1 :",
+  );
   return details
-    ? `${marker}\n${details}\n\n${entry.markdown}`
-    : `${marker}\n${entry.markdown}`;
+    ? `${marker}\n${details}\n\n${markdown}`
+    : `${marker}\n${markdown}`;
 }
 
 function appendToDateSection(
@@ -95,19 +128,22 @@ function appendToDateSection(
   date: string,
   block: string,
 ): string {
-  const headings = Array.from(content.matchAll(DATE_HEADING_PATTERN));
-  const headingIndex = headings.findIndex((match) => match[1] === date);
-  if (headingIndex < 0) {
-    return appendBlock(content, `## ${date}\n\n${block}`);
+  const sections = Array.from(content.matchAll(DATE_SECTION_PATTERN));
+  const sectionIndex = sections.findIndex((match) => match[1] === date);
+  if (sectionIndex < 0) {
+    return appendBlock(
+      content,
+      `<!-- discord-message-date: ${date} -->\n## ${date}\n\n${block}`,
+    );
   }
 
-  const nextHeading = headings[headingIndex + 1];
-  if (nextHeading?.index === undefined) {
+  const nextSection = sections[sectionIndex + 1];
+  if (nextSection?.index === undefined) {
     return appendBlock(content, block);
   }
 
-  const before = appendBlock(content.slice(0, nextHeading.index), block);
-  const after = content.slice(nextHeading.index);
+  const before = appendBlock(content.slice(0, nextSection.index), block);
+  const after = content.slice(nextSection.index);
   return `${before.endsWith("\n\n") ? before : `${before}\n`}${after}`;
 }
 
@@ -122,4 +158,15 @@ function appendBlock(content: string, block: string): string {
 
 function escapeMarkdown(value: string): string {
   return value.replace(/[\\`*_[\]{}()#+\-.!|<>]/g, "\\$&");
+}
+
+function getMarkerOffset(content: string): number {
+  const bomOffset = content.startsWith("\uFEFF") ? 1 : 0;
+  const frontmatter = content
+    .slice(bomOffset)
+    .match(/^---\r?\n[\s\S]*?^---\r?(?:\n|$)/m);
+  const contentOffset = bomOffset + (frontmatter?.[0].length ?? 0);
+  const blankLines =
+    content.slice(contentOffset).match(/^(?:[ \t]*\r?\n)*/)?.[0].length ?? 0;
+  return contentOffset + blankLines;
 }

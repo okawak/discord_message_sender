@@ -3,12 +3,16 @@ import {
   type AggregatedLogEntry,
   type AggregatedStorageMode,
   createAggregatedLog,
-  getAggregatedLogMarker,
   getAggregatedMessageIds,
+  hasAggregatedLogMarker,
   isManagedAggregatedLog,
   mergeAggregatedLog,
 } from "./aggregatedLog";
-import { type LocalDateTime, toLocalDateTime } from "./localDateTime";
+import {
+  getPossibleLocalDateTimes,
+  type LocalDateTime,
+  toLocalDateTime,
+} from "./localDateTime";
 import type { ProcessedMessage } from "./messages";
 import type { MessageStorageMode } from "./settings";
 
@@ -35,7 +39,11 @@ interface AggregatedLogGroup extends AggregatedLogTarget {
 }
 
 const AGGREGATED_STORAGE_MODES = ["daily", "weekly", "monthly"] as const;
-const INDIVIDUAL_MESSAGE_ID_PATTERN = /_(\d+)\.md$/;
+const INDIVIDUAL_MESSAGE_ID_PATTERN = /^\d{8}_\d{6}_(\d+)\.md$/;
+
+export class MessageStorageError extends Error {
+  override name = "MessageStorageError";
+}
 
 export async function saveProcessedMessages(
   vault: Vault,
@@ -114,18 +122,21 @@ async function findExistingMessageIds(
   const messageIds = new Set<string>();
   const folder = vault.getFolderByPath(messageDirectory);
   for (const child of folder?.children ?? []) {
-    const messageId = child.name.match(INDIVIDUAL_MESSAGE_ID_PATTERN)?.[1];
+    const file = vault.getFileByPath(child.path);
+    const messageId = file?.name.match(INDIVIDUAL_MESSAGE_ID_PATTERN)?.[1];
     if (messageId) {
       messageIds.add(messageId);
     }
   }
 
   const paths = new Set<string>();
-  for (const { localDateTime } of messages) {
-    for (const mode of AGGREGATED_STORAGE_MODES) {
-      paths.add(
-        getAggregatedLogTarget(messageDirectory, mode, localDateTime).path,
-      );
+  for (const { message } of messages) {
+    for (const localDateTime of getPossibleLocalDateTimes(message.timestamp)) {
+      for (const mode of AGGREGATED_STORAGE_MODES) {
+        paths.add(
+          getAggregatedLogTarget(messageDirectory, mode, localDateTime).path,
+        );
+      }
     }
   }
 
@@ -134,7 +145,7 @@ async function findExistingMessageIds(
     if (!file) {
       continue;
     }
-    const content = await vault.cachedRead(file);
+    const content = await vault.read(file);
     if (isManagedAggregatedLog(content)) {
       for (const messageId of getAggregatedMessageIds(content)) {
         messageIds.add(messageId);
@@ -181,16 +192,16 @@ async function saveAggregatedLog(
 
   const file = vault.getFileByPath(group.path);
   if (!file) {
-    throw new Error(
-      `Cannot update aggregated log "${group.path}": a folder exists at this path.`,
+    throw new MessageStorageError(
+      `a folder exists at "${group.path}"; move or rename it, then sync again`,
     );
   }
 
   let addedCount = 0;
   await vault.process(file, (content) => {
-    if (!content.startsWith(getAggregatedLogMarker(group.mode))) {
-      throw new Error(
-        `Cannot update aggregated log "${group.path}": the existing file is not managed by Discord Message Sender.`,
+    if (!hasAggregatedLogMarker(content, group.mode)) {
+      throw new MessageStorageError(
+        `"${group.path}" is not a ${group.mode} log managed by Discord Message Sender; move or rename it, then sync again`,
       );
     }
     const result = mergeAggregatedLog(content, group.entries, {
@@ -223,8 +234,8 @@ async function ensureDir(vault: Vault, path: string): Promise<void> {
   }
 
   if (vault.getAbstractFileByPath(path)) {
-    throw new Error(
-      `Cannot create directory "${path}": a file with the same name already exists`,
+    throw new MessageStorageError(
+      `a file blocks the directory "${path}"; move or rename it, then sync again`,
     );
   }
 

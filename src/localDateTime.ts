@@ -46,6 +46,20 @@ export function toLocalDateTime(
   };
 }
 
+export function getPossibleLocalDateTimes(timestamp: string): LocalDateTime[] {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid Discord message timestamp: "${timestamp}".`);
+  }
+
+  return [-12, 0, 14].map((offsetHours) =>
+    toLocalDateTime(
+      new Date(date.getTime() + offsetHours * 60 * 60 * 1000).toISOString(),
+      "UTC",
+    ),
+  );
+}
+
 function readPart(
   parts: Intl.DateTimeFormatPart[],
   type: Intl.DateTimeFormatPartTypes,

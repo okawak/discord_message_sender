@@ -11,6 +11,7 @@ function createVaultMock() {
   const folders = new Set<string>();
   const createdPaths: string[] = [];
   const processCalls = new Map<string, number>();
+  const readCalls = new Map<string, number>();
 
   const asFile = (path: string) =>
     ({
@@ -21,11 +22,27 @@ function createVaultMock() {
     ({
       path,
       name: path.slice(path.lastIndexOf("/") + 1),
-      children: Array.from(files.keys())
-        .filter(
-          (filePath) => filePath.slice(0, filePath.lastIndexOf("/")) === path,
-        )
-        .map(asFile),
+      children: [
+        ...Array.from(files.keys())
+          .filter(
+            (filePath) => filePath.slice(0, filePath.lastIndexOf("/")) === path,
+          )
+          .map(asFile),
+        ...Array.from(folders)
+          .filter(
+            (folderPath) =>
+              folderPath !== path &&
+              folderPath.slice(0, folderPath.lastIndexOf("/")) === path,
+          )
+          .map(
+            (folderPath) =>
+              ({
+                path: folderPath,
+                name: folderPath.slice(folderPath.lastIndexOf("/") + 1),
+                children: [],
+              }) as unknown as TFolder,
+          ),
+      ],
     }) as unknown as TFolder;
 
   const vault = {
@@ -47,7 +64,10 @@ function createVaultMock() {
       files.set(path, content);
       return asFile(path);
     },
-    cachedRead: async (file: TFile) => files.get(file.path) ?? "",
+    read: async (file: TFile) => {
+      readCalls.set(file.path, (readCalls.get(file.path) ?? 0) + 1);
+      return files.get(file.path) ?? "";
+    },
     process: async (file: TFile, update: (content: string) => string) => {
       processCalls.set(file.path, (processCalls.get(file.path) ?? 0) + 1);
       const content = update(files.get(file.path) ?? "");
@@ -61,7 +81,7 @@ function createVaultMock() {
     | "getAbstractFileByPath"
     | "createFolder"
     | "create"
-    | "cachedRead"
+    | "read"
     | "process"
   >;
 
@@ -71,6 +91,7 @@ function createVaultMock() {
     folders,
     createdPaths,
     processCalls,
+    readCalls,
   };
 }
 
@@ -80,27 +101,23 @@ function createMessage(
   markdown = "hello",
   isClipping = false,
 ): ProcessedMessage {
-  return createProcessedMessage(
-    markdown,
-    isClipping,
-    {
-      id,
-      content: markdown,
-      timestamp,
-      author: { id: `author-${id}`, username: "Alice" },
-    },
-    "Asia/Tokyo",
-  );
+  return createProcessedMessage(markdown, isClipping, {
+    id,
+    content: markdown,
+    timestamp,
+    author: { id: `author-${id}`, username: "Alice" },
+  });
 }
 
 function storageOptions(
   messageStorageMode: MessageStorageOptions["messageStorageMode"],
+  timeZone = "Asia/Tokyo",
 ): MessageStorageOptions {
   return {
     messageStorageMode,
     showAuthorNames: false,
     showMessageTime: false,
-    timeZone: "Asia/Tokyo",
+    timeZone,
   };
 }
 
@@ -282,7 +299,7 @@ describe("saveProcessedMessages", () => {
         [createMessage("123", "2026-06-29T12:34:00.000Z")],
         storageOptions("monthly"),
       ),
-    ).rejects.toThrow("the existing file is not managed");
+    ).rejects.toThrow("is not a monthly log managed");
 
     const collision = createVaultMock();
     collision.folders.add("DiscordLogs");
@@ -297,7 +314,90 @@ describe("saveProcessedMessages", () => {
         [createMessage("123", "2026-06-29T12:34:00.000Z")],
         storageOptions("monthly"),
       ),
-    ).rejects.toThrow("a folder exists at this path");
+    ).rejects.toThrow('a folder exists at "DiscordLogs/general/2026-06.md"');
+  });
+
+  test("ignores unrelated files and folders when detecting individual IDs", async () => {
+    const { vault, files, folders } = createVaultMock();
+    folders.add("DiscordLogs");
+    folders.add("DiscordLogs/general");
+    folders.add("DiscordLogs/general/20260629_213400_123.md");
+    files.set("DiscordLogs/general/archive_123.md", "User note");
+
+    const count = await saveProcessedMessages(
+      vault,
+      "DiscordLogs/general",
+      "DiscordClippings/general",
+      [createMessage("123", "2026-06-29T12:34:00.000Z")],
+      storageOptions("monthly"),
+    );
+
+    expect(count).toBe(1);
+    expect(files.has("DiscordLogs/general/2026-06.md")).toBe(true);
+  });
+
+  test("finds aggregate duplicates saved in another time zone", async () => {
+    for (const [mode, timestamp, utcPath, losAngelesPath] of [
+      ["daily", "2026-07-01T00:30:00.000Z", "2026-07-01.md", "2026-06-30.md"],
+      ["monthly", "2026-07-01T00:30:00.000Z", "2026-07.md", "2026-06.md"],
+      ["weekly", "2021-01-04T00:30:00.000Z", "2021-W01.md", "2020-W53.md"],
+    ] as const) {
+      const { vault, files } = createVaultMock();
+      const source = createMessage("123", timestamp);
+
+      expect(
+        await saveProcessedMessages(
+          vault,
+          "DiscordLogs/general",
+          "DiscordClippings/general",
+          [source],
+          storageOptions(mode, "UTC"),
+        ),
+      ).toBe(1);
+      expect(files.has(`DiscordLogs/general/${utcPath}`)).toBe(true);
+
+      expect(
+        await saveProcessedMessages(
+          vault,
+          "DiscordLogs/general",
+          "DiscordClippings/general",
+          [source],
+          storageOptions(mode, "America/Los_Angeles"),
+        ),
+      ).toBe(0);
+      expect(files.has(`DiscordLogs/general/${losAngelesPath}`)).toBe(false);
+    }
+  });
+
+  test("updates a managed log after Obsidian adds frontmatter", async () => {
+    const { vault, files, folders, processCalls } = createVaultMock();
+    folders.add("DiscordLogs");
+    folders.add("DiscordLogs/general");
+    const path = "DiscordLogs/general/2026-06.md";
+    files.set(
+      path,
+      [
+        "---",
+        "tags:",
+        "  - discord",
+        "---",
+        "<!-- discord-message-sender: monthly-log -->",
+        "# 2026-06",
+        "",
+      ].join("\n"),
+    );
+
+    const count = await saveProcessedMessages(
+      vault,
+      "DiscordLogs/general",
+      "DiscordClippings/general",
+      [createMessage("123", "2026-06-29T12:34:00.000Z")],
+      storageOptions("monthly"),
+    );
+
+    expect(count).toBe(1);
+    expect(processCalls.get(path)).toBe(1);
+    expect(files.get(path)).toContain("<!-- discord-message-id: 123 -->");
   });
 
   test("keeps two channel logs separate", async () => {

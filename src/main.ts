@@ -14,7 +14,8 @@ import {
 import { fetchMessages, postNotification } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
 import { getLocalTimeZone } from "./localDateTime";
-import type { DiscordMessage, ProcessedMessage } from "./messages";
+import { processDiscordMessageBatch } from "./messageBatch";
+import type { DiscordMessage } from "./messages";
 import {
   createMessageSyncSettingsSnapshot,
   type DiscordChannelSettings,
@@ -143,28 +144,17 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     channel: DiscordChannelSettings,
     settings: MessageSyncSettingsSnapshot,
   ): Promise<number> {
-    const processedMessages: ProcessedMessage[] = [];
-    for (const message of messages) {
-      if (message.author?.bot) {
-        continue;
-      }
-
-      const processedMessage = await parseMessageWasm(
-        message,
-        settings.messagePrefix,
-        settings.timeZone,
-      );
-      if (processedMessage.markdown) {
-        processedMessages.push(processedMessage);
-      }
-    }
-
-    return saveProcessedMessages(
-      this.app.vault,
-      createChannelDirectory(settings.messageDirectoryName, channel),
-      createChannelDirectory(settings.clippingDirectoryName, channel),
-      processedMessages,
-      settings,
+    return processDiscordMessageBatch(
+      messages,
+      (message) => parseMessageWasm(message, settings.messagePrefix),
+      (processedMessages) =>
+        saveProcessedMessages(
+          this.app.vault,
+          createChannelDirectory(settings.messageDirectoryName, channel),
+          createChannelDirectory(settings.clippingDirectoryName, channel),
+          processedMessages,
+          settings,
+        ),
     );
   }
 

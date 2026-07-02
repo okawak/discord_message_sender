@@ -1,5 +1,3 @@
-import { toLocalDateTime } from "./localDateTime";
-
 export interface DiscordMessage {
   id: string;
   content: string;
@@ -52,7 +50,6 @@ export function createProcessedMessage(
   markdown: string,
   isClipping: boolean,
   message: DiscordMessage,
-  timeZone: string,
 ): ProcessedMessage {
   return {
     messageId: message.id,
@@ -66,10 +63,16 @@ export function createProcessedMessage(
       "Unknown",
     markdown,
     isClipping,
-    fileName: `${formatMessageFileName(message.timestamp, timeZone)}_${message.id}`,
+    fileName: `${formatMessageFileName(message.timestamp)}_${message.id}`,
   };
 }
 
-function formatMessageFileName(timestamp: string, timeZone: string): string {
-  return toLocalDateTime(timestamp, timeZone).fileTimestamp;
+function formatMessageFileName(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString();
+  return `${jst.slice(0, 10).replaceAll("-", "")}_${jst.slice(11, 19).replaceAll(":", "")}`;
 }

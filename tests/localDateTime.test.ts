@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { toLocalDateTime } from "../src/localDateTime";
+import {
+  getPossibleLocalDateTimes,
+  toLocalDateTime,
+} from "../src/localDateTime";
 
 describe("toLocalDateTime", () => {
   test("uses the requested time zone at a UTC month boundary", () => {
@@ -35,5 +38,13 @@ describe("toLocalDateTime", () => {
     expect(() => toLocalDateTime("invalid", "UTC")).toThrow(
       'Invalid Discord message timestamp: "invalid".',
     );
+  });
+
+  test("covers every possible local date for cross-time-zone retries", () => {
+    const dates = getPossibleLocalDateTimes("2026-07-01T00:30:00.000Z").map(
+      ({ date }) => date,
+    );
+
+    expect(dates).toEqual(["2026-06-30", "2026-07-01", "2026-07-01"]);
   });
 });

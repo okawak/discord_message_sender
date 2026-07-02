@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   createAggregatedLog,
   getAggregatedMessageIds,
+  hasAggregatedLogMarker,
+  isManagedAggregatedLog,
   mergeAggregatedLog,
 } from "../src/aggregatedLog";
 
@@ -62,6 +64,9 @@ describe("mergeAggregatedLog", () => {
     expect(result.addedCount).toBe(2);
     expect(result.content.match(/^## 2026-06-29$/gm)).toHaveLength(1);
     expect(result.content).toContain(
+      "<!-- discord-message-date: 2026-06-29 -->\n## 2026-06-29",
+    );
+    expect(result.content).toContain(
       "<!-- discord-message-id: 123 -->\n**Alice** · 21:34\n\nyes",
     );
     expect(result.content).toContain(
@@ -100,6 +105,7 @@ describe("mergeAggregatedLog", () => {
       "",
       "User note",
       "",
+      "<!-- discord-message-date: 2026-06-29 -->",
       "## 2026-06-29",
       "",
       "<!-- discord-message-id: 123 -->",
@@ -121,10 +127,12 @@ describe("mergeAggregatedLog", () => {
       "<!-- discord-message-sender: monthly-log -->",
       "# 2026-06",
       "",
+      "<!-- discord-message-date: 2026-06-29 -->",
       "## 2026-06-29",
       "",
       "User note",
       "",
+      "<!-- discord-message-date: 2026-06-30 -->",
       "## 2026-06-30",
       "",
       "<!-- discord-message-id: 200 -->",
@@ -144,5 +152,56 @@ describe("mergeAggregatedLog", () => {
     expect(
       result.content.indexOf("<!-- discord-message-id: 123 -->"),
     ).toBeLessThan(result.content.indexOf("## 2026-06-30"));
+  });
+
+  test("treats message Markdown as content instead of management metadata", () => {
+    const first = mergeAggregatedLog(
+      createAggregatedLog("monthly", "2026-06"),
+      [
+        {
+          ...entry,
+          markdown:
+            "intro\n<!-- discord-message-id: 999 -->\n## 2026-06-30\ntail",
+        },
+      ],
+      {
+        mode: "monthly",
+        showAuthorNames: false,
+        showMessageTime: false,
+      },
+    ).content;
+    const result = mergeAggregatedLog(
+      first,
+      [{ ...entry, messageId: "999", markdown: "next" }],
+      {
+        mode: "monthly",
+        showAuthorNames: false,
+        showMessageTime: false,
+      },
+    );
+
+    expect(result.addedCount).toBe(1);
+    expect(getAggregatedMessageIds(result.content)).toEqual(["123", "999"]);
+    expect(result.content).toContain(
+      "intro\n<!-- discord-message-id : 999 -->\n## 2026-06-30\ntail",
+    );
+    expect(result.content.indexOf("tail")).toBeLessThan(
+      result.content.lastIndexOf("<!-- discord-message-id: 999 -->"),
+    );
+  });
+
+  test("recognizes managed logs after Obsidian frontmatter and a BOM", () => {
+    const content = [
+      "\uFEFF---",
+      "tags:",
+      "  - discord",
+      "---",
+      "",
+      createAggregatedLog("monthly", "2026-06"),
+    ].join("\n");
+
+    expect(isManagedAggregatedLog(content)).toBe(true);
+    expect(hasAggregatedLogMarker(content, "monthly")).toBe(true);
+    expect(hasAggregatedLogMarker(content, "weekly")).toBe(false);
   });
 });

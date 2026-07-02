@@ -49,9 +49,7 @@ describe("createProcessedMessage", () => {
       member: { nick: "Nickname" },
     };
 
-    expect(
-      createProcessedMessage("# title", true, message, "Asia/Tokyo"),
-    ).toEqual({
+    expect(createProcessedMessage("# title", true, message)).toEqual({
       messageId: "123",
       timestamp: "2026-06-21T03:00:00.000Z",
       authorId: "author-id",
@@ -70,49 +68,46 @@ describe("createProcessedMessage", () => {
     };
 
     expect(
-      createProcessedMessage(
-        "message",
-        false,
-        {
-          ...base,
-          author: {
-            id: "author-id",
-            username: "username",
-            global_name: "Global name",
-          },
+      createProcessedMessage("message", false, {
+        ...base,
+        author: {
+          id: "author-id",
+          username: "username",
+          global_name: "Global name",
         },
-        "UTC",
-      ).authorName,
+      }).authorName,
     ).toBe("Global name");
     expect(
-      createProcessedMessage(
-        "message",
-        false,
-        {
-          ...base,
-          author: { id: "author-id", username: "username" },
-        },
-        "UTC",
-      ).authorName,
+      createProcessedMessage("message", false, {
+        ...base,
+        author: { id: "author-id", username: "username" },
+      }).authorName,
     ).toBe("username");
     expect(
-      createProcessedMessage(
-        "message",
-        false,
-        { ...base, author: { id: "author-id" } },
-        "UTC",
-      ).authorName,
+      createProcessedMessage("message", false, {
+        ...base,
+        author: { id: "author-id" },
+      }).authorName,
     ).toBe("author-id");
   });
 
-  test("rejects invalid timestamps", () => {
-    expect(() =>
-      createProcessedMessage(
-        "message",
-        false,
-        { id: "123", content: "content", timestamp: "invalid" },
-        "UTC",
-      ),
-    ).toThrow('Invalid Discord message timestamp: "invalid".');
+  test("keeps the legacy JST file name outside Japan", () => {
+    const processed = createProcessedMessage("message", false, {
+      id: "123",
+      content: "content",
+      timestamp: "2026-06-30T15:30:45.000Z",
+    });
+
+    expect(processed.fileName).toBe("20260701_003045_123");
+  });
+
+  test("leaves invalid timestamps for storage validation", () => {
+    const processed = createProcessedMessage("message", false, {
+      id: "123",
+      content: "content",
+      timestamp: "invalid",
+    });
+
+    expect(processed.fileName).toBe("invalid_123");
   });
 });
