@@ -5,6 +5,7 @@ import { DISCORD_MESSAGE_PAGE_SIZE } from "./discordRoutes";
 import type { DiscordMessage } from "./messages";
 import { renderNotificationTemplate } from "./notificationTemplates";
 import type { DiscordChannelSettings, NotificationTemplates } from "./settings";
+import { MessageStorageError } from "./vault";
 
 export interface SingleChannelSyncOptions {
   botToken: string;
@@ -24,10 +25,10 @@ export interface SingleChannelSyncDependencies {
     channelId: string,
     text: string,
   ) => Promise<DiscordMessage>;
-  processMessage: (
-    message: DiscordMessage,
+  processMessages: (
+    messages: readonly DiscordMessage[],
     channel: DiscordChannelSettings,
-  ) => Promise<boolean>;
+  ) => Promise<number>;
   persistCursor: (
     channel: DiscordChannelSettings,
     messageId: string,
@@ -86,11 +87,10 @@ export async function syncChannelMessages(
   }
 
   for (const messages of pages.reverse()) {
-    for (const message of [...messages].reverse()) {
-      if (await dependencies.processMessage(message, channel)) {
-        processedMessageCount++;
-      }
-    }
+    processedMessageCount += await dependencies.processMessages(
+      [...messages].reverse(),
+      channel,
+    );
 
     const newestMessage = messages[0];
     if (newestMessage) {
@@ -144,7 +144,9 @@ export function getChannelSyncFailureNotice(
   const reason =
     failure.error instanceof DiscordApiError
       ? getDiscordApiFailureNotice(failure.error)
-      : "unexpected error; see console for details";
+      : failure.error instanceof MessageStorageError
+        ? failure.error.message
+        : "unexpected error; see console for details";
 
   return `Discord sync skipped "${channelName}": ${reason}.`;
 }

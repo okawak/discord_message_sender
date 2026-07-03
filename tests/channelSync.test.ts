@@ -9,6 +9,7 @@ import { DiscordApiError } from "../src/discordApiError";
 import { DISCORD_MESSAGE_PAGE_SIZE } from "../src/discordRoutes";
 import type { DiscordMessage } from "../src/messages";
 import type { DiscordChannelSettings } from "../src/settings";
+import { MessageStorageError } from "../src/vault";
 
 const firstChannel = { id: "111", name: "first" };
 const secondChannel = { id: "222", name: "second" };
@@ -88,6 +89,16 @@ describe("syncChannelsSequentially", () => {
     );
   });
 
+  test("shows actionable storage failures in the channel notice", () => {
+    const error = new MessageStorageError(
+      '"DiscordLogs/first/2026-06.md" is not a managed log; move or rename it',
+    );
+
+    expect(getChannelSyncFailureNotice({ channel: firstChannel, error })).toBe(
+      'Discord sync skipped "first": "DiscordLogs/first/2026-06.md" is not a managed log; move or rename it.',
+    );
+  });
+
   test("stops immediately when the bot token is invalid", async () => {
     const synced: string[] = [];
     const unauthorized = new DiscordApiError(
@@ -155,9 +166,9 @@ describe("syncChannelMessages", () => {
             timestamp: "2026-06-27T00:00:03Z",
           };
         },
-        processMessage: async (message) => {
-          processed.push(message.id);
-          return true;
+        processMessages: async (pageMessages) => {
+          processed.push(...pageMessages.map((message) => message.id));
+          return pageMessages.length;
         },
         persistCursor: async (_currentChannel, messageId) => {
           cursors.push(messageId);
@@ -196,9 +207,9 @@ describe("syncChannelMessages", () => {
         postNotification: async () => {
           throw new Error("Notification should not be sent.");
         },
-        processMessage: async (message) => {
-          processed.push(message.id);
-          return true;
+        processMessages: async (pageMessages) => {
+          processed.push(...pageMessages.map((message) => message.id));
+          return pageMessages.length;
         },
         persistCursor: async (_channel, messageId) => {
           cursors.push(messageId);
@@ -222,6 +233,7 @@ describe("syncChannelMessages", () => {
       const processed: string[] = [];
       const requests: (string | undefined)[] = [];
       const cursors: string[] = [];
+      let processCalls = 0;
 
       const count = await syncChannelMessages(
         {
@@ -242,9 +254,10 @@ describe("syncChannelMessages", () => {
           postNotification: async () => {
             throw new Error("Notification should not be sent.");
           },
-          processMessage: async (message) => {
-            processed.push(message.id);
-            return true;
+          processMessages: async (pageMessages) => {
+            processCalls++;
+            processed.push(...pageMessages.map((message) => message.id));
+            return pageMessages.length;
           },
           persistCursor: async (_channel, messageId) => {
             cursors.push(messageId);
@@ -263,6 +276,9 @@ describe("syncChannelMessages", () => {
         Math.floor(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE) + 1,
       );
       expect(cursors.length).toBe(
+        Math.ceil(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE),
+      );
+      expect(processCalls).toBe(
         Math.ceil(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE),
       );
       expect(cursors.at(-1)).toBe((cursor + newMessageCount).toString());
@@ -291,7 +307,7 @@ describe("syncChannelMessages", () => {
         postNotification: async () => {
           throw new Error("Notification should not be sent.");
         },
-        processMessage: async () => true,
+        processMessages: async (pageMessages) => pageMessages.length,
         persistCursor: async () => {},
         sleep: async (milliseconds) => {
           delays.push(milliseconds);
@@ -330,7 +346,7 @@ describe("syncChannelMessages", () => {
           postNotification: async () => {
             throw new Error("Missing Send Messages");
           },
-          processMessage: async () => true,
+          processMessages: async (pageMessages) => pageMessages.length,
           persistCursor: async (_currentChannel, messageId) => {
             cursors.push(messageId);
           },
@@ -373,7 +389,7 @@ describe("syncChannelMessages", () => {
           postNotification: async () => {
             throw new Error("Notification should not be sent.");
           },
-          processMessage: async () => {
+          processMessages: async () => {
             throw processingError;
           },
           persistCursor: async (_currentChannel, messageId) => {
@@ -415,7 +431,7 @@ describe("syncChannelMessages", () => {
         postNotification: async () => {
           throw new Error("Notification should not be sent.");
         },
-        processMessage: async () => false,
+        processMessages: async () => 0,
         persistCursor: async (_currentChannel, messageId) => {
           cursors.push(messageId);
         },
@@ -454,7 +470,7 @@ describe("syncChannelMessages", () => {
           notificationCount++;
           throw new Error("Notification should not be sent.");
         },
-        processMessage: async () => true,
+        processMessages: async (pageMessages) => pageMessages.length,
         persistCursor: async (_currentChannel, messageId) => {
           cursors.push(messageId);
         },

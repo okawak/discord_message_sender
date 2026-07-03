@@ -13,6 +13,7 @@ import type DiscordMessageSenderPlugin from "./main";
 import {
   DEFAULT_NOTIFICATION_TEMPLATES,
   type DiscordChannelSettings,
+  type MessageStorageMode,
   updateChannelId,
 } from "./settings";
 
@@ -167,6 +168,49 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
 
   private createBehaviorSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName("Behavior").setHeading();
+
+    new Setting(containerEl)
+      .setName("Message storage")
+      .setDesc("Choose how regular Discord messages are grouped")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            individual: "One file per message",
+            daily: "Daily log",
+            weekly: "Weekly log",
+            monthly: "Monthly log",
+          })
+          .setValue(this.plugin.settings.messageStorageMode)
+          .onChange(async (value) => {
+            this.plugin.settings.messageStorageMode =
+              value as MessageStorageMode;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Show author names")
+      .setDesc("Include the Discord author in aggregated logs")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showAuthorNames)
+          .onChange(async (value) => {
+            this.plugin.settings.showAuthorNames = value;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Show message time")
+      .setDesc("Include the local message time in aggregated logs")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.showMessageTime)
+          .onChange(async (value) => {
+            this.plugin.settings.showMessageTime = value;
+            await this.plugin.saveSettings();
+          }),
+      );
 
     new Setting(containerEl)
       .setName("Auto-sync on startup")
