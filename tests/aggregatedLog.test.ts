@@ -204,4 +204,19 @@ describe("mergeAggregatedLog", () => {
     expect(hasAggregatedLogMarker(content, "monthly")).toBe(true);
     expect(hasAggregatedLogMarker(content, "weekly")).toBe(false);
   });
+
+  test("does not treat frontmatter-like message content as file frontmatter", () => {
+    const content = [
+      createAggregatedLog("monthly", "2026-06"),
+      "<!-- discord-message-id: 123 -->",
+      "YAML example:",
+      "---",
+      "title: Example",
+      "---",
+      "",
+    ].join("\n");
+
+    expect(isManagedAggregatedLog(content)).toBe(true);
+    expect(hasAggregatedLogMarker(content, "monthly")).toBe(true);
+  });
 });

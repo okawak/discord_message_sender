@@ -164,7 +164,7 @@ function getMarkerOffset(content: string): number {
   const bomOffset = content.startsWith("\uFEFF") ? 1 : 0;
   const frontmatter = content
     .slice(bomOffset)
-    .match(/^---\r?\n[\s\S]*?^---\r?(?:\n|$)/m);
+    .match(/^---\r?\n(?:[\s\S]*?\r?\n)?---\r?(?:\n|$)/);
   const contentOffset = bomOffset + (frontmatter?.[0].length ?? 0);
   const blankLines =
     content.slice(contentOffset).match(/^(?:[ \t]*\r?\n)*/)?.[0].length ?? 0;
