@@ -2,9 +2,12 @@ import {
   type App,
   Notice,
   PluginSettingTab,
-  type Setting,
+  Setting,
+  type SettingControl,
   type SettingDefinition,
+  type SettingDefinitionGroup,
   type SettingDefinitionItem,
+  type SettingDefinitionList,
   type TextComponent,
 } from "obsidian";
 import {
@@ -44,6 +47,19 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: DiscordMessageSenderPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  /**
+   * Compatibility renderer for Obsidian versions before 1.13.
+   * Newer versions render getSettingDefinitions() without calling this method.
+   */
+  override display(): void {
+    this.containerEl.empty();
+    for (const item of this.getSettingDefinitions()) {
+      if ("type" in item && (item.type === "group" || item.type === "list")) {
+        this.renderLegacyGroup(item);
+      }
+    }
   }
 
   override getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
@@ -104,13 +120,13 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           action: async () => {
             this.plugin.settings.channels.push({ id: "", name: "" });
             await this.plugin.saveSettings();
-            this.update();
+            this.refresh();
           },
         },
         onDelete: async (index) => {
           this.plugin.settings.channels.splice(index, 1);
           await this.plugin.saveSettings();
-          this.update();
+          this.refresh();
         },
         items: this.plugin.settings.channels.map((channel, index) =>
           this.getChannelDefinition(channel, index),
@@ -244,6 +260,118 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         throw new TypeError(`Unknown setting key "${key}".`);
     }
     await this.plugin.saveSettings();
+  }
+
+  private renderLegacyGroup(group: SettingDefinitionGroup<SettingKey>): void {
+    const list =
+      group.type === "list"
+        ? (group as SettingDefinitionList<SettingKey>)
+        : undefined;
+
+    if (group.heading) {
+      const heading = new Setting(this.containerEl).setName(group.heading);
+      if (list?.addItem) {
+        const { addItem } = list;
+        heading.addButton((button) =>
+          button
+            .setButtonText(addItem.name)
+            .setCta()
+            .onClick(() => addItem.action(button.buttonEl)),
+        );
+      } else {
+        heading.setHeading();
+      }
+    }
+
+    if (list?.emptyState && group.items?.length === 0) {
+      new Setting(this.containerEl).setName(list.emptyState);
+    }
+
+    group.items?.forEach((definition, index) => {
+      if ("type" in definition) {
+        return;
+      }
+      const setting = new Setting(this.containerEl).setName(definition.name);
+      if (definition.desc) {
+        setting.setDesc(definition.desc);
+      }
+      if ("control" in definition && definition.control) {
+        this.renderLegacyControl(setting, definition.control);
+      } else if ("render" in definition) {
+        const render = definition.render as (setting: Setting) => void;
+        render(setting);
+      }
+      if (list?.onDelete) {
+        const { onDelete } = list;
+        setting.addExtraButton((button) =>
+          button
+            .setIcon("trash")
+            .setTooltip("Remove channel")
+            .onClick(() => onDelete(index)),
+        );
+      }
+    });
+  }
+
+  private renderLegacyControl(
+    setting: Setting,
+    control: SettingControl<SettingKey>,
+  ): void {
+    const value = this.getControlValue(control.key) ?? control.defaultValue;
+    switch (control.type) {
+      case "text":
+        setting.addText((text) =>
+          text
+            .setPlaceholder(control.placeholder ?? "")
+            .setValue(typeof value === "string" ? value : "")
+            .onChange((nextValue) =>
+              this.setControlValue(control.key, nextValue),
+            ),
+        );
+        return;
+      case "textarea":
+        setting.addTextArea((text) =>
+          text
+            .setPlaceholder(control.placeholder ?? "")
+            .setValue(typeof value === "string" ? value : "")
+            .onChange((nextValue) =>
+              this.setControlValue(control.key, nextValue),
+            ),
+        );
+        return;
+      case "dropdown":
+        setting.addDropdown((dropdown) =>
+          dropdown
+            .addOptions(control.options)
+            .setValue(typeof value === "string" ? value : "")
+            .onChange((nextValue) =>
+              this.setControlValue(control.key, nextValue),
+            ),
+        );
+        return;
+      case "toggle":
+        setting.addToggle((toggle) =>
+          toggle
+            .setValue(value === true)
+            .onChange((nextValue) =>
+              this.setControlValue(control.key, nextValue),
+            ),
+        );
+        return;
+      default:
+        throw new Error(
+          `Unsupported legacy setting control "${control.type}".`,
+        );
+    }
+  }
+
+  private refresh(): void {
+    const update: unknown = Reflect.get(this, "update");
+    if (typeof update === "function") {
+      update.call(this);
+    } else {
+      this.display();
+    }
   }
 
   private getChannelDefinition(

@@ -14,7 +14,7 @@ describe("manifest", () => {
     expect(manifest.description).toMatch(/[.!?]$/);
   });
 
-  test("requires the declarative settings API", () => {
-    expect(manifest.minAppVersion).toBe("1.13.0");
+  test("keeps compatibility with the legacy settings API", () => {
+    expect(manifest.minAppVersion).toBe("1.8.10");
   });
 });
