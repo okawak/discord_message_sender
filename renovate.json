@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["before 9am on Monday"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 9am on Monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Group GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Group Rust dependency and toolchain updates",
+      "matchManagers": ["cargo", "rust-toolchain"],
+      "groupName": "Rust dependencies"
+    },
+    {
+      "description": "Group Bun dependency and runtime updates",
+      "matchManagers": ["bun", "bun-version", "npm"],
+      "groupName": "Bun dependencies"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update wasm-pack installed by taiki-e/install-action",
+      "managerFilePatterns": ["/^\\.github\\/workflows\\/.*\\.ya?ml$/"],
+      "matchStrings": [
+        "tool:\\s*wasm-pack@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "wasm-pack",
+      "datasourceTemplate": "crate",
+      "versioningTemplate": "cargo"
+    }
+  ]
+}

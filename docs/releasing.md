@@ -43,11 +43,22 @@ versionファイルは開発中に次期versionへ変更しません。リリー
 5. production buildとWASM smoke testを実行する
 6. `github-actions[bot]`でversion更新コミットを`main`へpushする
 7. 同じコミットへversion名のannotated tagを作成する
-8. tagを指定して`Publish Plugin Release`を自動実行する
+8. tagを指定して同じ`Release Plugin` workflowを自動実行する
 
-`Publish Plugin Release`はtagのソースを改めてcheckoutし、固定したツールチェーンでテストとbuildを再実行します。生成した`main.js`と`manifest.json`へGitHub artifact attestationを付与し、この2ファイルだけをGitHub Releaseへ添付します。
+tagから実行された`Release Plugin`は、tagのソースを改めてcheckoutし、固定したツールチェーンでテストとbuildを再実行します。生成した`main.js`と`manifest.json`へGitHub artifact attestationを付与し、この2ファイルだけをGitHub Releaseへ添付します。
 
-release buildではRust 1.96.1、Bun 1.3.14、wasm-pack 0.15.0を使用します。`bun.lock`と`rust-toolchain.toml`も含め、tagから同じ環境で再ビルドできる状態を維持してください。
+Rustのversionは`rust-toolchain.toml`、Bunのversionは`.bun-version`を参照します。wasm-packはworkflow内で固定します。これらのversionと依存関係はRenovateが週次で更新PRを作成するため、CIを確認してからマージしてください。GitHub Actionsは`@v7`のようなmajor tagを維持します。
+
+Renovateを動作させるには、repositoryへRenovate GitHub Appをインストールする必要があります。設定は`renovate.json`へ集約し、次を更新対象とします。
+
+- Bun packageと`bun.lock`
+- Cargo crateと`Cargo.lock`
+- Rust toolchain
+- Bun runtime
+- wasm-pack
+- GitHub Actions
+
+固定versionは、tagから同じ環境で再ビルドできるようにするために維持します。更新作業は手動編集せず、RenovateのPRとしてレビューします。
 
 CIが作成するversion更新コミットとtagはGPG署名されません。人が作成する通常のコミットは、引き続き署名必須です。
 
@@ -94,7 +105,7 @@ bun run build
 ## 完了確認
 
 - workflowの全stepが成功している
-- 自動実行された`Publish Plugin Release`が成功している
+- tagから自動実行された`Release Plugin`のpublish jobが成功している
 - `main`に`chore: release <version>`コミットが追加されている
 - tagとversion更新コミットのSHAが一致している
 - GitHub Releaseに`manifest.json`と`main.js`だけがある
@@ -119,7 +130,7 @@ git rev-parse origin/main
 - versionコミット前の失敗: 修正後に同じversionで再実行する
 - versionコミット後、tag作成前の失敗: `main`が進んでいなければ、同じversionで再実行してreleaseコミットを再利用する
 - tag作成後、publication実行前の失敗: `Release Plugin`を同じversionで再実行し、tagを再利用してpublicationを再依頼する
-- `Publish Plugin Release`の失敗: tagから同じworkflowを再実行するか、`Release Plugin`を同じversionで再実行する
+- publish jobの失敗: tagから`Release Plugin`を再実行するか、`main`から同じversionで再実行する
 - tagが別のコミットを指す場合: workflowは停止する。tagを自動更新せず、履歴を確認してから手動対応する
 - versionコミット後に`main`が更新された場合: workflowは停止する。releaseコミットと追加変更を確認してから手動対応する
 - 実行中に別の変更が`main`へpushされ、versionコミットのpushに失敗した場合: 最新の`main`から再実行する
