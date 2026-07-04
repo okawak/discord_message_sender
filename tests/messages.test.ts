@@ -1,32 +1,140 @@
 import { describe, expect, test } from "bun:test";
-import { parseWasmMessageResult } from "../src/messages";
+import {
+  createProcessedMessage,
+  type DiscordMessage,
+  parseWasmMessageInstruction,
+} from "../src/messages";
 
-describe("parseWasmMessageResult", () => {
-  test("maps the wasm response to the TypeScript domain model", () => {
+describe("parseWasmMessageInstruction", () => {
+  test("parses a regular message instruction", () => {
+    expect(parseWasmMessageInstruction(["message", "# title"])).toEqual({
+      kind: "message",
+      markdown: "# title",
+    });
+  });
+
+  test("parses a URL instruction", () => {
+    expect(parseWasmMessageInstruction(["url", "https://example.com"])).toEqual(
+      {
+        kind: "url",
+        url: "https://example.com",
+      },
+    );
+  });
+
+  test("rejects malformed wasm responses", () => {
+    expect(() => parseWasmMessageInstruction(["message", false])).toThrow(
+      "WASM returned an invalid message instruction.",
+    );
+  });
+
+  test("rejects unknown message kinds", () => {
+    expect(() => parseWasmMessageInstruction(["unknown", "value"])).toThrow(
+      'WASM returned unknown message kind "unknown".',
+    );
+  });
+});
+
+describe("createProcessedMessage", () => {
+  test("maps a message to the TypeScript domain model", () => {
+    const message: DiscordMessage = {
+      id: "123",
+      content: "content",
+      timestamp: "2026-06-21T03:00:00.000Z",
+      author: {
+        id: "author-id",
+        username: "username",
+        global_name: "Global name",
+      },
+      member: { nick: "Nickname" },
+    };
+
     expect(
-      parseWasmMessageResult(
-        ["# title", true],
-        "2026-06-21T03:00:00.000Z",
-        "123",
-      ),
+      createProcessedMessage("# title", true, message, "Asia/Tokyo"),
     ).toEqual({
+      messageId: "123",
+      timestamp: "2026-06-21T03:00:00.000Z",
+      authorId: "author-id",
+      authorName: "Nickname",
       markdown: "# title",
       isClipping: true,
       fileName: "20260621_120000_123",
     });
   });
 
-  test("rejects malformed wasm responses", () => {
-    expect(() =>
-      parseWasmMessageResult(["# title", "true"], "timestamp", "123"),
-    ).toThrow("WASM returned an invalid processed message.");
+  test("falls back through the Discord author fields", () => {
+    const base = {
+      id: "123",
+      content: "content",
+      timestamp: "2026-06-21T03:00:00.000Z",
+    };
+
+    expect(
+      createProcessedMessage(
+        "message",
+        false,
+        {
+          ...base,
+          author: {
+            id: "author-id",
+            username: "username",
+            global_name: "Global name",
+          },
+        },
+        "UTC",
+      ).authorName,
+    ).toBe("Global name");
+    expect(
+      createProcessedMessage(
+        "message",
+        false,
+        {
+          ...base,
+          author: { id: "author-id", username: "username" },
+        },
+        "UTC",
+      ).authorName,
+    ).toBe("username");
+    expect(
+      createProcessedMessage(
+        "message",
+        false,
+        {
+          ...base,
+          author: { id: "author-id" },
+        },
+        "UTC",
+      ).authorName,
+    ).toBe("author-id");
   });
 
-  test("uses the original timestamp when it is invalid", () => {
-    expect(
-      parseWasmMessageResult(["message", false], "invalid", "123"),
-    ).toMatchObject({
-      fileName: "invalid_123",
-    });
+  test("uses the requested local time zone for file names", () => {
+    const processed = createProcessedMessage(
+      "message",
+      false,
+      {
+        id: "123",
+        content: "content",
+        timestamp: "2026-06-30T15:30:45.000Z",
+      },
+      "America/New_York",
+    );
+
+    expect(processed.fileName).toBe("20260630_113045_123");
+  });
+
+  test("rejects invalid timestamps", () => {
+    expect(() =>
+      createProcessedMessage(
+        "message",
+        false,
+        {
+          id: "123",
+          content: "content",
+          timestamp: "invalid",
+        },
+        "UTC",
+      ),
+    ).toThrow('Invalid Discord message timestamp: "invalid".');
   });
 });

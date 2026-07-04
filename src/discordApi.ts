@@ -1,24 +1,33 @@
 import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
 import { DiscordApiError, type DiscordRequestMethod } from "./discordApiError";
-import { getRateLimitDelay } from "./discordRateLimit";
+import { getRateLimitDelay, getRateLimitResetDelay } from "./discordRateLimit";
+import { DISCORD_API_VERSION, getChannelMessagesPath } from "./discordRoutes";
 import type { DiscordMessage } from "./messages";
 
-const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
+const DISCORD_API_BASE_URL = `https://discord.com/api/v${DISCORD_API_VERSION}`;
 const RATE_LIMIT_STATUS_CODE = 429;
-const MESSAGES_PER_REQUEST = 100;
 const MAX_RETRIES = 3;
 
-// Get message from Discord
+export interface DiscordMessagePage {
+  messages: DiscordMessage[];
+  nextRequestDelayMs: number;
+}
+
 export async function fetchMessages(
   botToken: string,
   channelId: string,
-  after?: string,
-): Promise<DiscordMessage[]> {
-  const path = `/channels/${channelId}/messages?limit=${MESSAGES_PER_REQUEST}${
-    after ? `&after=${after}` : ""
-  }`;
+  before?: string,
+): Promise<DiscordMessagePage> {
+  const path = getChannelMessagesPath(channelId, before);
   const res = await discordRequest(botToken, "GET", path);
-  return JSON.parse(res.text);
+  const messages: unknown = JSON.parse(res.text);
+  if (!Array.isArray(messages)) {
+    throw new TypeError("Discord API returned an invalid message list.");
+  }
+  return {
+    messages: messages as DiscordMessage[],
+    nextRequestDelayMs: getRateLimitResetDelay(res.headers),
+  };
 }
 
 // Post message to Discord

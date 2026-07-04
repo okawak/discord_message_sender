@@ -9,7 +9,8 @@ import {
 } from "../src/channelPaths";
 import { renderNotificationTemplate } from "../src/notificationTemplates";
 import {
-  CURRENT_SETTINGS_VERSION,
+  CURRENT_SETTINGS_SCHEMA_VERSION,
+  createMessageSyncSettingsSnapshot,
   type DiscordChannelSettings,
   getConfiguredChannels,
   migrateSettings,
@@ -36,11 +37,14 @@ describe("normalizeSettings", () => {
         lastProcessedMessageId: "9876543210",
       },
     ]);
-    expect(settings.settingsVersion).toBe(CURRENT_SETTINGS_VERSION);
+    expect(settings.settingsVersion).toBe(CURRENT_SETTINGS_SCHEMA_VERSION);
     expect(Object.hasOwn(settings, "channelId")).toBe(false);
     expect(Object.hasOwn(settings, "lastProcessedMessageId")).toBe(false);
     expect(settings.enableAutoSyncOnStartup).toBe(false);
     expect(settings.sendSyncNotifications).toBe(true);
+    expect(settings.messageStorageMode).toBe("individual");
+    expect(settings.showAuthorNames).toBe(false);
+    expect(settings.showMessageTime).toBe(false);
   });
 
   test("keeps valid channels and drops blank channel ids", () => {
@@ -100,6 +104,27 @@ describe("normalizeSettings", () => {
       normalizeSettings({ sendSyncNotifications: false }).sendSyncNotifications,
     ).toBe(false);
   });
+
+  test("keeps supported storage modes and rejects unknown values", () => {
+    for (const mode of ["daily", "weekly", "monthly"] as const) {
+      expect(
+        normalizeSettings({ messageStorageMode: mode }).messageStorageMode,
+      ).toBe(mode);
+    }
+    expect(
+      normalizeSettings({ messageStorageMode: "yearly" }).messageStorageMode,
+    ).toBe("individual");
+  });
+
+  test("keeps aggregated log display settings", () => {
+    const settings = normalizeSettings({
+      showAuthorNames: true,
+      showMessageTime: true,
+    });
+
+    expect(settings.showAuthorNames).toBe(true);
+    expect(settings.showMessageTime).toBe(true);
+  });
 });
 
 describe("migrateSettings", () => {
@@ -110,8 +135,33 @@ describe("migrateSettings", () => {
     });
 
     expect(migration.didMigrate).toBe(true);
-    expect(migration.settings.settingsVersion).toBe(CURRENT_SETTINGS_VERSION);
+    expect(migration.settings.settingsVersion).toBe(
+      CURRENT_SETTINGS_SCHEMA_VERSION,
+    );
     expect(migration.settings.sendSyncNotifications).toBe(true);
+  });
+
+  test("migrates v2 settings without changing channels or cursors", () => {
+    const migration = migrateSettings({
+      settingsVersion: 2,
+      channels: [
+        {
+          id: "123",
+          name: "notes",
+          lastProcessedMessageId: "456",
+        },
+      ],
+    });
+
+    expect(migration.didMigrate).toBe(true);
+    expect(migration.settings.channels).toEqual([
+      {
+        id: "123",
+        name: "notes",
+        lastProcessedMessageId: "456",
+      },
+    ]);
+    expect(migration.settings.messageStorageMode).toBe("individual");
   });
 
   test("rewrites v0.2.8 settings into the current schema", () => {
@@ -127,7 +177,7 @@ describe("migrateSettings", () => {
 
     expect(migration.didMigrate).toBe(true);
     expect(migration.settings).toMatchObject({
-      settingsVersion: CURRENT_SETTINGS_VERSION,
+      settingsVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
       channels: [
         {
           id: "123",
@@ -156,7 +206,7 @@ describe("migrateSettings", () => {
 
   test("removes stale legacy fields from an existing channels schema", () => {
     const migration = migrateSettings({
-      settingsVersion: CURRENT_SETTINGS_VERSION,
+      settingsVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
       channels: [{ id: "new-channel", name: "new" }],
       channelId: "stale-channel",
       lastProcessedMessageId: "stale-cursor",
@@ -170,6 +220,35 @@ describe("migrateSettings", () => {
     expect(Object.hasOwn(migration.settings, "lastProcessedMessageId")).toBe(
       false,
     );
+  });
+});
+
+describe("createMessageSyncSettingsSnapshot", () => {
+  test("keeps one sync isolated from later setting changes", () => {
+    const settings = normalizeSettings({
+      botToken: "token",
+      messageDirectoryName: "Logs",
+      clippingDirectoryName: "Clips",
+      messagePrefix: "!",
+      messageStorageMode: "weekly",
+      showAuthorNames: true,
+      showMessageTime: true,
+      sendSyncNotifications: true,
+      notificationTemplates: { saved: "saved", noNew: "none" },
+    });
+    const snapshot = createMessageSyncSettingsSnapshot(settings, "Asia/Tokyo");
+
+    settings.messageStorageMode = "monthly";
+    settings.showAuthorNames = false;
+    settings.notificationTemplates.saved = "changed";
+
+    expect(snapshot).toMatchObject({
+      messageStorageMode: "weekly",
+      showAuthorNames: true,
+      showMessageTime: true,
+      timeZone: "Asia/Tokyo",
+      notificationTemplates: { saved: "saved", noNew: "none" },
+    });
   });
 });
 

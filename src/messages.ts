@@ -1,42 +1,71 @@
+import { toLocalDateTime } from "./localDateTime";
+
 export interface DiscordMessage {
   id: string;
   content: string;
   timestamp: string;
-  author?: { bot?: boolean };
+  author?: {
+    id?: string;
+    username?: string;
+    global_name?: string | null;
+    bot?: boolean;
+  };
+  member?: { nick?: string | null };
 }
 
 export interface ProcessedMessage {
+  messageId: string;
+  timestamp: string;
+  authorId: string;
+  authorName: string;
   markdown: string;
   isClipping: boolean;
   fileName: string;
 }
 
-export function parseWasmMessageResult(
+export type MessageInstruction =
+  | { kind: "message"; markdown: string }
+  | { kind: "url"; url: string };
+
+export function parseWasmMessageInstruction(
   value: unknown,
-  timestamp: string,
-  messageId: string,
-): ProcessedMessage {
+): MessageInstruction {
   if (
     !Array.isArray(value) ||
     typeof value[0] !== "string" ||
-    typeof value[1] !== "boolean"
+    typeof value[1] !== "string"
   ) {
-    throw new TypeError("WASM returned an invalid processed message.");
+    throw new TypeError("WASM returned an invalid message instruction.");
   }
 
-  return {
-    markdown: value[0],
-    isClipping: value[1],
-    fileName: `${formatMessageFileName(timestamp)}_${messageId}`,
-  };
+  switch (value[0]) {
+    case "message":
+      return { kind: "message", markdown: value[1] };
+    case "url":
+      return { kind: "url", url: value[1] };
+    default:
+      throw new TypeError(`WASM returned unknown message kind "${value[0]}".`);
+  }
 }
 
-function formatMessageFileName(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return timestamp;
-  }
-
-  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString();
-  return `${jst.slice(0, 10).replaceAll("-", "")}_${jst.slice(11, 19).replaceAll(":", "")}`;
+export function createProcessedMessage(
+  markdown: string,
+  isClipping: boolean,
+  message: DiscordMessage,
+  timeZone: string,
+): ProcessedMessage {
+  return {
+    messageId: message.id,
+    timestamp: message.timestamp,
+    authorId: message.author?.id ?? "",
+    authorName:
+      message.member?.nick?.trim() ||
+      message.author?.global_name?.trim() ||
+      message.author?.username?.trim() ||
+      message.author?.id ||
+      "Unknown",
+    markdown,
+    isClipping,
+    fileName: `${toLocalDateTime(message.timestamp, timeZone).fileTimestamp}_${message.id}`,
+  };
 }

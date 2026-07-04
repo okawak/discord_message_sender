@@ -13,17 +13,20 @@ import {
 } from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
-import { cleanupGlobalNamespace } from "./global";
+import { getLocalTimeZone } from "./localDateTime";
+import { processDiscordMessageBatch } from "./messageBatch";
 import type { DiscordMessage } from "./messages";
 import {
+  createMessageSyncSettingsSnapshot,
   type DiscordChannelSettings,
   type DiscordPluginSettings,
   getConfiguredChannels,
+  type MessageSyncSettingsSnapshot,
   migrateSettings,
   normalizeSettings,
 } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
-import { saveToVault } from "./vault";
+import { saveProcessedMessages } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 
 export default class DiscordMessageSenderPlugin extends Plugin {
@@ -47,10 +50,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       this.syncDiscordMessages().catch(console.error);
     }
     this.addSettingTab(new DiscordMessageSenderSettingTab(this.app, this));
-  }
-
-  override onunload(): void {
-    cleanupGlobalNamespace();
   }
 
   private async syncDiscordMessages(): Promise<void> {
@@ -83,6 +82,10 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
+    const settingsSnapshot = createMessageSyncSettingsSnapshot(
+      this.settings,
+      getLocalTimeZone(),
+    );
     this.syncing = true;
     new Notice("Starting Discord sync.");
 
@@ -91,16 +94,20 @@ export default class DiscordMessageSenderPlugin extends Plugin {
         const snapshot = { ...channel };
         return syncChannelMessages(
           {
-            botToken: this.settings.botToken,
+            botToken: settingsSnapshot.botToken,
             channel: snapshot,
-            sendSyncNotifications: this.settings.sendSyncNotifications,
-            notificationTemplates: this.settings.notificationTemplates,
+            sendSyncNotifications: settingsSnapshot.sendSyncNotifications,
+            notificationTemplates: settingsSnapshot.notificationTemplates,
           },
           {
             fetchMessages,
             postNotification,
-            processMessage: (message, currentChannel) =>
-              this.processDiscordMessage(message, currentChannel),
+            processMessages: (messages, currentChannel) =>
+              this.processDiscordMessages(
+                messages,
+                currentChannel,
+                settingsSnapshot,
+              ),
             persistCursor: (_currentChannel, messageId) =>
               this.updateLastProcessedMessage(channel, snapshot.id, messageId),
             sleep,
@@ -132,30 +139,24 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     }
   }
 
-  private async processDiscordMessage(
-    message: DiscordMessage,
+  private async processDiscordMessages(
+    messages: readonly DiscordMessage[],
     channel: DiscordChannelSettings,
-  ): Promise<boolean> {
-    if (message.author?.bot) {
-      return false;
-    }
-
-    const processedMessage = await parseMessageWasm(
-      message,
-      this.settings.messagePrefix,
+    settings: MessageSyncSettingsSnapshot,
+  ): Promise<number> {
+    return processDiscordMessageBatch(
+      messages,
+      (message) =>
+        parseMessageWasm(message, settings.messagePrefix, settings.timeZone),
+      (processedMessages) =>
+        saveProcessedMessages(
+          this.app.vault,
+          createChannelDirectory(settings.messageDirectoryName, channel),
+          createChannelDirectory(settings.clippingDirectoryName, channel),
+          processedMessages,
+          settings,
+        ),
     );
-
-    if (!processedMessage.markdown) {
-      return false;
-    }
-
-    await saveToVault(
-      this.app.vault,
-      createChannelDirectory(this.settings.messageDirectoryName, channel),
-      createChannelDirectory(this.settings.clippingDirectoryName, channel),
-      processedMessage,
-    );
-    return true;
   }
 
   private async updateLastProcessedMessage(

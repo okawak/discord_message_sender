@@ -16,5 +16,5 @@ wasm-opt = ["-Oz"]
 [dependencies]
 html_to_markdown = { path = "../html_to_markdown" }
 js-sys = "0.3"
+thiserror = "2"
 wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
