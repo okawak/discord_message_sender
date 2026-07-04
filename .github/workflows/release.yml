@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version without a v prefix (for example, 0.3.0)
+        description: Release version without a v prefix (for example, 0.4.0)
         required: true
         type: string
 
@@ -13,26 +13,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-release:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
+    timeout-minutes: 5
     env:
       VERSION: ${{ inputs.version }}
 
     steps:
       - name: Validate release request
         run: |
-          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "::error::Run the release workflow from the main branch."
-            exit 1
-          fi
           if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "::error::Version must use the x.y.z format without a v prefix."
             exit 1
           fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != "refs/tags/$VERSION" ]]; then
+            echo "::error::Run this workflow from main or the release tag $VERSION."
+            exit 1
+          fi
 
+  prepare-release:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+
+    steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
@@ -60,21 +70,25 @@ jobs:
             .
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
+          checksum: true
+          fallback: none
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Audit Bun dependencies
+        run: bun audit
+
       - name: Prepare release version
         run: bun scripts/prepare-release.ts "$VERSION"
-
-      - name: Build WASM bindings
-        run: bun run wasm:build
 
       - name: Verify release version
         run: |
@@ -87,20 +101,17 @@ jobs:
           test "$CARGO_VERSION" = "$VERSION"
           test -n "$MIN_APP_VERSION"
 
+      - name: Build plugin
+        run: bun run build
+
       - name: Check plugin
         run: |
           bun run type-check
           bun run check
           bun run test
-          bun run test:wasm
 
-      - name: Build plugin
-        run: bun run build
-
-      - name: Create release archive
-        run: |
-          cd dist
-          zip -r "../discord-message-sender-$VERSION.zip" .
+      - name: Test WASM bindings
+        run: bun run test:wasm
 
       - name: Commit release version
         id: commit
@@ -144,17 +155,108 @@ jobs:
             git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$VERSION"
           fi
 
+      - name: Dispatch release publication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$VERSION" \
+            -f "version=$VERSION"
+
+  publish-release:
+    needs: validate
+    if: github.ref == format('refs/tags/{0}', inputs.version)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release commit
+        run: |
+          git fetch --tags origin
+          TAG_SHA="$(git rev-parse "refs/tags/$VERSION^{}")"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          MANIFEST_VERSION="$(node -p "require('./manifest.json').version")"
+          CARGO_VERSION="$(sed -n '/^\[workspace\.package\]/,/^\[/ s/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          EXPECTED_MESSAGE="chore: release $VERSION"
+          ACTUAL_MESSAGE="$(git log -1 --format=%s)"
+          test "$TAG_SHA" = "$HEAD_SHA"
+          test "$PACKAGE_VERSION" = "$VERSION"
+          test "$MANIFEST_VERSION" = "$VERSION"
+          test "$CARGO_VERSION" = "$VERSION"
+          test "$ACTUAL_MESSAGE" = "$EXPECTED_MESSAGE"
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+          cache-workspaces: |
+            .
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
+          checksum: true
+          fallback: none
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit Bun dependencies
+        run: bun audit
+
+      - name: Build plugin
+        run: bun run build
+
+      - name: Check plugin
+        run: |
+          bun run type-check
+          bun run check
+          bun run test
+
+      - name: Test WASM bindings
+        run: bun run test:wasm
+
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            dist/main.js
+            dist/manifest.json
+          create-storage-record: false
+
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.version }}
-          target_commitish: ${{ steps.commit.outputs.release_sha }}
+          target_commitish: ${{ github.sha }}
           files: |
-            discord-message-sender-${{ inputs.version }}.zip
             dist/manifest.json
             dist/main.js
           draft: false
+          fail_on_unmatched_files: true
           prerelease: false
           generate_release_notes: true
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
