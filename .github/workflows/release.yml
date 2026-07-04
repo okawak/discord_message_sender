@@ -99,14 +99,14 @@ jobs:
           test "$CARGO_VERSION" = "$VERSION"
           test -n "$MIN_APP_VERSION"
 
+      - name: Build plugin
+        run: bun run build
+
       - name: Check plugin
         run: |
           bun run type-check
           bun run check
           bun run test
-
-      - name: Build plugin
-        run: bun run build
 
       - name: Test WASM bindings
         run: bun run test:wasm
@@ -221,14 +221,14 @@ jobs:
       - name: Audit Bun dependencies
         run: bun audit
 
+      - name: Build plugin
+        run: bun run build
+
       - name: Check plugin
         run: |
           bun run type-check
           bun run check
           bun run test
-
-      - name: Build plugin
-        run: bun run build
 
       - name: Test WASM bindings
         run: bun run test:wasm
