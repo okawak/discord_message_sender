@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
 import { resolve } from "node:path";
-import { wasm } from "@rollup/plugin-wasm";
 import { defineConfig, type Plugin } from "vite";
 
 const fixWasmImportMetaUrlForCommonJs = (): Plugin => ({
@@ -54,7 +53,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       sourcemap: !prod,
       codeSplitting: false,
-      rollupOptions: {
+      rolldownOptions: {
         external: [
           "obsidian",
           "fs",
@@ -65,12 +64,6 @@ export default defineConfig(({ mode }) => {
           "events",
           "node:fs/promises",
           "node:path",
-        ],
-        plugins: [
-          wasm({
-            targetEnv: "auto-inline",
-            maxFileSize: Infinity,
-          }),
         ],
       },
     },
