@@ -2,7 +2,9 @@ import {
   type App,
   Notice,
   PluginSettingTab,
-  Setting,
+  type Setting,
+  type SettingDefinition,
+  type SettingDefinitionItem,
   type TextComponent,
 } from "obsidian";
 import {
@@ -17,6 +19,25 @@ import {
   updateChannelId,
 } from "./settings";
 
+type SettingKey =
+  | "messageDirectoryName"
+  | "clippingDirectoryName"
+  | "messagePrefix"
+  | "messageStorageMode"
+  | "showAuthorNames"
+  | "showMessageTime"
+  | "enableAutoSyncOnStartup"
+  | "sendSyncNotifications"
+  | "savedNotificationTemplate"
+  | "noNewNotificationTemplate";
+
+const STORAGE_OPTIONS: Record<MessageStorageMode, string> = {
+  individual: "One file per message",
+  daily: "Daily log",
+  weekly: "Weekly log",
+  monthly: "Monthly log",
+};
+
 export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   plugin: DiscordMessageSenderPlugin;
 
@@ -25,345 +46,293 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  override display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-
-    this.createDirectorySettings(containerEl);
-    this.createDiscordSettings(containerEl);
-    this.createNotificationSettings(containerEl);
-    this.createBehaviorSettings(containerEl);
-  }
-
-  private createDirectorySettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName("Directory").setHeading();
-
-    this.addTextSetting(containerEl, {
-      name: "Messages directory",
-      description: "Directory where regular Discord messages will be saved",
-      placeholder: "DiscordLogs",
-      getValue: () => this.plugin.settings.messageDirectoryName,
-      setValue: (value) => {
-        this.plugin.settings.messageDirectoryName = value || "DiscordLogs";
+  override getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
+    return [
+      {
+        type: "group",
+        heading: "Directory",
+        items: [
+          {
+            name: "Messages directory",
+            desc: "Directory where regular Discord messages will be saved",
+            control: {
+              type: "text",
+              key: "messageDirectoryName",
+              defaultValue: "DiscordLogs",
+              placeholder: "DiscordLogs",
+            },
+          },
+          {
+            name: "Clippings directory",
+            desc: "Directory where URL clippings will be saved",
+            control: {
+              type: "text",
+              key: "clippingDirectoryName",
+              defaultValue: "DiscordClippings",
+              placeholder: "DiscordClippings",
+            },
+          },
+        ],
       },
-    });
-
-    this.addTextSetting(containerEl, {
-      name: "Clippings directory",
-      description: "Directory where URL clippings will be saved",
-      placeholder: "DiscordClippings",
-      getValue: () => this.plugin.settings.clippingDirectoryName,
-      setValue: (value) => {
-        this.plugin.settings.clippingDirectoryName =
-          value || "DiscordClippings";
+      {
+        type: "group",
+        heading: "Discord",
+        items: [
+          {
+            name: "Bot token",
+            desc: "Your Discord bot token",
+            render: (setting) => this.renderBotToken(setting),
+          },
+          {
+            name: "Message prefix",
+            desc: "Prefix for message processing",
+            control: {
+              type: "text",
+              key: "messagePrefix",
+              defaultValue: "!",
+              placeholder: "!",
+            },
+          },
+        ],
       },
-    });
-  }
-
-  private createDiscordSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName("Discord").setHeading();
-
-    this.addPasswordSetting(containerEl, {
-      name: "Bot token",
-      description: "Your Discord bot token",
-      placeholder: "xxxxx.yyyyy.zzzzz",
-      getValue: () => this.plugin.settings.botToken,
-      setValue: (value) => {
-        this.plugin.settings.botToken = value;
-      },
-    });
-
-    this.createChannelSettings(containerEl);
-
-    this.addTextSetting(containerEl, {
-      name: "Message prefix",
-      description: "Prefix for message processing",
-      placeholder: "!",
-      getValue: () => this.plugin.settings.messagePrefix,
-      setValue: (value) => {
-        this.plugin.settings.messagePrefix = value || "!";
-      },
-    });
-  }
-
-  private createChannelSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName("Channels")
-      .setDesc("Discord channels to sync messages from")
-      .addButton((button) =>
-        button
-          .setButtonText("Add channel")
-          .setCta()
-          .onClick(async () => {
+      {
+        type: "list",
+        heading: "Channels",
+        emptyState: "No channels configured",
+        addItem: {
+          name: "Add channel",
+          action: async () => {
             this.plugin.settings.channels.push({ id: "", name: "" });
             await this.plugin.saveSettings();
-            this.display();
-          }),
-      );
-
-    if (this.plugin.settings.channels.length === 0) {
-      new Setting(containerEl).setName("No channels configured");
-      return;
-    }
-
-    this.plugin.settings.channels.forEach((channel, index) => {
-      this.addChannelSetting(containerEl, channel, index);
-    });
+            this.update();
+          },
+        },
+        onDelete: async (index) => {
+          this.plugin.settings.channels.splice(index, 1);
+          await this.plugin.saveSettings();
+          this.update();
+        },
+        items: this.plugin.settings.channels.map((channel, index) =>
+          this.getChannelDefinition(channel, index),
+        ),
+      },
+      {
+        type: "group",
+        heading: "Notifications",
+        items: [
+          {
+            name: "Send sync notifications",
+            desc: "Send a Discord message after each channel is synced",
+            control: { type: "toggle", key: "sendSyncNotifications" },
+          },
+          {
+            name: "Saved messages template",
+            desc: "Discord message sent when one or more messages are saved. Available variables: {count}, {channelName}, {channelId}",
+            control: {
+              type: "textarea",
+              key: "savedNotificationTemplate",
+              defaultValue: DEFAULT_NOTIFICATION_TEMPLATES.saved,
+              placeholder: DEFAULT_NOTIFICATION_TEMPLATES.saved,
+            },
+          },
+          {
+            name: "No new messages template",
+            desc: "Discord message sent when there are no new messages. Available variables: {count}, {channelName}, {channelId}",
+            control: {
+              type: "textarea",
+              key: "noNewNotificationTemplate",
+              defaultValue: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
+              placeholder: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
+            },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: "Behavior",
+        items: [
+          {
+            name: "Message storage",
+            desc: "Choose how regular Discord messages are grouped",
+            control: {
+              type: "dropdown",
+              key: "messageStorageMode",
+              defaultValue: "individual",
+              options: STORAGE_OPTIONS,
+            },
+          },
+          {
+            name: "Show author names",
+            desc: "Include the Discord author in aggregated logs",
+            control: { type: "toggle", key: "showAuthorNames" },
+          },
+          {
+            name: "Show message time",
+            desc: "Include the local message time in aggregated logs",
+            control: { type: "toggle", key: "showMessageTime" },
+          },
+          {
+            name: "Auto-sync on startup",
+            desc: "Automatically sync messages when Obsidian starts",
+            control: { type: "toggle", key: "enableAutoSyncOnStartup" },
+          },
+        ],
+      },
+    ];
   }
 
-  private addChannelSetting(
-    containerEl: HTMLElement,
+  override getControlValue(key: string): unknown {
+    const settings = this.plugin.settings;
+    switch (key) {
+      case "messageDirectoryName":
+      case "clippingDirectoryName":
+      case "messagePrefix":
+      case "messageStorageMode":
+      case "showAuthorNames":
+      case "showMessageTime":
+      case "enableAutoSyncOnStartup":
+      case "sendSyncNotifications":
+        return settings[key];
+      case "savedNotificationTemplate":
+        return settings.notificationTemplates.saved;
+      case "noNewNotificationTemplate":
+        return settings.notificationTemplates.noNew;
+      default:
+        return undefined;
+    }
+  }
+
+  override async setControlValue(key: string, value: unknown): Promise<void> {
+    const settings = this.plugin.settings;
+    switch (key) {
+      case "messageDirectoryName":
+        settings.messageDirectoryName = readString(value, "DiscordLogs");
+        break;
+      case "clippingDirectoryName":
+        settings.clippingDirectoryName = readString(value, "DiscordClippings");
+        break;
+      case "messagePrefix":
+        settings.messagePrefix = readString(value, "!");
+        break;
+      case "messageStorageMode":
+        if (!isMessageStorageMode(value)) {
+          throw new TypeError(
+            `Invalid message storage mode "${String(value)}".`,
+          );
+        }
+        settings.messageStorageMode = value;
+        break;
+      case "showAuthorNames":
+      case "showMessageTime":
+      case "enableAutoSyncOnStartup":
+      case "sendSyncNotifications":
+        settings[key] = readBoolean(value, key);
+        break;
+      case "savedNotificationTemplate":
+        settings.notificationTemplates.saved = readString(
+          value,
+          DEFAULT_NOTIFICATION_TEMPLATES.saved,
+        );
+        break;
+      case "noNewNotificationTemplate":
+        settings.notificationTemplates.noNew = readString(
+          value,
+          DEFAULT_NOTIFICATION_TEMPLATES.noNew,
+        );
+        break;
+      default:
+        throw new TypeError(`Unknown setting key "${key}".`);
+    }
+    await this.plugin.saveSettings();
+  }
+
+  private getChannelDefinition(
     channel: DiscordChannelSettings,
     index: number,
-  ): void {
-    new Setting(containerEl)
-      .setName(`Channel ${index + 1}`)
-      .addText((text) =>
-        text
-          .setPlaceholder("Name (optional)")
-          .setValue(channel.name)
-          .onChange(async (value) => {
-            const name = value.trim();
-            const error = getChannelNameValidationError(name);
-            if (error) {
-              new Notice(error);
-              text.setValue(channel.name);
-              return;
-            }
-            const duplicate = findDuplicateChannelPathSegment(
-              this.plugin.settings.channels.map((candidate) =>
-                candidate === channel ? { ...candidate, name } : candidate,
-              ),
-            );
-            if (duplicate) {
-              new Notice(
-                `Channel name is already in use as folder "${duplicate}". Enter a unique channel name.`,
-              );
-              return;
-            }
-            channel.name = name;
-            await this.plugin.saveSettings();
-          }),
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder("Channel ID")
-          .setValue(channel.id)
-          .onChange(async (value) => {
-            updateChannelId(channel, value.trim());
-            await this.plugin.saveSettings();
-          }),
-      )
-      .addExtraButton((button) =>
+  ): SettingDefinition<SettingKey> {
+    return {
+      name: `Channel ${index + 1}`,
+      render: (setting) => {
+        setting
+          .addText((text) =>
+            text
+              .setPlaceholder("Name (optional)")
+              .setValue(channel.name)
+              .onChange(async (value) => {
+                const name = value.trim();
+                const error = getChannelNameValidationError(name);
+                const duplicate = findDuplicateChannelPathSegment(
+                  this.plugin.settings.channels.map((candidate) =>
+                    candidate === channel ? { ...candidate, name } : candidate,
+                  ),
+                );
+                if (error || duplicate) {
+                  new Notice(
+                    error ??
+                      `Channel name is already in use as folder "${duplicate}". Enter a unique channel name.`,
+                  );
+                  text.setValue(channel.name);
+                  return;
+                }
+                channel.name = name;
+                await this.plugin.saveSettings();
+              }),
+          )
+          .addText((text) =>
+            text
+              .setPlaceholder("Channel ID")
+              .setValue(channel.id)
+              .onChange(async (value) => {
+                updateChannelId(channel, value.trim());
+                await this.plugin.saveSettings();
+              }),
+          );
+      },
+    };
+  }
+
+  private renderBotToken(setting: Setting): void {
+    let textComponent: TextComponent | undefined;
+    setting
+      .addExtraButton((button) => {
+        let isVisible = false;
         button
-          .setIcon("trash")
-          .setTooltip("Remove channel")
-          .onClick(async () => {
-            this.plugin.settings.channels.splice(index, 1);
-            await this.plugin.saveSettings();
-            this.display();
-          }),
-      );
-  }
-
-  private createBehaviorSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName("Behavior").setHeading();
-
-    new Setting(containerEl)
-      .setName("Message storage")
-      .setDesc("Choose how regular Discord messages are grouped")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOptions({
-            individual: "One file per message",
-            daily: "Daily log",
-            weekly: "Weekly log",
-            monthly: "Monthly log",
-          })
-          .setValue(this.plugin.settings.messageStorageMode)
+          .setIcon("eye-off")
+          .setTooltip("Toggle password visibility")
+          .onClick(() => {
+            if (!textComponent) {
+              return;
+            }
+            isVisible = !isVisible;
+            textComponent.inputEl.type = isVisible ? "text" : "password";
+            button.setIcon(isVisible ? "eye" : "eye-off");
+          });
+      })
+      .addText((text) => {
+        textComponent = text;
+        text.inputEl.type = "password";
+        text
+          .setPlaceholder("xxxxx.yyyyy.zzzzz")
+          .setValue(this.plugin.settings.botToken)
           .onChange(async (value) => {
-            this.plugin.settings.messageStorageMode =
-              value as MessageStorageMode;
+            this.plugin.settings.botToken = value.trim();
             await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Show author names")
-      .setDesc("Include the Discord author in aggregated logs")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showAuthorNames)
-          .onChange(async (value) => {
-            this.plugin.settings.showAuthorNames = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Show message time")
-      .setDesc("Include the local message time in aggregated logs")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showMessageTime)
-          .onChange(async (value) => {
-            this.plugin.settings.showMessageTime = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Auto-sync on startup")
-      .setDesc("Automatically sync messages when Obsidian starts")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.enableAutoSyncOnStartup)
-          .onChange(async (value) => {
-            this.plugin.settings.enableAutoSyncOnStartup = value;
-            await this.plugin.saveSettings();
-          }),
-      );
+          });
+      });
   }
+}
 
-  private createNotificationSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName("Notifications").setHeading();
+function readString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value.trim() || fallback : fallback;
+}
 
-    new Setting(containerEl)
-      .setName("Send sync notifications")
-      .setDesc("Send a Discord message after each channel is synced")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.sendSyncNotifications)
-          .onChange(async (value) => {
-            this.plugin.settings.sendSyncNotifications = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    this.addTextAreaSetting(containerEl, {
-      name: "Saved messages template",
-      description:
-        "Discord message sent when one or more messages are saved. Available variables: {count}, {channelName}, {channelId}",
-      placeholder: DEFAULT_NOTIFICATION_TEMPLATES.saved,
-      getValue: () => this.plugin.settings.notificationTemplates.saved,
-      setValue: (value) => {
-        this.plugin.settings.notificationTemplates.saved =
-          value || DEFAULT_NOTIFICATION_TEMPLATES.saved;
-      },
-    });
-
-    this.addTextAreaSetting(containerEl, {
-      name: "No new messages template",
-      description:
-        "Discord message sent when there are no new messages. Available variables: {count}, {channelName}, {channelId}",
-      placeholder: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
-      getValue: () => this.plugin.settings.notificationTemplates.noNew,
-      setValue: (value) => {
-        this.plugin.settings.notificationTemplates.noNew =
-          value || DEFAULT_NOTIFICATION_TEMPLATES.noNew;
-      },
-    });
+function readBoolean(value: unknown, key: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new TypeError(`Setting "${key}" requires a boolean value.`);
   }
+  return value;
+}
 
-  // =============================================
-  // Utility Methods for Settings
-  // =============================================
-  private addTextSetting(
-    containerEl: HTMLElement,
-    options: {
-      name: string;
-      description?: string;
-      placeholder: string;
-      getValue: () => string;
-      setValue: (value: string) => void;
-    },
-  ): void {
-    const setting = new Setting(containerEl).setName(options.name);
-
-    if (options.description) {
-      setting.setDesc(options.description);
-    }
-
-    setting.addText((text) =>
-      text
-        .setPlaceholder(options.placeholder)
-        .setValue(options.getValue())
-        .onChange(async (value) => {
-          options.setValue(value.trim());
-          await this.plugin.saveSettings();
-        }),
-    );
-  }
-
-  private addPasswordSetting(
-    containerEl: HTMLElement,
-    options: {
-      name: string;
-      description?: string;
-      placeholder: string;
-      getValue: () => string;
-      setValue: (value: string) => void;
-    },
-  ): void {
-    const setting = new Setting(containerEl).setName(options.name);
-
-    if (options.description) {
-      setting.setDesc(options.description);
-    }
-
-    let textComponent!: TextComponent;
-    // Toggle password visibility
-    setting.addExtraButton((button) => {
-      let isVisible = false;
-      const toggleVisibility = () => {
-        isVisible = !isVisible;
-        textComponent.inputEl.type = isVisible ? "text" : "password";
-        button.setIcon(isVisible ? "eye" : "eye-off");
-      };
-
-      button
-        .setIcon("eye-off")
-        .setTooltip("Toggle password visibility")
-        .onClick(toggleVisibility);
-    });
-
-    setting.addText((text) => {
-      textComponent = text;
-      text.inputEl.type = "password";
-      text
-        .setPlaceholder(options.placeholder)
-        .setValue(options.getValue())
-        .onChange(async (value) => {
-          options.setValue(value.trim());
-          await this.plugin.saveSettings();
-        });
-    });
-  }
-
-  private addTextAreaSetting(
-    containerEl: HTMLElement,
-    options: {
-      name: string;
-      description?: string;
-      placeholder: string;
-      getValue: () => string;
-      setValue: (value: string) => void;
-    },
-  ): void {
-    const setting = new Setting(containerEl).setName(options.name);
-
-    if (options.description) {
-      setting.setDesc(options.description);
-    }
-
-    setting.addTextArea((text) =>
-      text
-        .setPlaceholder(options.placeholder)
-        .setValue(options.getValue())
-        .onChange(async (value) => {
-          options.setValue(value.trim());
-          await this.plugin.saveSettings();
-        }),
-    );
-  }
+function isMessageStorageMode(value: unknown): value is MessageStorageMode {
+  return typeof value === "string" && Object.hasOwn(STORAGE_OPTIONS, value);
 }
