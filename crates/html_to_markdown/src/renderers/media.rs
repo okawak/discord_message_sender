@@ -2,7 +2,7 @@ use super::{Context, Renderer, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::{format_list_content, normalize_heading_content},
+    utils::format_list_content,
 };
 use std::{borrow::Cow, collections::HashMap};
 
@@ -157,6 +157,26 @@ impl Media {
         Self::contains_element(dom, node_id, Self::is_card_link_element)
     }
 
+    fn is_structured_block_element(tag_name: &str) -> bool {
+        matches!(
+            tag_name,
+            "aside"
+                | "blockquote"
+                | "dl"
+                | "fieldset"
+                | "form"
+                | "li"
+                | "ol"
+                | "pre"
+                | "table"
+                | "ul"
+        )
+    }
+
+    fn has_structured_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        Self::contains_element(dom, node_id, Self::is_structured_block_element)
+    }
+
     fn contains_element(dom: &Dom, node_id: NodeId, predicate: fn(&str) -> bool) -> bool {
         let Ok(children) = dom.iter_children(node_id) else {
             return false;
@@ -171,6 +191,15 @@ impl Media {
             };
             predicate(tag.local.as_ref()) || Self::contains_element(dom, child_id, predicate)
         })
+    }
+
+    fn append_standalone_destination(content: String, resolved_url: &str) -> String {
+        let content = content.trim_end();
+        if content.is_empty() {
+            format!("[{resolved_url}]({resolved_url})")
+        } else {
+            format!("{content}\n\n[{resolved_url}]({resolved_url})")
+        }
     }
 
     fn render_complex_link(
@@ -237,12 +266,19 @@ impl Renderer for Media {
                     }
 
                     ctx.in_inline = true;
+                    let old_in_link_label = ctx.in_link_label;
+                    ctx.in_link_label = true;
                     let rendered = render_children(url, dom, id, ctx);
                     ctx.in_inline = old_inline_status;
+                    ctx.in_link_label = old_in_link_label;
                     let content = rendered?;
 
+                    if self.has_structured_block_content(dom, id) {
+                        return Ok(Self::append_standalone_destination(content, &resolved_url));
+                    }
+
                     let content = if has_block_content {
-                        normalize_heading_content(&content).into_owned()
+                        content.trim().to_string()
                     } else {
                         content
                     };
@@ -672,6 +708,10 @@ mod tests {
         r#"<a href="/target"><p>First</p><p>Second</p></a>"#,
         "[First Second](https://example.com/target)"
     )]
+    #[case(
+        r#"<a href="/target"><p><code>a  b</code></p></a>"#,
+        "[`a  b`](https://example.com/target)"
+    )]
     fn test_text_block_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
@@ -683,6 +723,25 @@ mod tests {
         )
         .expect("Failed to render text block link children");
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_structured_block_link_preserves_code_and_destination() {
+        let dom =
+            parser::parse_html("<a href=\"/target\"><pre><code>line1\n  line2</code></pre></a>")
+                .expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render structured block link");
+        assert_eq!(
+            result,
+            "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)"
+        );
     }
 
     /// image rendering tests
