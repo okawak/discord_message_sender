@@ -1,36 +1,38 @@
 {
   "name": "discord-message-sender",
   "version": "0.4.0",
-  "description": "Send messages to Obsidian from Discord.",
-  "type": "module",
-  "private": true,
   "author": "okawak",
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.12",
+    "@types/bun": "^1.4.2",
+    "binaryen": "117.0.0",
+    "obsidian": "^1.13.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  },
+  "description": "Send messages to Obsidian from Discord.",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "license": "MIT",
+  "packageManager": "bun@1.4.0",
+  "private": true,
   "scripts": {
-    "wasm:build": "wasm-pack build crates/parse_message --release --target web -d ../../pkg",
+    "wasm:build": "bun scripts/build-wasm.ts",
     "dev:build": "bun run wasm:build && bunx vite build --mode development",
     "copy:manifest": "bun -e \"await Bun.write('dist/manifest.json', Bun.file('manifest.json'))\"",
     "build": "bun run wasm:build && bunx vite build --mode production && bun run copy:manifest",
-    "clean:files": "bun -e \"import fs from 'fs'; import {glob} from 'glob'; ['dist','dev','pkg','main.js','main.js.map',...await glob('*.wasm')].forEach(p => fs.rmSync(p, {recursive:true, force:true}))\"",
+    "clean:files": "bun -e \"import fs from 'node:fs'; ['dist','dev','pkg','main.js','main.js.map',...await Array.fromAsync(new Bun.Glob('*.wasm').scan('.'))].forEach(p => fs.rmSync(p, {recursive:true, force:true}))\"",
     "clean": "cargo clean && bun run clean:files",
-    "check": "bunx biome check && cargo clippy --workspace --all-targets",
+    "check": "bunx biome check && cargo clippy --workspace --all-targets --locked && cargo clippy --workspace --target wasm32-unknown-unknown --lib --locked",
     "check:fix": "bunx biome check --write",
     "release:prepare": "bun scripts/prepare-release.ts",
     "type-check": "tsc --noEmit",
     "test": "bun run test:ts && bun run test:rust",
-    "test:rust": "cargo test --workspace",
+    "test:rust": "cargo test --workspace --locked",
     "test:ts": "bun test",
-    "test:wasm": "bun tests/wasm.smoke.ts"
+    "test:wasm": "bun tests/wasm.smoke.ts && bun tests/bundle.smoke.ts",
+    "verify:build": "bun scripts/verify-build.ts"
   },
-  "devDependencies": {
-    "@biomejs/biome": "^2.5.2",
-    "@types/bun": "^1.3.14",
-    "obsidian": "^1.13.1",
-    "typescript": "^7.0.0",
-    "vite": "^8.1.3"
-  },
-  "dependencies": {},
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "type": "module"
 }

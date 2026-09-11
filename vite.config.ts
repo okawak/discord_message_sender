@@ -2,28 +2,48 @@ import fs from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
-const fixWasmImportMetaUrlForCommonJs = (): Plugin => ({
-  name: "fix-wasm-import-meta-url-for-commonjs",
-  enforce: "post" as const,
-  transform(code: string, id: string) {
-    if (!id.endsWith("/pkg/parse_message.js")) {
-      return null;
-    }
+// Embed the original WASM before Vite rewrites wasm-bindgen's default URL.
+// No compression, decompression dependency, or asset fetch is needed.
+const inlineWasm = (): Plugin => ({
+  name: "inline-wasm",
+  enforce: "pre",
+  async transform(code, id) {
+    if (!id.endsWith("/pkg/parse_message.js")) return null;
 
-    if (!code.includes("data:application/wasm;base64,")) {
-      throw new Error("Expected Vite to inline the wasm-bindgen binary.");
+    const wasmUrl =
+      /new URL\(['"]parse_message_bg\.wasm['"], import\.meta\.url\)/g;
+    if (Array.from(code.matchAll(wasmUrl)).length !== 1) {
+      throw new Error("Expected one wasm-bindgen default WASM URL.");
     }
-
-    // Vite inlines the WASM URL before this hook. CommonJS output has no
-    // import.meta.url, but URL still requires a syntactically valid base.
-    const importMetaUrl = "import.meta.url";
-    const commonJsBaseUrl = JSON.stringify("file:///").padEnd(
-      importMetaUrl.length,
-    );
+    const wasmPath = resolve("pkg/parse_message_bg.wasm");
+    this.addWatchFile(wasmPath);
+    const binary = await fs.readFile(wasmPath);
+    const base64 = binary.toString("base64");
     return {
-      code: code.replaceAll(importMetaUrl, commonJsBaseUrl),
-      map: this.getCombinedSourcemap(),
+      code: code.replace(
+        wasmUrl,
+        `Uint8Array.from(atob(${JSON.stringify(base64)}), c => c.charCodeAt(0))`,
+      ),
+      map: null,
     };
+  },
+});
+
+// Enforce the actual shipped byte count, not the HTTP gzip size shown by Vite.
+const releaseSizeBudget = (): Plugin => ({
+  name: "release-size-budget",
+  generateBundle(_options, bundle) {
+    const main = bundle["main.js"];
+    if (main?.type !== "chunk") this.error("Missing main.js bundle.");
+    const bytes = Buffer.byteLength(main.code, "utf8");
+    if (bytes >= 1_000_000) {
+      this.error(
+        `main.js must be smaller than 1,000,000 bytes; received ${bytes}.`,
+      );
+    }
+    this.info(
+      `main.js size: ${bytes.toLocaleString("en-US")} / 1,000,000 bytes`,
+    );
   },
 });
 
@@ -44,6 +64,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     build: {
+      target: "es2022",
       lib: {
         entry: "src/main.ts",
         formats: ["cjs"], // obsidian requires CommonJS
@@ -68,7 +89,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
-      fixWasmImportMetaUrlForCommonJs(),
+      inlineWasm(),
+      prod && releaseSizeBudget(),
       !prod && copyMainToRoot(),
     ].filter(Boolean),
     optimizeDeps: {
