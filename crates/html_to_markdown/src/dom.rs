@@ -25,12 +25,21 @@ impl std::fmt::Display for NodeId {
 #[derive(Debug)]
 pub enum NodeData {
     Document,
+    Doctype {
+        name: String,
+        public_id: String,
+        system_id: String,
+    },
     Element {
         tag: QualName,
         attrs: HashMap<String, String>,
     },
     Text(String),
     Comment(String),
+    ProcessingInstruction {
+        target: String,
+        data: String,
+    },
 }
 
 /// Represents a node in the DOM tree.
@@ -107,6 +116,88 @@ impl Dom {
             children: Vec::new(),
         });
         id
+    }
+
+    pub(crate) fn append_node(&mut self, parent: NodeId, child: NodeId) {
+        assert!(
+            self.node(parent).is_some(),
+            "parent {parent} does not exist"
+        );
+        assert!(self.node(child).is_some(), "child {child} does not exist");
+        assert_ne!(parent, child, "a node cannot be its own parent");
+        self.remove_from_parent(child);
+        self.arena[child.as_usize()].parent = Some(parent);
+        self.arena[parent.as_usize()].children.push(child);
+    }
+
+    pub(crate) fn append_text(&mut self, parent: NodeId, text: &str) {
+        let last_child = self.arena[parent.as_usize()].children.last().copied();
+        if let Some(last_child) = last_child
+            && let NodeData::Text(existing) = &mut self.arena[last_child.as_usize()].data
+        {
+            existing.push_str(text);
+            return;
+        }
+        self.create(NodeData::Text(text.to_owned()), parent);
+    }
+
+    pub(crate) fn insert_node_before(&mut self, sibling: NodeId, child: NodeId) {
+        let parent = self.arena[sibling.as_usize()]
+            .parent
+            .unwrap_or_else(|| panic!("sibling {sibling} has no parent"));
+        self.remove_from_parent(child);
+        let index = self.arena[parent.as_usize()]
+            .children
+            .iter()
+            .position(|candidate| *candidate == sibling)
+            .unwrap_or_else(|| panic!("sibling {sibling} is missing from parent {parent}"));
+        self.arena[child.as_usize()].parent = Some(parent);
+        self.arena[parent.as_usize()].children.insert(index, child);
+    }
+
+    pub(crate) fn insert_text_before(&mut self, sibling: NodeId, text: &str) {
+        let parent = self.arena[sibling.as_usize()]
+            .parent
+            .unwrap_or_else(|| panic!("sibling {sibling} has no parent"));
+        let index = self.arena[parent.as_usize()]
+            .children
+            .iter()
+            .position(|candidate| *candidate == sibling)
+            .unwrap_or_else(|| panic!("sibling {sibling} is missing from parent {parent}"));
+        if index > 0 {
+            let previous = self.arena[parent.as_usize()].children[index - 1];
+            if let NodeData::Text(existing) = &mut self.arena[previous.as_usize()].data {
+                existing.push_str(text);
+                return;
+            }
+        }
+        let child = self.create_without_parent(NodeData::Text(text.to_owned()));
+        self.insert_node_before(sibling, child);
+    }
+
+    pub(crate) fn remove_from_parent(&mut self, target: NodeId) {
+        let Some(parent) = self.arena[target.as_usize()].parent else {
+            return;
+        };
+        let children = &mut self.arena[parent.as_usize()].children;
+        let index = children
+            .iter()
+            .position(|candidate| *candidate == target)
+            .unwrap_or_else(|| panic!("child {target} is missing from parent {parent}"));
+        children.remove(index);
+        self.arena[target.as_usize()].parent = None;
+    }
+
+    pub(crate) fn reparent_children(&mut self, node: NodeId, new_parent: NodeId) {
+        assert_ne!(
+            node, new_parent,
+            "a node cannot reparent children to itself"
+        );
+        let children = std::mem::take(&mut self.arena[node.as_usize()].children);
+        for child in &children {
+            self.arena[child.as_usize()].parent = Some(new_parent);
+        }
+        self.arena[new_parent.as_usize()].children.extend(children);
     }
 
     pub fn node(&self, id: NodeId) -> Option<&Node> {
