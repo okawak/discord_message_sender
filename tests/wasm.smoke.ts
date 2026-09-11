@@ -35,6 +35,30 @@ if (!markdown.includes("Example") || !markdown.includes("Content")) {
   throw new Error("WASM HTML conversion smoke test failed.");
 }
 
+const resolvedUrls = convertHtml(
+  "https://example.com/docs/page?old=1",
+  [
+    '<a href="next">Next</a>',
+    '<a href="?q=x">Query</a>',
+    '<img src="//cdn.example.com/image.png" alt="CDN">',
+    '<a href="HTTPS://other.example/x">Other</a>',
+    '<a href="java&#10;script:alert(1)">Unsafe</a>',
+  ].join(""),
+);
+for (const expectedUrl of [
+  "https://example.com/docs/next",
+  "https://example.com/docs/page?q=x",
+  "https://cdn.example.com/image.png",
+  "https://other.example/x",
+]) {
+  if (!resolvedUrls.includes(expectedUrl)) {
+    throw new Error(`WASM URL resolution failed for "${expectedUrl}".`);
+  }
+}
+if (resolvedUrls.includes("javascript:")) {
+  throw new Error("WASM URL resolution restored an unsafe scheme.");
+}
+
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;
 for (let index = 0; index < 100; index += 1) {
   convertHtml("https://example.com", repeatedHtml);
