@@ -17,7 +17,7 @@ import {
   syncChannelsSequentially,
 } from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
-import { migrateSettings } from "./settings";
+import { migrateSettings, persistChannelCursor } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
 import { saveProcessedMessages } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
@@ -144,20 +144,9 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     expectedChannelId: string,
     id: string,
   ): Promise<void> {
-    if (channel.id !== expectedChannelId) {
-      return;
-    }
-    channel.lastProcessedMessageId = id;
-    try {
-      await this.saveSettings();
-    } catch (e) {
-      console.warn(
-        `Could not persist lastProcessedMessageId for ${getChannelDisplayName(
-          channel,
-        )}:`,
-        e,
-      );
-    }
+    await persistChannelCursor(channel, expectedChannelId, id, () =>
+      this.saveSettings(),
+    );
   }
 
   async loadSettings(): Promise<void> {
