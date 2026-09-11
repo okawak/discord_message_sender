@@ -174,7 +174,25 @@ impl Media {
     }
 
     fn has_structured_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
-        Self::contains_element(dom, node_id, Self::is_structured_block_element)
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, attrs } = &child_node.data else {
+                return false;
+            };
+
+            Self::is_structured_block_element(tag.local.as_ref())
+                || attrs.contains_key("data-lang")
+                || attrs
+                    .get("class")
+                    .is_some_and(|class| class.contains("code-frame"))
+                || self.has_structured_block_content(dom, child_id)
+        })
     }
 
     fn contains_element(dom: &Dom, node_id: NodeId, predicate: fn(&str) -> bool) -> bool {
@@ -725,11 +743,24 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    #[test]
-    fn test_structured_block_link_preserves_code_and_destination() {
-        let dom =
-            parser::parse_html("<a href=\"/target\"><pre><code>line1\n  line2</code></pre></a>")
-                .expect("Failed to parse HTML");
+    #[rstest]
+    #[case(
+        "<a href=\"/target\"><pre><code>line1\n  line2</code></pre></a>",
+        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><div class=\"code-frame\"><code>line1\n  line2</code></div></a>",
+        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><div data-lang=\"rust\"><code>fn main() {}</code></div></a>",
+        "```rust\nfn main() {}\n```\n\n[https://example.com/target](https://example.com/target)"
+    )]
+    fn test_structured_block_link_preserves_code_and_destination(
+        #[case] html: &str,
+        #[case] expected: &str,
+    ) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
         let result = renderers::render_node(
             "https://example.com/articles/page",
@@ -738,10 +769,7 @@ mod tests {
             &mut context,
         )
         .expect("Failed to render structured block link");
-        assert_eq!(
-            result,
-            "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)"
-        );
+        assert_eq!(result, expected);
     }
 
     /// image rendering tests
