@@ -1,4 +1,4 @@
-use super::{Context, Renderer, render_children};
+use super::{Context, Renderer, is_block_element, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
@@ -10,6 +10,8 @@ struct TableRow {
     cells: Vec<String>,
     is_header: bool,
 }
+
+const MAX_COLSPAN: usize = 1_000;
 
 impl Table {
     fn collect_rows(dom: &Dom, id: NodeId, in_header: bool, rows: &mut Vec<(NodeId, bool)>) {
@@ -79,20 +81,70 @@ impl Table {
         Self::escape_cell_pipes(&flattened)
     }
 
+    fn span(attrs: &std::collections::HashMap<String, String>, name: &str) -> Option<usize> {
+        attrs.get(name)?.trim().parse().ok()
+    }
+
+    fn next_available_column(active_rowspans: &[usize], start: usize, width: usize) -> usize {
+        let mut column = start;
+        loop {
+            let blocked = (column..column + width)
+                .find(|&candidate| active_rowspans.get(candidate).copied().unwrap_or(0) > 0);
+            match blocked {
+                Some(blocked_column) => column = blocked_column + 1,
+                None => return column,
+            }
+        }
+    }
+
+    fn has_preceding_inline_content(dom: &Dom, id: NodeId) -> bool {
+        let Ok(Some(parent_id)) = dom.get_parent(id) else {
+            return false;
+        };
+        let Ok(children) = dom.iter_children(parent_id) else {
+            return false;
+        };
+        let children = children.copied().collect::<Vec<_>>();
+        let Some(index) = children.iter().position(|&candidate| candidate == id) else {
+            return false;
+        };
+
+        for &sibling_id in children[..index].iter().rev() {
+            let Some(sibling) = dom.node(sibling_id) else {
+                continue;
+            };
+            match &sibling.data {
+                NodeData::Text(text) if text.trim().is_empty() => continue,
+                NodeData::Text(_) => return true,
+                NodeData::Element { tag, .. } => {
+                    return !is_block_element(tag.local.as_ref());
+                }
+                _ => continue,
+            }
+        }
+
+        false
+    }
+
     fn render_row(
-        &self,
         url: &str,
         dom: &Dom,
         id: NodeId,
         in_header: bool,
         ctx: &Context,
+        remaining_rows: usize,
+        active_rowspans: &mut Vec<usize>,
     ) -> Result<Option<TableRow>, ConvertError> {
         let node = dom.get_node(id)?;
-        let mut cells = Vec::new();
-        let mut has_header_cell = false;
+        let had_active_rowspan = active_rowspans.iter().any(|&remaining| remaining > 0);
+        let mut cells = vec![String::new(); active_rowspans.len()];
+        let mut next_column = 0;
+        let mut source_cell_count = 0;
+        let mut all_cells_are_column_headers = true;
+        let mut has_explicit_column_header = false;
 
         for &child_id in &node.children {
-            let Some(NodeData::Element { tag, .. }) = dom.node(child_id).map(|node| &node.data)
+            let Some(NodeData::Element { tag, attrs }) = dom.node(child_id).map(|node| &node.data)
             else {
                 continue;
             };
@@ -100,19 +152,56 @@ impl Table {
                 continue;
             }
 
-            has_header_cell |= tag.local.as_ref() == "th";
+            source_cell_count += 1;
+            let scope = attrs.get("scope").map(String::as_str).unwrap_or_default();
+            let is_column_header = tag.local.as_ref() == "th"
+                && !matches!(scope.to_ascii_lowercase().as_str(), "row" | "rowgroup");
+            all_cells_are_column_headers &= is_column_header;
+            has_explicit_column_header |= tag.local.as_ref() == "th"
+                && matches!(scope.to_ascii_lowercase().as_str(), "col" | "colgroup");
+
+            let colspan = Self::span(attrs, "colspan")
+                .unwrap_or(1)
+                .clamp(1, MAX_COLSPAN);
+            let rowspan = match Self::span(attrs, "rowspan") {
+                Some(0) => remaining_rows,
+                Some(value) => value.clamp(1, remaining_rows),
+                None => 1,
+            };
+            let column = Self::next_available_column(active_rowspans, next_column, colspan);
+            let end_column = column + colspan;
+            if cells.len() < end_column {
+                cells.resize(end_column, String::new());
+            }
+            if active_rowspans.len() < end_column {
+                active_rowspans.resize(end_column, 0);
+            }
+
             let mut cell_context = ctx.clone();
             let content = render_children(url, dom, child_id, &mut cell_context)?;
-            cells.push(Self::format_cell(&content));
+            cells[column] = Self::format_cell(&content);
+            for active in &mut active_rowspans[column..end_column] {
+                *active = (*active).max(rowspan);
+            }
+            next_column = end_column;
         }
 
-        Ok((!cells.is_empty()).then_some(TableRow {
-            cells,
-            is_header: in_header || has_header_cell,
-        }))
+        for active in active_rowspans.iter_mut() {
+            *active = active.saturating_sub(1);
+        }
+
+        Ok(
+            (source_cell_count > 0 || had_active_rowspan).then_some(TableRow {
+                cells,
+                is_header: in_header
+                    || has_explicit_column_header
+                    || (source_cell_count > 0 && all_cells_are_column_headers),
+            }),
+        )
     }
 
-    fn write_row(output: &mut String, cells: &[String], column_count: usize) {
+    fn write_row(output: &mut String, indent: &str, cells: &[String], column_count: usize) {
+        output.push_str(indent);
         output.push_str("| ");
         for column in 0..column_count {
             if column > 0 {
@@ -163,8 +252,18 @@ impl Table {
         Self::collect_rows(dom, id, false, &mut row_ids);
 
         let mut rows = Vec::with_capacity(row_ids.len());
-        for (row_id, in_header) in row_ids {
-            if let Some(row) = self.render_row(url, dom, row_id, in_header, ctx)? {
+        let mut active_rowspans = Vec::new();
+        let row_count = row_ids.len();
+        for (index, (row_id, in_header)) in row_ids.into_iter().enumerate() {
+            if let Some(row) = Self::render_row(
+                url,
+                dom,
+                row_id,
+                in_header,
+                ctx,
+                row_count - index,
+                &mut active_rowspans,
+            )? {
                 rows.push(row);
             }
         }
@@ -177,23 +276,58 @@ impl Table {
             };
         };
 
+        let list_indent = " ".repeat(ctx.list_depth);
+        let starts_after_list_content = ctx.list_depth > 0 && !ctx.list_first_item;
+        let needs_leading_boundary = starts_after_list_content
+            || (ctx.list_depth == 0 && Self::has_preceding_inline_content(dom, id));
+        let first_line_indent = if starts_after_list_content {
+            list_indent.as_str()
+        } else {
+            ""
+        };
+        let continuation_indent = if ctx.list_depth > 0 {
+            list_indent.as_str()
+        } else {
+            ""
+        };
+
         let mut output = String::new();
-        if !caption.is_empty() {
-            output.push_str(&caption);
+        if needs_leading_boundary {
             output.push_str("\n\n");
         }
+        if !caption.is_empty() {
+            output.push_str(first_line_indent);
+            output.push_str(&caption);
+            output.push_str("\n\n");
+            output.push_str(continuation_indent);
+        }
 
+        let table_first_line_indent = if caption.is_empty() {
+            first_line_indent
+        } else {
+            ""
+        };
         let first_row_is_header = rows.first().is_some_and(|row| row.is_header);
         if first_row_is_header {
-            Self::write_row(&mut output, &rows[0].cells, column_count);
+            Self::write_row(
+                &mut output,
+                table_first_line_indent,
+                &rows[0].cells,
+                column_count,
+            );
         } else {
-            Self::write_row(&mut output, &[], column_count);
+            Self::write_row(&mut output, table_first_line_indent, &[], column_count);
         }
         let delimiter_cells = vec!["---".to_string(); column_count];
-        Self::write_row(&mut output, &delimiter_cells, column_count);
+        Self::write_row(
+            &mut output,
+            continuation_indent,
+            &delimiter_cells,
+            column_count,
+        );
 
         for row in rows.iter().skip(usize::from(first_row_is_header)) {
-            Self::write_row(&mut output, &row.cells, column_count);
+            Self::write_row(&mut output, continuation_indent, &row.cells, column_count);
         }
         output.push('\n');
         Ok(output)
@@ -286,6 +420,36 @@ mod tests {
     }
 
     #[test]
+    fn keeps_row_headers_in_the_table_body() {
+        let html = r#"<table><tr><th scope="row">A</th><td>1</td></tr><tr><th scope="row">B</th><td>2</td></tr></table>"#;
+
+        assert_eq!(
+            render(html),
+            "|  |  |\n| --- | --- |\n| A | 1 |\n| B | 2 |\n\n"
+        );
+    }
+
+    #[test]
+    fn uses_explicit_column_headers_in_a_mixed_row() {
+        let html = r#"<table><tr><th scope="col">Name</th><td>Value</td></tr><tr><td>A</td><td>1</td></tr></table>"#;
+
+        assert_eq!(
+            render(html),
+            "| Name | Value |\n| --- | --- |\n| A | 1 |\n\n"
+        );
+    }
+
+    #[test]
+    fn reserves_columns_occupied_by_rowspan_and_colspan() {
+        let html = r#"<table><tr><td rowspan="2">A</td><td>B</td></tr><tr><td>C</td></tr><tr><td colspan="2">D</td></tr></table>"#;
+
+        assert_eq!(
+            render(html),
+            "|  |  |\n| --- | --- |\n| A | B |\n|  | C |\n| D |  |\n\n"
+        );
+    }
+
+    #[test]
     fn escapes_cell_pipes_and_flattens_block_line_breaks() {
         let html = r#"<table><tr><th>A|B</th><th>Plain</th></tr><tr><td><p>One</p><p>Two | Three</p></td><td>Last<br>Line</td></tr></table>"#;
 
@@ -305,6 +469,23 @@ mod tests {
             "<table><caption>Results</caption><tr><th>A</th></tr><tr><td>1</td></tr></table>";
 
         assert_eq!(render(html), "Results\n\n| A |\n| --- |\n| 1 |\n\n");
+    }
+
+    #[rstest]
+    #[case(
+        "<div>Before<table><tr><th>A</th></tr><tr><td>1</td></tr></table></div>",
+        "Before\n\n| A |\n| --- |\n| 1 |\n\n"
+    )]
+    #[case(
+        "<ul><li><table><tr><th>A</th></tr><tr><td>1</td></tr></table></li></ul>",
+        "- | A |\n  | --- |\n  | 1 |\n\n"
+    )]
+    #[case(
+        "<ol><li>Before<table><tr><th>A</th></tr><tr><td>1</td></tr></table></li></ol>",
+        "1. Before\n\n   | A |\n   | --- |\n   | 1 |\n\n"
+    )]
+    fn keeps_tables_on_valid_block_boundaries(#[case] html: &str, #[case] expected: &str) {
+        assert_eq!(render(html), expected);
     }
 
     #[test]
