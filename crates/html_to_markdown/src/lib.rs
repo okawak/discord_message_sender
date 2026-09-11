@@ -6,7 +6,7 @@ mod renderers;
 mod utils;
 
 use error::ConvertError;
-use frontmatters::get_frontmatter_extractors;
+use frontmatters::{get_frontmatter_extractors, serialize_yaml_string};
 
 /// Convert HTML to Markdown with front-matter extraction
 ///
@@ -28,7 +28,7 @@ use frontmatters::get_frontmatter_extractors;
 /// let keys = ["title"];
 /// let markdown = html_to_markdown::convert(url, html, &keys);
 /// assert!(markdown.is_ok());
-/// assert!(markdown.unwrap().contains("---\ntitle: Title\n---\n\n# Title\n\nContent"));
+/// assert!(markdown.unwrap().contains("---\ntitle: \"Title\"\n---\n\n# Title\n\nContent"));
 /// ```
 ///
 /// if you don't need front-matter, you can pass an empty slice for `keys`.
@@ -63,7 +63,7 @@ pub fn convert(url: &str, html: &str, keys: &[&str]) -> Result<String, ConvertEr
         .filter_map(|(key, extractor)| {
             extractor
                 .extract(url, &dom)
-                .map(|val| format!("{key}: {val}"))
+                .map(|val| format!("{key}: {}", serialize_yaml_string(&val)))
         })
         .collect();
 
@@ -86,4 +86,39 @@ pub fn convert(url: &str, html: &str, keys: &[&str]) -> Result<String, ConvertEr
     let body = renderers::render_node(url, &dom, start_id, &mut ctx)?;
     markdown.push_str(&body);
     Ok(markdown)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convert;
+
+    #[test]
+    fn serializes_frontmatter_values_as_quoted_yaml_strings() {
+        let markdown = convert(
+            "https://example.com/a:b#fragment",
+            r#"<html><head><title>Mapping: #1 &quot;draft&quot; \ path</title></head><body>Content</body></html>"#,
+            &["title", "source"],
+        )
+        .unwrap();
+
+        assert_eq!(
+            markdown,
+            "---\ntitle: \"Mapping: #1 \\\"draft\\\" \\\\ path\"\nsource: \"https://example.com/a:b#fragment\"\n---\n\nContent"
+        );
+    }
+
+    #[test]
+    fn escapes_line_breaks_in_frontmatter_values() {
+        let markdown = convert(
+            "https://example.com/first\nsecond\rthird\tfourth",
+            "<html><body>Content</body></html>",
+            &["source"],
+        )
+        .unwrap();
+
+        assert_eq!(
+            markdown,
+            "---\nsource: \"https://example.com/first\\u000Asecond\\u000Dthird\\u0009fourth\"\n---\n\nContent"
+        );
+    }
 }
