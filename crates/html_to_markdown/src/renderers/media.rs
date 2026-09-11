@@ -877,6 +877,10 @@ mod tests {
         r#"<a href="https://other.example/a)b"><h2><img src="icon.png" alt="a]b"> *literal*</h2></a>"#,
         "## [a\\]b \\*literal\\*](https://other.example/a\\)b)\n\n"
     )]
+    #[case(
+        r#"<a href="/target"><code>a*b</code></a>"#,
+        "[`a*b`](https://example.com/target)"
+    )]
     fn test_markdown_media_delimiters_are_escaped(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();

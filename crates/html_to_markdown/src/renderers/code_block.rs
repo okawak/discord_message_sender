@@ -250,10 +250,13 @@ impl CodeBlock {
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
         let old_preserve = ctx.preserve_whitespace;
+        let old_in_link_label = ctx.in_link_label;
         ctx.preserve_whitespace = true;
-        let content = render_children(url, dom, id, ctx)?;
+        ctx.in_link_label = false;
+        let content = render_children(url, dom, id, ctx);
         ctx.preserve_whitespace = old_preserve;
-        Ok(content)
+        ctx.in_link_label = old_in_link_label;
+        content
     }
 
     /// check if code block has data-lang attribute
