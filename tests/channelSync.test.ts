@@ -5,6 +5,7 @@ import {
   discord_page_size as getDiscordMessagePageSize,
 } from "../pkg/parse_message.js";
 import {
+  getChannelNotificationFailureNotice,
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
   syncChannelMessages,
@@ -69,7 +70,10 @@ describe("syncChannelsSequentially", () => {
         if (channel.id === "222") {
           throw forbidden;
         }
-        return channel.id === "111" ? 2 : 1;
+        return {
+          kind: "success",
+          processedMessageCount: channel.id === "111" ? 2 : 1,
+        };
       },
     );
 
@@ -78,6 +82,7 @@ describe("syncChannelsSequentially", () => {
     expect(summary.failures).toEqual([
       { channel: secondChannel, error: forbidden },
     ]);
+    expect(summary.notificationFailures).toEqual([]);
     const [failure] = summary.failures;
     expect(failure).toBeDefined();
     if (!failure) {
@@ -88,6 +93,67 @@ describe("syncChannelsSequentially", () => {
     );
     expect(getSyncCompletionNotice(summary)).toBe(
       "Discord sync finished. 3 messages saved; 1 channel failed.",
+    );
+  });
+
+  test("keeps saved counts when only the Discord notification fails", async () => {
+    const notificationError = new DiscordApiError(
+      403,
+      "POST",
+      "/channels/111/messages",
+      '{"message":"Missing Permissions","code":50013}',
+    );
+
+    const summary = await syncChannelsSequentially(
+      [firstChannel],
+      async () => ({
+        kind: "notificationFailure",
+        processedMessageCount: 2,
+        error: notificationError,
+      }),
+    );
+
+    expect(summary.processedMessageCount).toBe(2);
+    expect(summary.failures).toEqual([]);
+    expect(summary.notificationFailures).toEqual([
+      {
+        channel: firstChannel,
+        error: notificationError,
+        processedMessageCount: 2,
+      },
+    ]);
+    expect(getSyncCompletionNotice(summary)).toBe(
+      "Discord sync finished. 2 messages saved.",
+    );
+    const [failure] = summary.notificationFailures;
+    expect(failure).toBeDefined();
+    if (!failure) {
+      throw new Error("Expected one notification failure.");
+    }
+    expect(getChannelNotificationFailureNotice(failure)).toBe(
+      'Discord sync notification failed for "first": missing Discord permission (Send Messages). The channel sync completed; retrying is not required.',
+    );
+  });
+
+  test("keeps completed page counts when a channel sync later fails", async () => {
+    const processingError = new Error("later page failed");
+
+    const summary = await syncChannelsSequentially(
+      [firstChannel],
+      async () => ({
+        kind: "syncFailure",
+        processedMessageCount: 2,
+        error: processingError,
+      }),
+    );
+
+    expect(summary).toEqual({
+      processedMessageCount: 2,
+      failures: [{ channel: firstChannel, error: processingError }],
+      notificationFailures: [],
+    });
+    expect(getSyncCompletionNotice(summary)).toBe(
+      "Discord sync finished. 2 messages saved; 1 channel failed.",
     );
   });
 
@@ -114,7 +180,38 @@ describe("syncChannelsSequentially", () => {
     try {
       await syncChannelsSequentially(channels, async (channel) => {
         synced.push(channel.id);
-        throw unauthorized;
+        return {
+          kind: "syncFailure",
+          processedMessageCount: 0,
+          error: unauthorized,
+        };
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBe(unauthorized);
+    expect(synced).toEqual(["111"]);
+  });
+
+  test("stops immediately when a notification reports an invalid token", async () => {
+    const synced: string[] = [];
+    const unauthorized = new DiscordApiError(
+      401,
+      "POST",
+      "/channels/111/messages",
+      '{"message":"401: Unauthorized","code":0}',
+    );
+
+    let caught: unknown;
+    try {
+      await syncChannelsSequentially(channels, async (channel) => {
+        synced.push(channel.id);
+        return {
+          kind: "notificationFailure",
+          processedMessageCount: 2,
+          error: unauthorized,
+        };
       });
     } catch (error) {
       caught = error;
@@ -145,7 +242,7 @@ describe("syncChannelMessages", () => {
     ];
     let fetchCount = 0;
 
-    const count = await syncChannelMessages(
+    const result = await syncChannelMessages(
       {
         botToken: "token",
         channel,
@@ -181,7 +278,7 @@ describe("syncChannelMessages", () => {
       },
     );
 
-    expect(count).toBe(2);
+    expect(result).toEqual({ kind: "success", processedMessageCount: 2 });
     expect(processed).toEqual(["1", "2"]);
     expect(cursors).toEqual(["2"]);
     expect(fetchCount).toBe(1);
@@ -194,7 +291,7 @@ describe("syncChannelMessages", () => {
     const requests: (string | undefined)[] = [];
     const cursors: string[] = [];
 
-    const count = await syncChannelMessages(
+    const result = await syncChannelMessages(
       {
         botToken: "token",
         channel: { id: "111", name: "first" },
@@ -220,7 +317,7 @@ describe("syncChannelMessages", () => {
       },
     );
 
-    expect(count).toBe(100);
+    expect(result).toEqual({ kind: "success", processedMessageCount: 100 });
     expect(requests).toEqual([undefined]);
     expect(processed).toEqual(
       Array.from({ length: 100 }, (_, index) => (10_201 + index).toString()),
@@ -237,7 +334,7 @@ describe("syncChannelMessages", () => {
       const cursors: string[] = [];
       let processCalls = 0;
 
-      const count = await syncChannelMessages(
+      const result = await syncChannelMessages(
         {
           botToken: "token",
           channel: {
@@ -268,7 +365,10 @@ describe("syncChannelMessages", () => {
         },
       );
 
-      expect(count).toBe(newMessageCount);
+      expect(result).toEqual({
+        kind: "success",
+        processedMessageCount: newMessageCount,
+      });
       expect(processed).toEqual(
         Array.from({ length: newMessageCount }, (_, index) =>
           (cursor + index + 1).toString(),
@@ -323,43 +423,43 @@ describe("syncChannelMessages", () => {
   test("persists the fetched cursor before a notification failure", async () => {
     const channel = { id: "111", name: "first" };
     const cursors: string[] = [];
+    const notificationError = new Error("Missing Send Messages");
 
-    let caught: unknown;
-    try {
-      await syncChannelMessages(
-        {
-          botToken: "token",
-          channel,
-          sendSyncNotifications: true,
-          notificationTemplates: {
-            saved: "saved",
-            noNew: "none",
-          },
+    const result = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel,
+        sendSyncNotifications: true,
+        notificationTemplates: {
+          saved: "saved",
+          noNew: "none",
         },
-        {
-          fetchMessages: async () =>
-            messagePage([
-              {
-                id: "message",
-                content: "content",
-                timestamp: "2026-06-27T00:00:00Z",
-              },
-            ]),
-          postNotification: async () => {
-            throw new Error("Missing Send Messages");
-          },
-          processMessages: async (pageMessages) => pageMessages.length,
-          persistCursor: async (_currentChannel, messageId) => {
-            cursors.push(messageId);
-          },
-          sleep: async () => {},
+      },
+      {
+        fetchMessages: async () =>
+          messagePage([
+            {
+              id: "message",
+              content: "content",
+              timestamp: "2026-06-27T00:00:00Z",
+            },
+          ]),
+        postNotification: async () => {
+          throw notificationError;
         },
-      );
-    } catch (error) {
-      caught = error;
-    }
+        processMessages: async (pageMessages) => pageMessages.length,
+        persistCursor: async (_currentChannel, messageId) => {
+          cursors.push(messageId);
+        },
+        sleep: async () => {},
+      },
+    );
 
-    expect(caught).toBeInstanceOf(Error);
+    expect(result).toEqual({
+      kind: "notificationFailure",
+      processedMessageCount: 1,
+      error: notificationError,
+    });
     expect(cursors).toEqual(["message"]);
   });
 
@@ -367,51 +467,96 @@ describe("syncChannelMessages", () => {
     const cursors: string[] = [];
     const processingError = new Error("URL fetch failed");
 
-    let caught: unknown;
-    try {
-      await syncChannelMessages(
-        {
-          botToken: "token",
-          channel: { id: "111", name: "first" },
-          sendSyncNotifications: false,
-          notificationTemplates: {
-            saved: "saved",
-            noNew: "none",
-          },
+    const result = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel: { id: "111", name: "first" },
+        sendSyncNotifications: false,
+        notificationTemplates: {
+          saved: "saved",
+          noNew: "none",
         },
-        {
-          fetchMessages: async () =>
-            messagePage([
-              {
-                id: "message",
-                content: "!url https://example.com",
-                timestamp: "2026-06-27T00:00:00Z",
-              },
-            ]),
-          postNotification: async () => {
-            throw new Error("Notification should not be sent.");
-          },
-          processMessages: async () => {
-            throw processingError;
-          },
-          persistCursor: async (_currentChannel, messageId) => {
-            cursors.push(messageId);
-          },
-          sleep: async () => {},
+      },
+      {
+        fetchMessages: async () =>
+          messagePage([
+            {
+              id: "message",
+              content: "!url https://example.com",
+              timestamp: "2026-06-27T00:00:00Z",
+            },
+          ]),
+        postNotification: async () => {
+          throw new Error("Notification should not be sent.");
         },
-      );
-    } catch (error) {
-      caught = error;
-    }
+        processMessages: async () => {
+          throw processingError;
+        },
+        persistCursor: async (_currentChannel, messageId) => {
+          cursors.push(messageId);
+        },
+        sleep: async () => {},
+      },
+    );
 
-    expect(caught).toBe(processingError);
+    expect(result).toEqual({
+      kind: "syncFailure",
+      processedMessageCount: 0,
+      error: processingError,
+    });
     expect(cursors).toEqual([]);
+  });
+
+  test("keeps the count from completed pages when a later page fails", async () => {
+    const cursor = 10_000;
+    const history = createHistory(cursor, 150);
+    const processingError = new Error("later page failed");
+    const cursors: string[] = [];
+    let processCalls = 0;
+
+    const result = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel: {
+          id: "111",
+          name: "first",
+          lastProcessedMessageId: cursor.toString(),
+        },
+        sendSyncNotifications: false,
+        notificationTemplates: { saved: "saved", noNew: "none" },
+      },
+      {
+        fetchMessages: async (_token, _channelId, before) =>
+          messagePage(getHistoryPage(history, before)),
+        postNotification: async () => {
+          throw new Error("Notification should not be sent.");
+        },
+        processMessages: async (pageMessages) => {
+          processCalls++;
+          if (processCalls === 2) {
+            throw processingError;
+          }
+          return pageMessages.length;
+        },
+        persistCursor: async (_currentChannel, messageId) => {
+          cursors.push(messageId);
+        },
+        sleep: async () => {},
+      },
+    );
+
+    expect(result).toEqual({
+      kind: "syncFailure",
+      processedMessageCount: 50,
+      error: processingError,
+    });
+    expect(cursors).toEqual(["10050"]);
   });
 
   test("does not count messages that were already saved", async () => {
     const cursors: string[] = [];
 
-    const count = await syncChannelMessages(
+    const result = await syncChannelMessages(
       {
         botToken: "token",
         channel: { id: "111", name: "first" },
@@ -441,7 +586,7 @@ describe("syncChannelMessages", () => {
       },
     );
 
-    expect(count).toBe(0);
+    expect(result).toEqual({ kind: "success", processedMessageCount: 0 });
     expect(cursors).toEqual(["duplicate"]);
   });
 
@@ -449,7 +594,7 @@ describe("syncChannelMessages", () => {
     const cursors: string[] = [];
     let notificationCount = 0;
 
-    const count = await syncChannelMessages(
+    const result = await syncChannelMessages(
       {
         botToken: "token",
         channel: { id: "111", name: "first" },
@@ -480,7 +625,7 @@ describe("syncChannelMessages", () => {
       },
     );
 
-    expect(count).toBe(1);
+    expect(result).toEqual({ kind: "success", processedMessageCount: 1 });
     expect(cursors).toEqual(["message"]);
     expect(notificationCount).toBe(0);
   });

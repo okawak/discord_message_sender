@@ -1,6 +1,7 @@
 import {
   type DiscordChannelSettings,
   type DiscordMessage,
+  channel_display_name as getChannelDisplayName,
   type NotificationTemplates,
   type ProcessedMessage,
   select_message_page,
@@ -48,15 +49,29 @@ export interface ChannelSyncFailure {
   error: unknown;
 }
 
+export type SingleChannelSyncResult =
+  | { kind: "success"; processedMessageCount: number }
+  | { kind: "syncFailure"; processedMessageCount: number; error: unknown }
+  | {
+      kind: "notificationFailure";
+      processedMessageCount: number;
+      error: unknown;
+    };
+
+export interface ChannelNotificationFailure extends ChannelSyncFailure {
+  processedMessageCount: number;
+}
+
 export interface ChannelSyncSummary {
   processedMessageCount: number;
   failures: ChannelSyncFailure[];
+  notificationFailures: ChannelNotificationFailure[];
 }
 
 export async function syncChannelMessages(
   options: SingleChannelSyncOptions,
   dependencies: SingleChannelSyncDependencies,
-): Promise<number> {
+): Promise<SingleChannelSyncResult> {
   const { botToken, channel, sendSyncNotifications, notificationTemplates } =
     options;
   const lastMessageId = channel.lastProcessedMessageId;
@@ -64,51 +79,89 @@ export async function syncChannelMessages(
   const pages: DiscordMessage[][] = [];
   let before: string | undefined;
 
-  while (true) {
-    const page = await dependencies.fetchMessages(botToken, channel.id, before);
-    const selection = select_message_page(page.messages, lastMessageId);
-    if (selection.messages.length > 0) pages.push(selection.messages);
-    if (!selection.before) break;
-    before = selection.before;
-    if (page.nextRequestDelayMs > 0) {
-      await dependencies.sleep(page.nextRequestDelayMs);
+  try {
+    while (true) {
+      const page = await dependencies.fetchMessages(
+        botToken,
+        channel.id,
+        before,
+      );
+      const selection = select_message_page(page.messages, lastMessageId);
+      if (selection.messages.length > 0) pages.push(selection.messages);
+      if (!selection.before) break;
+      before = selection.before;
+      if (page.nextRequestDelayMs > 0) {
+        await dependencies.sleep(page.nextRequestDelayMs);
+      }
     }
-  }
 
-  for (const batch of sync_batches(pages)) {
-    processedMessageCount += await dependencies.processMessages(
-      batch.messages,
-      channel,
-    );
-    // Persist only after all storage operations for this page have succeeded.
-    await dependencies.persistCursor(channel, batch.cursor);
+    for (const batch of sync_batches(pages)) {
+      processedMessageCount += await dependencies.processMessages(
+        batch.messages,
+        channel,
+      );
+      // Persist only after all storage operations for this page have succeeded.
+      await dependencies.persistCursor(channel, batch.cursor);
+    }
+  } catch (syncError) {
+    return { kind: "syncFailure", processedMessageCount, error: syncError };
   }
 
   if (sendSyncNotifications) {
-    await dependencies.postNotification(
-      botToken,
-      channel.id,
-      sync_notification_text(
-        notificationTemplates,
-        channel,
+    try {
+      await dependencies.postNotification(
+        botToken,
+        channel.id,
+        sync_notification_text(
+          notificationTemplates,
+          channel,
+          processedMessageCount,
+        ),
+      );
+    } catch (notificationError) {
+      return {
+        kind: "notificationFailure",
         processedMessageCount,
-      ),
-    );
+        error: notificationError,
+      };
+    }
   }
 
-  return processedMessageCount;
+  return { kind: "success", processedMessageCount };
 }
 
 export async function syncChannelsSequentially(
   channels: readonly DiscordChannelSettings[],
-  syncChannel: (channel: DiscordChannelSettings) => Promise<number>,
+  syncChannel: (
+    channel: DiscordChannelSettings,
+  ) => Promise<SingleChannelSyncResult>,
 ): Promise<ChannelSyncSummary> {
   let processedMessageCount = 0;
   const failures: ChannelSyncFailure[] = [];
+  const notificationFailures: ChannelNotificationFailure[] = [];
 
   for (const channel of channels) {
     try {
-      processedMessageCount += await syncChannel(channel);
+      const result = await syncChannel(channel);
+      processedMessageCount += result.processedMessageCount;
+
+      if (
+        result.kind !== "success" &&
+        result.error instanceof DiscordApiError &&
+        result.error.status === 401
+      ) {
+        throw result.error;
+      }
+
+      if (result.kind === "syncFailure") {
+        failures.push({ channel, error: result.error });
+      } else if (result.kind === "notificationFailure") {
+        notificationFailures.push({
+          channel,
+          error: result.error,
+          processedMessageCount: result.processedMessageCount,
+        });
+      }
     } catch (error) {
       if (error instanceof DiscordApiError && error.status === 401) {
         throw error;
@@ -117,20 +170,27 @@ export async function syncChannelsSequentially(
     }
   }
 
-  return { processedMessageCount, failures };
+  return { processedMessageCount, failures, notificationFailures };
+}
+
+function getFailureReason(error: unknown): string {
+  return error instanceof DiscordApiError
+    ? getDiscordApiFailureNotice(error)
+    : error instanceof MessageStorageError
+      ? error.message
+      : "unexpected error; see console for details";
 }
 
 export function getChannelSyncFailureNotice(
   failure: ChannelSyncFailure,
 ): string {
-  const reason =
-    failure.error instanceof DiscordApiError
-      ? getDiscordApiFailureNotice(failure.error)
-      : failure.error instanceof MessageStorageError
-        ? failure.error.message
-        : "unexpected error; see console for details";
+  return sync_failure_notice(failure.channel, getFailureReason(failure.error));
+}
 
-  return sync_failure_notice(failure.channel, reason);
+export function getChannelNotificationFailureNotice(
+  failure: ChannelNotificationFailure,
+): string {
+  return `Discord sync notification failed for "${getChannelDisplayName(failure.channel)}": ${getFailureReason(failure.error)}. The channel sync completed; retrying is not required.`;
 }
 
 export function getSyncCompletionNotice(summary: ChannelSyncSummary): string {
