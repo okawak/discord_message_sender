@@ -11,6 +11,27 @@ impl Inline {
     fn update_last_char(&self, ctx: &mut Context, content: &str) {
         ctx.last_char = content.chars().last();
     }
+
+    /// Keeps collapsible boundary whitespace outside Markdown emphasis markers.
+    /// Whitespace inside the markers can prevent CommonMark parsers from
+    /// recognizing the delimiter run.
+    fn wrap_with_marker(&self, content: &str, marker: &str) -> String {
+        let trimmed = content.trim_matches(char::is_whitespace);
+        if trimmed.is_empty() {
+            return String::new();
+        }
+
+        let leading = content.starts_with(char::is_whitespace);
+        let trailing = content.ends_with(char::is_whitespace);
+        format!(
+            "{}{}{}{}{}",
+            if leading { " " } else { "" },
+            marker,
+            trimmed,
+            marker,
+            if trailing { " " } else { "" }
+        )
+    }
 }
 
 impl Renderer for Inline {
@@ -44,13 +65,13 @@ impl Renderer for Inline {
                 ctx.in_inline = true;
                 let content = render_children(url, dom, id, ctx)?;
                 ctx.in_inline = old_inline_status;
-                format!("**{content}**")
+                self.wrap_with_marker(&content, "**")
             }
             "em" | "i" => {
                 ctx.in_inline = true;
                 let content = render_children(url, dom, id, ctx)?;
                 ctx.in_inline = old_inline_status;
-                format!("*{content}*")
+                self.wrap_with_marker(&content, "*")
             }
             "br" => "<br>".to_string(),
             _ => {

@@ -326,6 +326,10 @@ mod tests {
     #[case("<p>A&nbsp;B 👩‍💻 A‌B</p>", "A B 👩‍💻 A‌B\n\n")]
     #[case("<p>A&nbsp;<strong>B</strong></p>", "A **B**\n\n")]
     #[case("<p><strong>A</strong>&nbsp;B</p>", "**A** B\n\n")]
+    #[case("<p>A<strong>&nbsp;B</strong></p>", "A **B**\n\n")]
+    #[case("<p><strong>A&nbsp;</strong>B</p>", "**A** B\n\n")]
+    #[case("<p>A<em>&nbsp;B</em></p>", "A *B*\n\n")]
+    #[case("<p><em>A&nbsp;</em>B</p>", "*A* B\n\n")]
     #[case("<p>A   <strong>B</strong></p>", "A **B**\n\n")]
     #[case("<p>Hello \n<br>\n world</p>", "Hello<br>world\n\n")]
     #[case(
