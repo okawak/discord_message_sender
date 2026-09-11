@@ -177,6 +177,8 @@ impl Media {
                     let tag_name = tag.local.as_ref();
                     if Self::is_ignored_element(tag_name, attrs) {
                         false
+                    } else if matches!(tag_name, "code" | "pre") {
+                        !dom.collect_text_content(child_id).trim().is_empty()
                     } else if tag_name == "img" {
                         !self.get_alt_text(attrs).is_empty()
                     } else {
@@ -203,6 +205,15 @@ impl Media {
 
             let tag_name = tag.local.as_ref();
             if Self::is_ignored_element(tag_name, attrs) {
+                return false;
+            }
+            if tag_name == "code"
+                || Self::is_structured_block_element(tag_name)
+                || attrs.contains_key("data-lang")
+                || attrs
+                    .get("class")
+                    .is_some_and(|class| class.contains("code-frame"))
+            {
                 return false;
             }
             if tag_name == "img" {
@@ -968,6 +979,10 @@ mod tests {
     #[case(
         "<a href=\"/target\"><div class=\"sidebar\"><pre>ignored</pre></div><span>Details</span></a>",
         "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><div><code><img src=\"/icon.png\" alt=\"Icon\"></code><span>Details</span></div></a>",
+        "[`![Icon](https://example.com/icon.png)`Details](https://example.com/target)"
     )]
     fn test_complex_link_boundaries(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
