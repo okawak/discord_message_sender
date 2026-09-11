@@ -135,6 +135,49 @@ impl Table {
         }
     }
 
+    fn is_definitely_empty(dom: &Dom, id: NodeId) -> bool {
+        let Some(node) = dom.node(id) else {
+            return true;
+        };
+
+        match &node.data {
+            NodeData::Text(text) => text.trim().is_empty(),
+            NodeData::Element { tag, .. } => {
+                let tag_name = tag.local.as_ref();
+                if matches!(tag_name, "script" | "style" | "noscript" | "footer" | "nav") {
+                    return true;
+                }
+
+                matches!(
+                    tag_name,
+                    "p" | "h1"
+                        | "h2"
+                        | "h3"
+                        | "h4"
+                        | "h5"
+                        | "h6"
+                        | "div"
+                        | "section"
+                        | "summary"
+                        | "article"
+                        | "main"
+                        | "header"
+                        | "span"
+                        | "del"
+                        | "ins"
+                        | "mark"
+                        | "sub"
+                        | "sup"
+                        | "small"
+                ) && node
+                    .children
+                    .iter()
+                    .all(|&child_id| Self::is_definitely_empty(dom, child_id))
+            }
+            _ => true,
+        }
+    }
+
     fn has_preceding_unseparated_content(dom: &Dom, id: NodeId) -> bool {
         let Ok(Some(parent_id)) = dom.get_parent(id) else {
             return false;
@@ -151,8 +194,10 @@ impl Table {
             let Some(sibling) = dom.node(sibling_id) else {
                 continue;
             };
+            if Self::is_definitely_empty(dom, sibling_id) {
+                continue;
+            }
             match &sibling.data {
-                NodeData::Text(text) if text.trim().is_empty() => continue,
                 NodeData::Text(_) => return true,
                 NodeData::Element { tag, .. } => {
                     let tag_name = tag.local.as_ref();
@@ -548,6 +593,14 @@ mod tests {
     #[case(
         "Before<table><caption>Results</caption></table>",
         "Before\n\nResults\n\n"
+    )]
+    #[case(
+        "Before<p></p><table><tr><th>A</th></tr><tr><td>1</td></tr></table>",
+        "Before\n\n| A |\n| --- |\n| 1 |\n\n"
+    )]
+    #[case(
+        "Before<nav>Ignored</nav><div><span></span></div><table><tr><th>A</th></tr></table>",
+        "Before\n\n| A |\n| --- |\n\n"
     )]
     #[case(
         "<ul><li><table><tr><th>A</th></tr><tr><td>1</td></tr></table></li></ul>",
