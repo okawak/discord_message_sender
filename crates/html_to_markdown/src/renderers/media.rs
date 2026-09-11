@@ -2,7 +2,10 @@ use super::{Context, Renderer, is_block_element, render_children, render_node};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::{filtering, format_list_content},
+    utils::{
+        escape_markdown_label_text, escape_markdown_link_destination, filtering,
+        format_list_content,
+    },
 };
 use std::{borrow::Cow, collections::HashMap};
 
@@ -266,10 +269,12 @@ impl Media {
         } else {
             String::new()
         };
+        let label = escape_markdown_label_text(resolved_url);
+        let destination = escape_markdown_link_destination(resolved_url);
         if content.is_empty() {
-            format!("{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
+            format!("{indent}[{label}]({destination}){trailing_separator}")
         } else {
-            format!("{content}\n\n{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
+            format!("{content}\n\n{indent}[{label}]({destination}){trailing_separator}")
         }
     }
 
@@ -454,7 +459,8 @@ impl Renderer for Media {
                         String::new()
                     };
 
-                    Ok(format!("[{content}]({resolved_url}){trailing_separator}"))
+                    let destination = escape_markdown_link_destination(&resolved_url);
+                    Ok(format!("[{content}]({destination}){trailing_separator}"))
                 } else {
                     ctx.in_inline = true;
                     let content = render_children(url, dom, id, ctx)?;
@@ -464,7 +470,12 @@ impl Renderer for Media {
             }
             "img" => {
                 if ctx.in_heading {
-                    return Ok(self.get_alt_text(attrs));
+                    let alt = self.get_alt_text(attrs);
+                    return if ctx.in_link_label {
+                        Ok(escape_markdown_label_text(&alt).into_owned())
+                    } else {
+                        Ok(alt)
+                    };
                 }
 
                 let alt = self.get_alt_text(attrs);
@@ -472,13 +483,18 @@ impl Renderer for Media {
 
                 // check link context
                 let result = if let Some(link_info) = &ctx.link_info {
+                    let link_destination = escape_markdown_link_destination(link_info);
+                    let escaped_alt = escape_markdown_label_text(&alt);
                     if let Some(resolved_src) = self.resolve_url(url, &src) {
-                        format!("[![{alt}]({resolved_src})]({link_info})",)
+                        let image_destination = escape_markdown_link_destination(&resolved_src);
+                        format!("[![{escaped_alt}]({image_destination})]({link_destination})",)
                     } else {
-                        format!("[{alt}]({link_info})")
+                        format!("[{escaped_alt}]({link_destination})")
                     }
                 } else if let Some(resolved_src) = self.resolve_url(url, &src) {
-                    format!("![{alt}]({resolved_src})")
+                    let escaped_alt = escape_markdown_label_text(&alt);
+                    let image_destination = escape_markdown_link_destination(&resolved_src);
+                    format!("![{escaped_alt}]({image_destination})")
                 } else {
                     alt
                 };
@@ -841,6 +857,40 @@ mod tests {
         let mut context = Context::default();
         let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
             .expect("Failed to render external links");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        r#"<a href="https://other.example/a)b">a]b *literal*</a>"#,
+        r#"[a\]b \*literal\*](https://other.example/a\)b)"#
+    )]
+    #[case(
+        r#"<a href="https://other.example/(a)"><strong>Bold</strong> [literal]</a>"#,
+        r#"[**Bold** \[literal\]](https://other.example/\(a\))"#
+    )]
+    #[case(
+        r#"<img src="https://other.example/a)b" alt="a]b *literal*">"#,
+        "![a\\]b \\*literal\\*](https://other.example/a\\)b)\n\n"
+    )]
+    #[case(
+        r#"<a href="https://other.example/a)b"><h2><img src="icon.png" alt="a]b"> *literal*</h2></a>"#,
+        "## [a\\]b \\*literal\\*](https://other.example/a\\)b)\n\n"
+    )]
+    #[case(
+        r#"<a href="/target"><code>a*b</code></a>"#,
+        "[`a*b`](https://example.com/target)"
+    )]
+    fn test_markdown_media_delimiters_are_escaped(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render escaped media");
         assert_eq!(result, expected);
     }
 

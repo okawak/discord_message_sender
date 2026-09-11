@@ -12,7 +12,7 @@ pub mod table;
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::{cow_to_string, normalize_html_text},
+    utils::{cow_to_string, escape_markdown_label_text, normalize_html_text},
 };
 use std::collections::HashMap;
 use std::default::Default;
@@ -298,7 +298,11 @@ pub fn render_children(
         }
         NodeData::Text(text) => {
             if ctx.preserve_whitespace {
-                Ok(text.clone())
+                if ctx.in_link_label {
+                    Ok(escape_markdown_label_text(text).into_owned())
+                } else {
+                    Ok(text.clone())
+                }
                 //Ok(format_list_content(ctx, text))
             } else {
                 let normalized = normalize_html_text(text, ctx.in_inline)
@@ -306,7 +310,11 @@ pub fn render_children(
                     .unwrap_or_default();
 
                 //Ok(format_list_content(ctx, &normalized))
-                Ok(normalized)
+                if ctx.in_link_label {
+                    Ok(escape_markdown_label_text(&normalized).into_owned())
+                } else {
+                    Ok(normalized)
+                }
             }
         }
         NodeData::Document => {

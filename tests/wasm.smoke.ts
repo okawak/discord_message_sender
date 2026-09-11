@@ -104,6 +104,24 @@ if (
   throw new Error("WASM HTML conversion used an unsafe code delimiter.");
 }
 
+const escapedMedia = convertHtml(
+  "https://example.com",
+  '<img src="https://other.example/a)b" alt="a]b *literal*"><a href="https://other.example/a)b">a]b *literal*</a>',
+);
+const renderedMedia = Bun.markdown.html(escapedMedia);
+if (
+  !renderedMedia.includes(
+    '<img src="https://other.example/a)b" alt="a]b *literal*"',
+  ) ||
+  !renderedMedia.includes(
+    '<a href="https://other.example/a)b">a]b *literal*</a>',
+  )
+) {
+  throw new Error(
+    "WASM HTML conversion did not preserve escaped media values.",
+  );
+}
+
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;
 for (let index = 0; index < 100; index += 1) {
   convertHtml("https://example.com", repeatedHtml);

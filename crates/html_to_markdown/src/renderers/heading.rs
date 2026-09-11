@@ -2,7 +2,7 @@ use super::{Context, Renderer, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::{cow_to_string, normalize_heading_content},
+    utils::{cow_to_string, escape_markdown_link_destination, normalize_heading_content},
 };
 
 pub struct Heading;
@@ -28,14 +28,17 @@ impl Heading {
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
         let old_in_heading = ctx.in_heading;
+        let old_in_link_label = ctx.in_link_label;
         let old_preserve_whitespace = ctx.preserve_whitespace;
 
         ctx.in_heading = true;
+        ctx.in_link_label |= ctx.link_info.is_some();
         ctx.preserve_whitespace = true;
 
         let content = render_children(url, dom, id, ctx)?;
 
         ctx.in_heading = old_in_heading;
+        ctx.in_link_label = old_in_link_label;
         ctx.preserve_whitespace = old_preserve_whitespace;
 
         Ok(cow_to_string(normalize_heading_content(&content)))
@@ -56,7 +59,10 @@ impl Heading {
         let newlines = if needs_separation { "\n\n" } else { "" };
 
         match link_url {
-            Some(url) => format!("{newlines}{level} [{trimmed}]({url})\n\n"),
+            Some(url) => {
+                let destination = escape_markdown_link_destination(url);
+                format!("{newlines}{level} [{trimmed}]({destination})\n\n")
+            }
             None => format!("{newlines}{level} {trimmed}\n\n"),
         }
     }
