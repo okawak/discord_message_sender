@@ -19,7 +19,10 @@ import {
 import { fetchMessages, postNotification } from "./discordApi";
 import { migrateSettings, persistChannelCursor } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
-import { saveProcessedMessages } from "./vault";
+import {
+  getExistingIndividualMessageIds,
+  saveProcessedMessages,
+} from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./wasmCore";
 
@@ -124,6 +127,21 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     channel: DiscordChannelSettings,
     settings: MessageSyncSettingsSnapshot,
   ): Promise<number> {
+    const messageDirectory = createChannelDirectory(
+      settings.messageDirectoryName,
+      channel,
+    );
+    const clippingDirectory = createChannelDirectory(
+      settings.clippingDirectoryName,
+      channel,
+    );
+    // Clippings are always individual files, so skip their IDs before parsing
+    // to avoid fetching the same external URL again during a retry.
+    const existingClippingIds = getExistingIndividualMessageIds(
+      this.app.vault,
+      clippingDirectory,
+    );
+
     return processDiscordMessageBatch(
       messages,
       (message) =>
@@ -131,11 +149,12 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       (processedMessages) =>
         saveProcessedMessages(
           this.app.vault,
-          createChannelDirectory(settings.messageDirectoryName, channel),
-          createChannelDirectory(settings.clippingDirectoryName, channel),
+          messageDirectory,
+          clippingDirectory,
           processedMessages,
           settings,
         ),
+      existingClippingIds,
     );
   }
 

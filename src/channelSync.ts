@@ -144,12 +144,16 @@ export async function processDiscordMessageBatch(
   messages: readonly DiscordMessage[],
   parseMessage: (message: DiscordMessage) => Promise<ProcessedMessage>,
   saveMessages: (messages: readonly ProcessedMessage[]) => Promise<number>,
+  alreadyProcessedMessageIds: ReadonlySet<string> = new Set(),
 ): Promise<number> {
   const processedMessages: ProcessedMessage[] = [];
 
   try {
     for (const message of messages) {
-      if (!should_process_message(message)) {
+      if (
+        !should_process_message(message) ||
+        alreadyProcessedMessageIds.has(message.id)
+      ) {
         continue;
       }
 
