@@ -1,4 +1,4 @@
-use super::{Context, Renderer, render_children, render_node};
+use super::{Context, Renderer, is_block_element, render_children, render_node};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
@@ -107,46 +107,8 @@ impl Media {
             .unwrap_or_default()
     }
 
-    fn is_block_element(tag_name: &str) -> bool {
-        matches!(
-            tag_name,
-            "address"
-                | "article"
-                | "aside"
-                | "blockquote"
-                | "details"
-                | "div"
-                | "dl"
-                | "dt"
-                | "dd"
-                | "fieldset"
-                | "figcaption"
-                | "figure"
-                | "footer"
-                | "form"
-                | "h1"
-                | "h2"
-                | "h3"
-                | "h4"
-                | "h5"
-                | "h6"
-                | "header"
-                | "hr"
-                | "li"
-                | "main"
-                | "nav"
-                | "ol"
-                | "p"
-                | "pre"
-                | "section"
-                | "summary"
-                | "table"
-                | "ul"
-        )
-    }
-
     fn has_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
-        Self::contains_element(dom, node_id, Self::is_block_element)
+        Self::contains_element(dom, node_id, is_block_element)
     }
 
     fn is_card_link_element(tag_name: &str) -> bool {
@@ -477,7 +439,18 @@ impl Renderer for Media {
                         content
                     };
 
-                    Ok(format!("[{content}]({resolved_url})"))
+                    let trailing_separator =
+                        if has_block_content && self.has_following_content(url, dom, id, ctx)? {
+                            if ctx.list_depth == 0 {
+                                "\n\n".to_string()
+                            } else {
+                                format!("\n{}", " ".repeat(ctx.list_depth))
+                            }
+                        } else {
+                            String::new()
+                        };
+
+                    Ok(format!("[{content}]({resolved_url}){trailing_separator}"))
                 } else {
                     ctx.in_inline = true;
                     let content = render_children(url, dom, id, ctx)?;
@@ -914,6 +887,26 @@ mod tests {
         r#"<a href="/target"><p>Before</p>After</a>"#,
         "[Before After](https://example.com/target)"
     )]
+    #[case(
+        r#"<a href="/target">Before<figure>After</figure></a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><figure>Before</figure>After</a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<address>Middle</address>After</a>"#,
+        "[Before Middle After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<details>Middle</details>After</a>"#,
+        "[Before Middle After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<hr>After</a>"#,
+        "[Before After](https://example.com/target)"
+    )]
     fn test_text_block_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
@@ -964,6 +957,10 @@ mod tests {
     #[case(
         "<a href=\"/target\"><pre><code>x</code></pre></a>After",
         "```\nx\n```\n\n[https://example.com/target](https://example.com/target)\n\nAfter"
+    )]
+    #[case(
+        "<a href=\"/target\"><p>Before</p></a>After",
+        "[Before](https://example.com/target)\n\nAfter"
     )]
     #[case(
         "<a href=\"/target\"><h2></h2><p>Details</p></a>",
