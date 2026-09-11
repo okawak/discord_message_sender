@@ -6,128 +6,53 @@ use crate::{
 };
 use std::collections::HashMap;
 
+#[cfg(not(target_arch = "wasm32"))]
+use url::Url;
+
+// Use the host's WHATWG implementation instead of embedding IDNA tables in the WASM bundle.
+#[cfg(target_arch = "wasm32")]
+mod browser_url {
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen]
+    extern "C" {
+        #[allow(clippy::upper_case_acronyms)]
+        pub type URL;
+
+        #[wasm_bindgen(constructor, catch)]
+        pub fn new(reference: &str, base: &str) -> Result<URL, JsValue>;
+
+        #[wasm_bindgen(method, getter)]
+        pub fn href(this: &URL) -> String;
+    }
+}
+
 pub struct Media;
 
 impl Media {
     /// Resolves a relative URL to an absolute URL using the base URL
     fn resolve_url(&self, base_url: &str, url: &str) -> Result<String, ConvertError> {
-        if url.starts_with("https://")
-            || url.starts_with("mailto:")
-            || url.starts_with("tel:")
-            || url.starts_with("ftp:")
+        let url = url.trim();
+        if !base_url
+            .trim()
+            .get(..8)
+            .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
         {
             return Ok(url.to_string());
         }
 
-        let clean_base = base_url.split('#').next().unwrap_or(base_url);
-        let clean_base = clean_base.split('?').next().unwrap_or(clean_base);
-
-        // extension check
-        let base_for_join = if self.has_file_extension(clean_base) {
-            let trimmed = clean_base
-                .rsplit_once('/')
-                .map(|(base, _)| format!("{base}/"))
-                .ok_or_else(|| {
-                    ConvertError::InvalidUrl(format!("File extension seems invalid {clean_base}"))
-                })?;
-            trimmed.to_string()
-        } else if clean_base.ends_with('/') {
-            clean_base.to_string()
-        } else {
-            format!("{clean_base}/")
-        };
-
-        match self.url_join(&base_for_join, url) {
-            Ok(resolved) => Ok(resolved),
-            Err(_) => Ok(url.to_string()),
-        }
+        Ok(Self::resolve_standard_url(base_url.trim(), url).unwrap_or_else(|| url.to_string()))
     }
 
-    fn has_file_extension(&self, url: &str) -> bool {
-        // https:// included at lest two slashes
-        if url.matches('/').count() <= 2 {
-            return false;
-        }
-
-        url.split('/')
-            .next_back()
-            .map(|segment| segment.contains('.') && segment.split('.').count() > 1)
-            .unwrap_or(false)
+    #[cfg(not(target_arch = "wasm32"))]
+    fn resolve_standard_url(base_url: &str, url: &str) -> Option<String> {
+        Url::parse(base_url).ok()?.join(url).ok().map(Into::into)
     }
 
-    fn url_join(&self, base: &str, relative: &str) -> Result<String, ConvertError> {
-        let (host, path) = self.parse_url(base)?;
-
-        if relative.starts_with("/") {
-            Ok(format!("https://{host}{relative}"))
-        } else if relative.starts_with("./") {
-            let rel_path = relative.strip_prefix("./").ok_or_else(|| {
-                ConvertError::InvalidUrl(format!("Cannot strip ./ from {relative}"))
-            })?;
-            if path.ends_with('/') {
-                Ok(format!("https://{host}{path}{rel_path}"))
-            } else {
-                Ok(format!("https://{host}{path}/{rel_path}"))
-            }
-        } else if relative.starts_with("../") {
-            self.resolve_parent_path(&host, &path, relative)
-        } else if path.ends_with('/') {
-            Ok(format!("https://{host}{path}{relative}"))
-        } else {
-            Ok(format!("https://{host}{path}/{relative}"))
-        }
-    }
-
-    fn parse_url(&self, url: &str) -> Result<(String, String), ConvertError> {
-        if !url.starts_with("https://") {
-            return Err(ConvertError::InvalidUrl(format!(
-                "Not HTTPS protocol: {url}"
-            )));
-        }
-
-        let rest_url = url.strip_prefix("https://").ok_or_else(|| {
-            ConvertError::InvalidUrl(format!("Failed to strip https:// from {url}"))
-        })?;
-        let (host, path) = if let Some(slash_pos) = rest_url.find('/') {
-            (&rest_url[..slash_pos], &rest_url[slash_pos..])
-        } else {
-            (rest_url, "/")
-        };
-        Ok((host.to_string(), path.to_string()))
-    }
-
-    fn resolve_parent_path(
-        &self,
-        host: &str,
-        path: &str,
-        relative: &str,
-    ) -> Result<String, ConvertError> {
-        // split by '/' and collect as Vec
-        let mut path_parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-        let mut rel_parts: Vec<&str> = relative.split('/').collect();
-
-        while let Some(&part) = rel_parts.first() {
-            if part == ".." {
-                if !path_parts.is_empty() {
-                    path_parts.pop();
-                }
-                rel_parts.remove(0);
-            } else if part == "." {
-                rel_parts.remove(0);
-            } else {
-                break;
-            }
-        }
-
-        path_parts.extend(rel_parts.iter().filter(|s| !s.is_empty()));
-
-        let final_path = if path_parts.is_empty() {
-            "/".to_string()
-        } else {
-            format!("/{}", path_parts.join("/"))
-        };
-
-        Ok(format!("https://{host}{final_path}"))
+    #[cfg(target_arch = "wasm32")]
+    fn resolve_standard_url(base_url: &str, url: &str) -> Option<String> {
+        let resolved = browser_url::URL::new(url, base_url).ok()?;
+        Some(resolved.href())
     }
 
     /// Validates if the URL is safe to include in markdown
@@ -339,7 +264,7 @@ mod tests {
     #[case(
         "https://example.com/blog",
         "image.jpg",
-        "https://example.com/blog/image.jpg"
+        "https://example.com/image.jpg"
     )]
     #[case(
         "https://example.com/blog/",
@@ -349,12 +274,12 @@ mod tests {
     #[case(
         "https://example.com/docs/api",
         "diagram.svg",
-        "https://example.com/docs/api/diagram.svg"
+        "https://example.com/docs/diagram.svg"
     )]
     #[case(
         "https://example.com/category/subcategory",
         "images/icon.gif",
-        "https://example.com/category/subcategory/images/icon.gif"
+        "https://example.com/category/images/icon.gif"
     )]
     #[case(
         "https://example.com/category/subcategory/index.html",
@@ -375,7 +300,7 @@ mod tests {
     #[case(
         "https://example.com/blog",
         "./image.jpg",
-        "https://example.com/blog/image.jpg"
+        "https://example.com/image.jpg"
     )]
     #[case(
         "https://example.com/docs/",
@@ -401,7 +326,7 @@ mod tests {
     #[case(
         "https://example.com/blog/post",
         "../assets/image.jpg",
-        "https://example.com/blog/assets/image.jpg"
+        "https://example.com/assets/image.jpg"
     )]
     #[case(
         "https://example.com/docs/api/",
@@ -411,7 +336,7 @@ mod tests {
     #[case(
         "https://example.com/a/b/c",
         "../../shared/icon.svg",
-        "https://example.com/a/shared/icon.svg"
+        "https://example.com/shared/icon.svg"
     )]
     #[case(
         "https://example.com/deep/nested/path",
@@ -444,13 +369,38 @@ mod tests {
         "https://external-site.com/api/data",
         "https://external-site.com/api/data"
     )]
-    fn test_absolute_urls_passthrough(
+    #[case(
+        "https://example.com",
+        "HTTPS://cdn.example.com/image.jpg",
+        "https://cdn.example.com/image.jpg"
+    )]
+    fn test_absolute_urls(
         #[case] base_url: &str,
         #[case] absolute_url: &str,
         #[case] expected: &str,
     ) {
         let media = Media;
         assert_eq!(media.resolve_url(base_url, absolute_url).unwrap(), expected);
+    }
+
+    #[rstest]
+    #[case(
+        "https://example.com/articles/page",
+        "//cdn.example.com/image.jpg",
+        "https://cdn.example.com/image.jpg"
+    )]
+    #[case(
+        "HTTPS://example.com/articles/page",
+        "//cdn.example.com/image.jpg",
+        "https://cdn.example.com/image.jpg"
+    )]
+    fn test_protocol_relative_urls(
+        #[case] base_url: &str,
+        #[case] relative_url: &str,
+        #[case] expected: &str,
+    ) {
+        let media = Media;
+        assert_eq!(media.resolve_url(base_url, relative_url).unwrap(), expected);
     }
 
     /// special schemes test
@@ -481,13 +431,19 @@ mod tests {
     #[case(
         "https://example.com/page#section",
         "image.jpg",
-        "https://example.com/page/image.jpg"
+        "https://example.com/image.jpg"
     )]
     #[case(
         "https://example.com/blog?page=2&sort=date",
         "../images/header.jpg",
         "https://example.com/images/header.jpg"
     )]
+    #[case(
+        "https://example.com/docs/page?old=1#old",
+        "?new=2#results",
+        "https://example.com/docs/page?new=2#results"
+    )]
+    #[case("https://example.com?old=1", "?new=2", "https://example.com/?new=2")]
     fn test_base_url_with_query_and_fragment(
         #[case] base_url: &str,
         #[case] relative_url: &str,
@@ -615,7 +571,7 @@ mod tests {
         r#"<figure><img src="../images/chart.svg" alt="Performance Chart"><figcaption>Q4 Performance</figcaption></figure>"#,
         "https://example.com/reports/2024",
         indoc! {r#"
-            ![Performance Chart](https://example.com/reports/images/chart.svg)
+            ![Performance Chart](https://example.com/images/chart.svg)
 
             Q4 Performance"#}
     )]
@@ -786,7 +742,7 @@ mod tests {
 
             Rust is becoming popular for web development. Here's why:
 
-            ![Rust Programming Language Logo](https://blog.example.com/posts/assets/rust-logo.png)
+            ![Rust Programming Language Logo](https://blog.example.com/assets/rust-logo.png)
 
             For more information, visit the [official Rust website](https://www.rust-lang.org/).
 
@@ -795,7 +751,7 @@ mod tests {
     #[case(
         r#"<a href="/dir1"><img alt="" src="https://example.com" /></a>"#,
         "https://example.com",
-        "[![](https://example.com)](https://example.com/dir1)"
+        "[![](https://example.com/)](https://example.com/dir1)"
     )]
     fn test_realistic_blog_structure(
         #[case] html: &str,
