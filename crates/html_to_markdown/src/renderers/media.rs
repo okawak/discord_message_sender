@@ -313,23 +313,35 @@ impl Media {
     }
 
     fn has_following_content(dom: &Dom, id: NodeId) -> bool {
-        let Ok(Some(parent_id)) = dom.get_parent(id) else {
-            return false;
-        };
-        let Ok(children) = dom.iter_children(parent_id) else {
-            return false;
-        };
+        let mut current_id = id;
 
-        children
-            .skip_while(|&&child_id| child_id != id)
-            .skip(1)
-            .any(|&child_id| {
-                dom.node(child_id).is_some_and(|node| match &node.data {
-                    NodeData::Text(text) => !text.trim().is_empty(),
-                    NodeData::Element { .. } => true,
-                    _ => false,
+        while let Ok(Some(parent_id)) = dom.get_parent(current_id) {
+            let Ok(children) = dom.iter_children(parent_id) else {
+                return false;
+            };
+            if children
+                .skip_while(|&&child_id| child_id != current_id)
+                .skip(1)
+                .any(|&child_id| {
+                    dom.node(child_id).is_some_and(|node| match &node.data {
+                        NodeData::Text(text) => !text.trim().is_empty(),
+                        NodeData::Element { .. } => true,
+                        _ => false,
+                    })
                 })
-            })
+            {
+                return true;
+            }
+
+            if dom.node(parent_id).is_some_and(|node| {
+                matches!(&node.data, NodeData::Element { tag, .. } if tag.local.as_ref() == "li")
+            }) {
+                break;
+            }
+            current_id = parent_id;
+        }
+
+        false
     }
 
     fn normalize_link_label(content: &str) -> String {
@@ -970,6 +982,10 @@ mod tests {
     )]
     #[case(
         "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a><h2>After</h2></li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n  ## After\n\n"
+    )]
+    #[case(
+        "<ul><li><div><a href=\"/target\"><pre><code>x</code></pre></a></div><h2>After</h2></li></ul>",
         "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n  ## After\n\n"
     )]
     #[case(
