@@ -90,6 +90,20 @@ if (
   throw new Error("WASM HTML conversion changed semantic Unicode whitespace.");
 }
 
+const codeDelimiters = convertHtml(
+  "https://example.com",
+  "<pre><code>before\n```\nafter</code></pre><p><code>a`b</code></p>",
+);
+if (
+  !codeDelimiters.includes("````\nbefore\n```\nafter\n````") ||
+  !codeDelimiters.includes("``a`b``") ||
+  !Bun.markdown
+    .html(codeDelimiters)
+    .includes("before\n```\nafter\n</code></pre>")
+) {
+  throw new Error("WASM HTML conversion used an unsafe code delimiter.");
+}
+
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;
 for (let index = 0; index < 100; index += 1) {
   convertHtml("https://example.com", repeatedHtml);
