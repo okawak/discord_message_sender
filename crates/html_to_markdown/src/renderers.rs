@@ -146,6 +146,53 @@ pub(crate) fn is_block_element(tag_name: &str) -> bool {
     )
 }
 
+fn rendered_node_is_inline(rendered: &str) -> bool {
+    !rendered.starts_with('\n') && !rendered.ends_with('\n')
+}
+
+fn render_child_nodes(
+    url: &str,
+    dom: &Dom,
+    children: &[NodeId],
+    ctx: &mut Context,
+) -> Result<String, ConvertError> {
+    let mut result = String::with_capacity(children.len() * CHARS_PER_CHILD);
+    let mut previous_was_inline = false;
+    let mut pending_whitespace = false;
+
+    for &child_id in children {
+        if !ctx.preserve_whitespace
+            && matches!(
+                dom.node(child_id).map(|child| &child.data),
+                Some(NodeData::Text(text))
+                    if !text.is_empty() && text.chars().all(char::is_whitespace)
+            )
+        {
+            pending_whitespace |= previous_was_inline;
+            continue;
+        }
+
+        let rendered = render_node(url, dom, child_id, ctx)?;
+        if rendered.is_empty() {
+            continue;
+        }
+
+        let current_is_inline = rendered_node_is_inline(&rendered);
+        if pending_whitespace && previous_was_inline {
+            if current_is_inline {
+                result.push(' ');
+            } else if !result.ends_with('\n') && !rendered.starts_with('\n') {
+                result.push_str("\n\n");
+            }
+        }
+        result.push_str(&rendered);
+        previous_was_inline = current_is_inline;
+        pending_whitespace = false;
+    }
+
+    Ok(result)
+}
+
 pub fn render_node(
     url: &str,
     dom: &Dom,
@@ -195,13 +242,7 @@ pub fn render_children(
     match &node.data {
         NodeData::Element { .. } => {
             let children = &node.children;
-
-            let mut result = String::with_capacity(children.len() * CHARS_PER_CHILD);
-
-            for &child in children {
-                result.push_str(&render_node(url, dom, child, ctx)?);
-            }
-            Ok(result)
+            render_child_nodes(url, dom, children, ctx)
         }
         NodeData::Text(text) => {
             if ctx.preserve_whitespace {
@@ -218,13 +259,40 @@ pub fn render_children(
         }
         NodeData::Document => {
             let children = &node.children;
-            let mut result = String::with_capacity(children.len() * CHARS_PER_CHILD);
-
-            for &child in children {
-                result.push_str(&render_node(url, dom, child, ctx)?);
-            }
-            Ok(result)
+            render_child_nodes(url, dom, children, ctx)
         }
         _ => Ok(String::new()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser;
+    use pretty_assertions::assert_eq;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(
+        "<p><strong>Hello</strong> <em>world</em></p>",
+        "**Hello** *world*\n\n"
+    )]
+    #[case("<p><span>Hello</span>\n\t<span>world</span></p>", "Hello world\n\n")]
+    #[case(
+        "<p><strong>Hello</strong> <span></span> <script>ignored</script> <em>world</em></p>",
+        "**Hello** *world*\n\n"
+    )]
+    #[case("<p>A&nbsp;B 👩‍💻 A‌B</p>", "A B 👩‍💻 A‌B\n\n")]
+    #[case(
+        "<div><span>Published</span> <div><span>Updated</span></div></div>",
+        "Published Updated"
+    )]
+    #[case("<span>Hello</span> <div><p>world</p></div>", "Hello\n\nworld\n\n")]
+    fn preserves_semantic_html_whitespace(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("HTML should parse");
+        let output = render_node("", &dom, dom.document, &mut Context::default())
+            .expect("HTML should render");
+
+        assert_eq!(output, expected);
     }
 }

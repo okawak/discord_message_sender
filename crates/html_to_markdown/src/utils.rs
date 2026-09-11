@@ -9,10 +9,8 @@ pub fn normalize_html_text(text: &str, preserve_edge_spaces: bool) -> Option<Cow
     }
 
     let needs_char_filtering = text.chars().any(|c| {
-        matches!(
-            c,
-            '\u{00A0}' | '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{2060}' | '\u{FEFF}'
-        ) || (c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+        matches!(c, '\u{00A0}' | '\u{200B}' | '\u{2060}' | '\u{FEFF}')
+            || (c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
     });
 
     let needs_whitespace_norm = has_extra_whitespace(text);
@@ -24,11 +22,11 @@ pub fn normalize_html_text(text: &str, preserve_edge_spaces: bool) -> Option<Cow
     let processed = if needs_char_filtering {
         let filtered: String = text
             .chars()
-            .filter(|c| {
-                !matches!(
-                    *c,
-                    '\u{00A0}' | '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{2060}' | '\u{FEFF}'
-                ) && (!c.is_control() || matches!(*c, '\t' | '\n' | '\r'))
+            .filter_map(|c| match c {
+                '\u{00A0}' => Some(' '),
+                '\u{200B}' | '\u{2060}' | '\u{FEFF}' => None,
+                _ if c.is_control() && !matches!(c, '\t' | '\n' | '\r') => None,
+                _ => Some(c),
             })
             .collect();
 
@@ -141,6 +139,9 @@ mod tests {
     #[case("Hello World", Some("Hello World"))]
     #[case("  Hello   World  ", Some("Hello World"))]
     #[case("\u{00A0}\u{200B}Hello\u{FEFF}World\u{2060}", Some("HelloWorld"))]
+    #[case("Hello\u{00A0}World", Some("Hello World"))]
+    #[case("👩\u{200D}💻", Some("👩\u{200D}💻"))]
+    #[case("A\u{200C}B", Some("A\u{200C}B"))]
     #[case("Multi\nLine\tText", Some("Multi Line Text"))]
     fn test_normalize_html_text(#[case] input: &str, #[case] expected: Option<&str>) {
         let result = normalize_html_text(input, false);
