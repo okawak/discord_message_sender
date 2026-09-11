@@ -193,6 +193,33 @@ describe("syncChannelsSequentially", () => {
     expect(caught).toBe(unauthorized);
     expect(synced).toEqual(["111"]);
   });
+
+  test("stops immediately when a notification reports an invalid token", async () => {
+    const synced: string[] = [];
+    const unauthorized = new DiscordApiError(
+      401,
+      "POST",
+      "/channels/111/messages",
+      '{"message":"401: Unauthorized","code":0}',
+    );
+
+    let caught: unknown;
+    try {
+      await syncChannelsSequentially(channels, async (channel) => {
+        synced.push(channel.id);
+        return {
+          kind: "notificationFailure",
+          processedMessageCount: 2,
+          error: unauthorized,
+        };
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBe(unauthorized);
+    expect(synced).toEqual(["111"]);
+  });
 });
 
 describe("syncChannelMessages", () => {

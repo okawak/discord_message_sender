@@ -145,13 +145,15 @@ export async function syncChannelsSequentially(
       const result = await syncChannel(channel);
       processedMessageCount += result.processedMessageCount;
 
+      if (
+        result.kind !== "success" &&
+        result.error instanceof DiscordApiError &&
+        result.error.status === 401
+      ) {
+        throw result.error;
+      }
+
       if (result.kind === "syncFailure") {
-        if (
-          result.error instanceof DiscordApiError &&
-          result.error.status === 401
-        ) {
-          throw result.error;
-        }
         failures.push({ channel, error: result.error });
       } else if (result.kind === "notificationFailure") {
         notificationFailures.push({
