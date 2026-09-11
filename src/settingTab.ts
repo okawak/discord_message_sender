@@ -2,25 +2,22 @@ import {
   type App,
   Notice,
   PluginSettingTab,
-  Setting,
-  type SettingControl,
+  type Setting,
   type SettingDefinition,
-  type SettingDefinitionGroup,
   type SettingDefinitionItem,
-  type SettingDefinitionList,
   type TextComponent,
 } from "obsidian";
 import {
-  findDuplicateChannelPathSegment,
-  getChannelNameValidationError,
-} from "./channelPaths";
-import type DiscordMessageSenderPlugin from "./main";
-import {
-  DEFAULT_NOTIFICATION_TEMPLATES,
   type DiscordChannelSettings,
+  default_settings as getDefaultSettings,
   type MessageStorageMode,
-  updateChannelId,
-} from "./settings";
+  normalize_setting_control,
+  read_setting_control,
+  rename_channel,
+  trim_setting,
+} from "../pkg/parse_message.js";
+import type DiscordMessageSenderPlugin from "./main";
+import { updateChannelId } from "./settings";
 
 type SettingKey =
   | "messageDirectoryName"
@@ -49,20 +46,8 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  /**
-   * Compatibility renderer for Obsidian versions before 1.13.
-   * Newer versions render getSettingDefinitions() without calling this method.
-   */
-  override display(): void {
-    this.containerEl.empty();
-    for (const item of this.getSettingDefinitions()) {
-      if ("type" in item && (item.type === "group" || item.type === "list")) {
-        this.renderLegacyGroup(item);
-      }
-    }
-  }
-
   override getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
+    const defaults = getDefaultSettings();
     return [
       {
         type: "group",
@@ -74,7 +59,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             control: {
               type: "text",
               key: "messageDirectoryName",
-              defaultValue: "DiscordLogs",
+              defaultValue: defaults.messageDirectoryName,
               placeholder: "DiscordLogs",
             },
           },
@@ -84,7 +69,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             control: {
               type: "text",
               key: "clippingDirectoryName",
-              defaultValue: "DiscordClippings",
+              defaultValue: defaults.clippingDirectoryName,
               placeholder: "DiscordClippings",
             },
           },
@@ -105,7 +90,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             control: {
               type: "text",
               key: "messagePrefix",
-              defaultValue: "!",
+              defaultValue: defaults.messagePrefix,
               placeholder: "!",
             },
           },
@@ -117,16 +102,14 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         emptyState: "No channels configured",
         addItem: {
           name: "Add channel",
-          action: async () => {
+          action: () => {
             this.plugin.settings.channels.push({ id: "", name: "" });
-            await this.plugin.saveSettings();
-            this.refresh();
+            this.saveChannelChanges();
           },
         },
-        onDelete: async (index) => {
+        onDelete: (index) => {
           this.plugin.settings.channels.splice(index, 1);
-          await this.plugin.saveSettings();
-          this.refresh();
+          this.saveChannelChanges();
         },
         items: this.plugin.settings.channels.map((channel, index) =>
           this.getChannelDefinition(channel, index),
@@ -147,8 +130,8 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             control: {
               type: "textarea",
               key: "savedNotificationTemplate",
-              defaultValue: DEFAULT_NOTIFICATION_TEMPLATES.saved,
-              placeholder: DEFAULT_NOTIFICATION_TEMPLATES.saved,
+              defaultValue: defaults.notificationTemplates.saved,
+              placeholder: defaults.notificationTemplates.saved,
             },
           },
           {
@@ -157,8 +140,8 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             control: {
               type: "textarea",
               key: "noNewNotificationTemplate",
-              defaultValue: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
-              placeholder: DEFAULT_NOTIFICATION_TEMPLATES.noNew,
+              defaultValue: defaults.notificationTemplates.noNew,
+              placeholder: defaults.notificationTemplates.noNew,
             },
           },
         ],
@@ -173,7 +156,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
             control: {
               type: "dropdown",
               key: "messageStorageMode",
-              defaultValue: "individual",
+              defaultValue: defaults.messageStorageMode,
               options: STORAGE_OPTIONS,
             },
           },
@@ -198,180 +181,36 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   }
 
   override getControlValue(key: string): unknown {
-    const settings = this.plugin.settings;
-    switch (key) {
-      case "messageDirectoryName":
-      case "clippingDirectoryName":
-      case "messagePrefix":
-      case "messageStorageMode":
-      case "showAuthorNames":
-      case "showMessageTime":
-      case "enableAutoSyncOnStartup":
-      case "sendSyncNotifications":
-        return settings[key];
-      case "savedNotificationTemplate":
-        return settings.notificationTemplates.saved;
-      case "noNewNotificationTemplate":
-        return settings.notificationTemplates.noNew;
-      default:
-        return undefined;
-    }
+    return read_setting_control(this.plugin.settings, key);
   }
 
   override async setControlValue(key: string, value: unknown): Promise<void> {
-    const settings = this.plugin.settings;
-    switch (key) {
-      case "messageDirectoryName":
-        settings.messageDirectoryName = readString(value, "DiscordLogs");
-        break;
-      case "clippingDirectoryName":
-        settings.clippingDirectoryName = readString(value, "DiscordClippings");
-        break;
-      case "messagePrefix":
-        settings.messagePrefix = readString(value, "!");
-        break;
-      case "messageStorageMode":
-        if (!isMessageStorageMode(value)) {
-          throw new TypeError(
-            `Invalid message storage mode "${String(value)}".`,
-          );
-        }
-        settings.messageStorageMode = value;
-        break;
-      case "showAuthorNames":
-      case "showMessageTime":
-      case "enableAutoSyncOnStartup":
-      case "sendSyncNotifications":
-        settings[key] = readBoolean(value, key);
-        break;
-      case "savedNotificationTemplate":
-        settings.notificationTemplates.saved = readString(
-          value,
-          DEFAULT_NOTIFICATION_TEMPLATES.saved,
-        );
-        break;
-      case "noNewNotificationTemplate":
-        settings.notificationTemplates.noNew = readString(
-          value,
-          DEFAULT_NOTIFICATION_TEMPLATES.noNew,
-        );
-        break;
-      default:
-        throw new TypeError(`Unknown setting key "${key}".`);
+    const normalized: unknown = normalize_setting_control(key, value);
+    // Apply the single changed field without replacing channels used by active syncs.
+    if (
+      key === "savedNotificationTemplate" ||
+      key === "noNewNotificationTemplate"
+    ) {
+      Reflect.set(
+        this.plugin.settings.notificationTemplates,
+        key === "savedNotificationTemplate" ? "saved" : "noNew",
+        normalized,
+      );
+    } else {
+      Reflect.set(this.plugin.settings, key, normalized);
     }
     await this.plugin.saveSettings();
   }
 
-  private renderLegacyGroup(group: SettingDefinitionGroup<SettingKey>): void {
-    const list =
-      group.type === "list"
-        ? (group as SettingDefinitionList<SettingKey>)
-        : undefined;
-
-    if (group.heading) {
-      const heading = new Setting(this.containerEl).setName(group.heading);
-      if (list?.addItem) {
-        const { addItem } = list;
-        heading.addButton((button) =>
-          button
-            .setButtonText(addItem.name)
-            .setCta()
-            .onClick(() => addItem.action(button.buttonEl)),
-        );
-      } else {
-        heading.setHeading();
-      }
-    }
-
-    if (list?.emptyState && group.items?.length === 0) {
-      new Setting(this.containerEl).setName(list.emptyState);
-    }
-
-    group.items?.forEach((definition, index) => {
-      if ("type" in definition) {
-        return;
-      }
-      const setting = new Setting(this.containerEl).setName(definition.name);
-      if (definition.desc) {
-        setting.setDesc(definition.desc);
-      }
-      if ("control" in definition && definition.control) {
-        this.renderLegacyControl(setting, definition.control);
-      } else if ("render" in definition) {
-        const render = definition.render as (setting: Setting) => void;
-        render(setting);
-      }
-      if (list?.onDelete) {
-        const { onDelete } = list;
-        setting.addExtraButton((button) =>
-          button
-            .setIcon("trash")
-            .setTooltip("Remove channel")
-            .onClick(() => onDelete(index)),
-        );
-      }
-    });
-  }
-
-  private renderLegacyControl(
-    setting: Setting,
-    control: SettingControl<SettingKey>,
-  ): void {
-    const value = this.getControlValue(control.key) ?? control.defaultValue;
-    switch (control.type) {
-      case "text":
-        setting.addText((text) =>
-          text
-            .setPlaceholder(control.placeholder ?? "")
-            .setValue(typeof value === "string" ? value : "")
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      case "textarea":
-        setting.addTextArea((text) =>
-          text
-            .setPlaceholder(control.placeholder ?? "")
-            .setValue(typeof value === "string" ? value : "")
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      case "dropdown":
-        setting.addDropdown((dropdown) =>
-          dropdown
-            .addOptions(control.options)
-            .setValue(typeof value === "string" ? value : "")
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      case "toggle":
-        setting.addToggle((toggle) =>
-          toggle
-            .setValue(value === true)
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      default:
-        throw new Error(
-          `Unsupported legacy setting control "${control.type}".`,
-        );
-    }
-  }
-
-  private refresh(): void {
-    const update: unknown = Reflect.get(this, "update");
-    if (typeof update === "function") {
-      update.call(this);
-    } else {
-      this.display();
-    }
+  private saveChannelChanges(): void {
+    // Obsidian's list callbacks return void; handle persistence failures here.
+    void this.plugin.saveSettings().then(
+      () => this.update(),
+      () => {
+        new Notice("Could not save Discord channels. Please try again.");
+        this.update();
+      },
+    );
   }
 
   private getChannelDefinition(
@@ -387,22 +226,19 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
               .setPlaceholder("Name (optional)")
               .setValue(channel.name)
               .onChange(async (value) => {
-                const name = value.trim();
-                const error = getChannelNameValidationError(name);
-                const duplicate = findDuplicateChannelPathSegment(
-                  this.plugin.settings.channels.map((candidate) =>
-                    candidate === channel ? { ...candidate, name } : candidate,
-                  ),
-                );
-                if (error || duplicate) {
+                try {
+                  channel.name = rename_channel(
+                    this.plugin.settings.channels,
+                    this.plugin.settings.channels.indexOf(channel),
+                    value,
+                  );
+                } catch (error) {
                   new Notice(
-                    error ??
-                      `Channel name is already in use as folder "${duplicate}". Enter a unique channel name.`,
+                    error instanceof Error ? error.message : String(error),
                   );
                   text.setValue(channel.name);
                   return;
                 }
-                channel.name = name;
                 await this.plugin.saveSettings();
               }),
           )
@@ -411,7 +247,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
               .setPlaceholder("Channel ID")
               .setValue(channel.id)
               .onChange(async (value) => {
-                updateChannelId(channel, value.trim());
+                updateChannelId(channel, trim_setting(value));
                 await this.plugin.saveSettings();
               }),
           );
@@ -443,24 +279,9 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
           .setPlaceholder("xxxxx.yyyyy.zzzzz")
           .setValue(this.plugin.settings.botToken)
           .onChange(async (value) => {
-            this.plugin.settings.botToken = value.trim();
+            this.plugin.settings.botToken = trim_setting(value);
             await this.plugin.saveSettings();
           });
       });
   }
-}
-
-function readString(value: unknown, fallback: string): string {
-  return typeof value === "string" ? value.trim() || fallback : fallback;
-}
-
-function readBoolean(value: unknown, key: string): boolean {
-  if (typeof value !== "boolean") {
-    throw new TypeError(`Setting "${key}" requires a boolean value.`);
-  }
-  return value;
-}
-
-function isMessageStorageMode(value: unknown): value is MessageStorageMode {
-  return typeof value === "string" && Object.hasOwn(STORAGE_OPTIONS, value);
 }

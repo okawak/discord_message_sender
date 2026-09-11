@@ -1,0 +1,2294 @@
+{
+  "settings": [
+    {
+      "input": null,
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": false
+      }
+    },
+    {
+      "input": false,
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": false
+      }
+    },
+    {
+      "input": "wrong",
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": false
+      }
+    },
+    {
+      "input": [],
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": false
+      }
+    },
+    {
+      "input": {},
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": true
+      }
+    },
+    {
+      "input": {
+        "channels": [
+          null,
+          1,
+          {},
+          {
+            "id": " 123 ",
+            "name": " a﻿ ",
+            "lastProcessedMessageId": " 456 "
+          },
+          {
+            "id": "123",
+            "name": "duplicate"
+          }
+        ]
+      },
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [
+            {
+              "id": "123",
+              "name": "a",
+              "lastProcessedMessageId": "456"
+            }
+          ],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": true
+      }
+    },
+    {
+      "input": {
+        "channelId": "123",
+        "lastProcessedMessageId": "456",
+        "settingsVersion": 1
+      },
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [
+            {
+              "id": "123",
+              "name": "",
+              "lastProcessedMessageId": "456"
+            }
+          ],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": true
+      }
+    },
+    {
+      "input": {
+        "settingsVersion": 3,
+        "channels": [
+          {
+            "id": "123",
+            "name": "x"
+          }
+        ],
+        "channelId": "old"
+      },
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [
+            {
+              "id": "123",
+              "name": "x"
+            }
+          ],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": true
+      }
+    },
+    {
+      "input": {
+        "notificationTemplates": {
+          "saved": "  保存 {count}  ",
+          "noNew": "  "
+        },
+        "sendSyncNotifications": false
+      },
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "DiscordLogs",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": false,
+          "notificationTemplates": {
+            "saved": "保存 {count}",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": true
+      }
+    },
+    {
+      "input": {
+        "messageDirectoryName": "",
+        "messagePrefix": "﻿!﻿",
+        "botToken": "dummy",
+        "showAuthorNames": "true"
+      },
+      "expected": {
+        "settings": {
+          "settingsVersion": 3,
+          "messageDirectoryName": "",
+          "clippingDirectoryName": "DiscordClippings",
+          "botToken": "dummy",
+          "channels": [],
+          "messagePrefix": "!",
+          "messageStorageMode": "individual",
+          "showAuthorNames": false,
+          "showMessageTime": false,
+          "enableAutoSyncOnStartup": true,
+          "sendSyncNotifications": true,
+          "notificationTemplates": {
+            "saved": "✅ {count} messages saved.",
+            "noNew": "⚠️ No new messages."
+          }
+        },
+        "didMigrate": true
+      }
+    }
+  ],
+  "channels": [
+    {
+      "channel": {
+        "id": "123",
+        "name": "a/b"
+      },
+      "segment": "a-b",
+      "directory": "Logs/a-b"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "A:B"
+      },
+      "segment": "A-B",
+      "directory": "Logs/A-B"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": " [] [] "
+      },
+      "segment": " ",
+      "directory": "Logs/ "
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "[//] a\t b"
+      },
+      "segment": " a b",
+      "directory": "Logs/ a b"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "ab"
+      },
+      "segment": "ab",
+      "directory": "Logs/ab"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "a﻿b"
+      },
+      "segment": "a b",
+      "directory": "Logs/a b"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "﻿"
+      },
+      "segment": "123",
+      "directory": "Logs/123"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": ".."
+      },
+      "segment": "123",
+      "directory": "Logs/123"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "."
+      },
+      "segment": "123",
+      "directory": "Logs/123"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "é"
+      },
+      "segment": "é",
+      "directory": "Logs/é"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "é"
+      },
+      "segment": "é",
+      "directory": "Logs/é"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "a\\|:x"
+      },
+      "segment": "a-x",
+      "directory": "Logs/a-x"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "----"
+      },
+      "segment": "123",
+      "directory": "Logs/123"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "a[|]b"
+      },
+      "segment": "a---b",
+      "directory": "Logs/a---b"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "名前 🐈"
+      },
+      "segment": "名前 🐈",
+      "directory": "Logs/名前 🐈"
+    },
+    {
+      "channel": {
+        "id": "123",
+        "name": "[]/[]"
+      },
+      "segment": "123",
+      "directory": "Logs/123"
+    }
+  ],
+  "duplicates": [
+    {
+      "channels": [
+        {
+          "id": "1",
+          "name": "é"
+        },
+        {
+          "id": "2",
+          "name": "é"
+        }
+      ],
+      "expected": "é"
+    },
+    {
+      "channels": [
+        {
+          "id": "1",
+          "name": "A/B"
+        },
+        {
+          "id": "2",
+          "name": "a:b"
+        }
+      ],
+      "expected": "a-b"
+    }
+  ],
+  "logs": [
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n追加\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n# message\r\n\r\n🐈\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n# message\r\n\r\n🐈\r\n\n<!-- discord-message-id: 200 -->\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: daily-log -->\n# period\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "daily",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: daily-log -->\r\n# period\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: weekly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "weekly",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: weekly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": false,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\***\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\***\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": true,
+        "showMessageTime": false
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\***\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\***\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": false,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 4
+      }
+    },
+    {
+      "existing": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "<!-- discord-message-sender: monthly-log -->\n# period\n\n<!-- discord-message-date: 2026-06-30 -->\n## 2026-06-30\n\n<!-- discord-message-id: 123 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 125 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n# message\n\n🐈\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\n## 2026-07-01\n\n<!-- discord-message-id: 124 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n<!-- discord-message-id : 999 -->\n<!-- discord-message-date : 2026-07-02 -->\n",
+        "addedCount": 1
+      }
+    },
+    {
+      "existing": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+      "entries": [
+        {
+          "messageId": "123",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "124",
+          "date": "2026-07-01",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "<!-- discord-message-id: 999 -->\n<!-- discord-message-date: 2026-07-02 -->"
+        },
+        {
+          "messageId": "125",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "# message\n\n🐈"
+        },
+        {
+          "messageId": "200",
+          "date": "2026-06-30",
+          "time": "23:59",
+          "authorName": "猫 *[name]*",
+          "markdown": "追加"
+        }
+      ],
+      "options": {
+        "mode": "monthly",
+        "showAuthorNames": true,
+        "showMessageTime": true
+      },
+      "expected": {
+        "content": "﻿---\r\ntags: [discord]\r\n---\r\n\r\n<!-- discord-message-sender: monthly-log -->\r\n# period\r\n\r\n<!-- discord-message-date: 2026-06-30 -->\r\n## 2026-06-30\r\n\r\n<!-- discord-message-id: 123 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n<!-- discord-message-id: 125 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n# message\r\n\r\n🐈\r\n\r\n\n<!-- discord-message-id: 200 -->\n**猫 \\*\\[name\\]\\*** · 23:59\n\n追加\n\n<!-- discord-message-date: 2026-07-01 -->\r\n## 2026-07-01\r\n\r\n<!-- discord-message-id: 124 -->\r\n**猫 \\*\\[name\\]\\*** · 23:59\r\n\r\n<!-- discord-message-id : 999 -->\r\n<!-- discord-message-date : 2026-07-02 -->\r\n",
+        "addedCount": 1
+      }
+    }
+  ],
+  "dates": [
+    {
+      "timestamp": "2026-03-08T06:59:59.999Z",
+      "zone": "UTC",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "06:59",
+        "fileTimestamp": "20260308_065959"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T06:59:59.999Z",
+      "zone": "Asia/Tokyo",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "15:59",
+        "fileTimestamp": "20260308_155959"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T06:59:59.999Z",
+      "zone": "America/New_York",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "01:59",
+        "fileTimestamp": "20260308_015959"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T06:59:59.999Z",
+      "zone": "Asia/Kathmandu",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "12:44",
+        "fileTimestamp": "20260308_124459"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T06:59:59.999Z",
+      "zone": "Pacific/Kiritimati",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "20:59",
+        "fileTimestamp": "20260308_205959"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T07:00:00.000Z",
+      "zone": "UTC",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "07:00",
+        "fileTimestamp": "20260308_070000"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T07:00:00.000Z",
+      "zone": "Asia/Tokyo",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "16:00",
+        "fileTimestamp": "20260308_160000"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T07:00:00.000Z",
+      "zone": "America/New_York",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "03:00",
+        "fileTimestamp": "20260308_030000"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T07:00:00.000Z",
+      "zone": "Asia/Kathmandu",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "12:45",
+        "fileTimestamp": "20260308_124500"
+      }
+    },
+    {
+      "timestamp": "2026-03-08T07:00:00.000Z",
+      "zone": "Pacific/Kiritimati",
+      "expected": {
+        "date": "2026-03-08",
+        "month": "2026-03",
+        "week": "2026-W10",
+        "time": "21:00",
+        "fileTimestamp": "20260308_210000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T05:30:00Z",
+      "zone": "UTC",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "05:30",
+        "fileTimestamp": "20261101_053000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T05:30:00Z",
+      "zone": "Asia/Tokyo",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "14:30",
+        "fileTimestamp": "20261101_143000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T05:30:00Z",
+      "zone": "America/New_York",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "01:30",
+        "fileTimestamp": "20261101_013000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T05:30:00Z",
+      "zone": "Asia/Kathmandu",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "11:15",
+        "fileTimestamp": "20261101_111500"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T05:30:00Z",
+      "zone": "Pacific/Kiritimati",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "19:30",
+        "fileTimestamp": "20261101_193000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T06:30:00Z",
+      "zone": "UTC",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "06:30",
+        "fileTimestamp": "20261101_063000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T06:30:00Z",
+      "zone": "Asia/Tokyo",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "15:30",
+        "fileTimestamp": "20261101_153000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T06:30:00Z",
+      "zone": "America/New_York",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "01:30",
+        "fileTimestamp": "20261101_013000"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T06:30:00Z",
+      "zone": "Asia/Kathmandu",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "12:15",
+        "fileTimestamp": "20261101_121500"
+      }
+    },
+    {
+      "timestamp": "2026-11-01T06:30:00Z",
+      "zone": "Pacific/Kiritimati",
+      "expected": {
+        "date": "2026-11-01",
+        "month": "2026-11",
+        "week": "2026-W44",
+        "time": "20:30",
+        "fileTimestamp": "20261101_203000"
+      }
+    },
+    {
+      "timestamp": "2020-12-31T15:30:00Z",
+      "zone": "UTC",
+      "expected": {
+        "date": "2020-12-31",
+        "month": "2020-12",
+        "week": "2020-W53",
+        "time": "15:30",
+        "fileTimestamp": "20201231_153000"
+      }
+    },
+    {
+      "timestamp": "2020-12-31T15:30:00Z",
+      "zone": "Asia/Tokyo",
+      "expected": {
+        "date": "2021-01-01",
+        "month": "2021-01",
+        "week": "2020-W53",
+        "time": "00:30",
+        "fileTimestamp": "20210101_003000"
+      }
+    },
+    {
+      "timestamp": "2020-12-31T15:30:00Z",
+      "zone": "America/New_York",
+      "expected": {
+        "date": "2020-12-31",
+        "month": "2020-12",
+        "week": "2020-W53",
+        "time": "10:30",
+        "fileTimestamp": "20201231_103000"
+      }
+    },
+    {
+      "timestamp": "2020-12-31T15:30:00Z",
+      "zone": "Asia/Kathmandu",
+      "expected": {
+        "date": "2020-12-31",
+        "month": "2020-12",
+        "week": "2020-W53",
+        "time": "21:15",
+        "fileTimestamp": "20201231_211500"
+      }
+    },
+    {
+      "timestamp": "2020-12-31T15:30:00Z",
+      "zone": "Pacific/Kiritimati",
+      "expected": {
+        "date": "2021-01-01",
+        "month": "2021-01",
+        "week": "2020-W53",
+        "time": "05:30",
+        "fileTimestamp": "20210101_053000"
+      }
+    },
+    {
+      "timestamp": "2024-02-29T23:59:59+09:00",
+      "zone": "UTC",
+      "expected": {
+        "date": "2024-02-29",
+        "month": "2024-02",
+        "week": "2024-W09",
+        "time": "14:59",
+        "fileTimestamp": "20240229_145959"
+      }
+    },
+    {
+      "timestamp": "2024-02-29T23:59:59+09:00",
+      "zone": "Asia/Tokyo",
+      "expected": {
+        "date": "2024-02-29",
+        "month": "2024-02",
+        "week": "2024-W09",
+        "time": "23:59",
+        "fileTimestamp": "20240229_235959"
+      }
+    },
+    {
+      "timestamp": "2024-02-29T23:59:59+09:00",
+      "zone": "America/New_York",
+      "expected": {
+        "date": "2024-02-29",
+        "month": "2024-02",
+        "week": "2024-W09",
+        "time": "09:59",
+        "fileTimestamp": "20240229_095959"
+      }
+    },
+    {
+      "timestamp": "2024-02-29T23:59:59+09:00",
+      "zone": "Asia/Kathmandu",
+      "expected": {
+        "date": "2024-02-29",
+        "month": "2024-02",
+        "week": "2024-W09",
+        "time": "20:44",
+        "fileTimestamp": "20240229_204459"
+      }
+    },
+    {
+      "timestamp": "2024-02-29T23:59:59+09:00",
+      "zone": "Pacific/Kiritimati",
+      "expected": {
+        "date": "2024-03-01",
+        "month": "2024-03",
+        "week": "2024-W09",
+        "time": "04:59",
+        "fileTimestamp": "20240301_045959"
+      }
+    }
+  ]
+}

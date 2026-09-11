@@ -1,28 +1,22 @@
-import { Notice } from "obsidian";
-import initWasm, {
-  convert_html as convertHtml,
-  type InitOutput,
-  parse_message as parseMessage,
-} from "../pkg/parse_message.js";
+import { Notice, requestUrl } from "obsidian";
 import {
-  createProcessedMessage,
+  convert_html as convertHtml,
+  processed_message as createProcessedMessage,
   type DiscordMessage,
+  type InitOutput,
   type MessageInstruction,
   type ProcessedMessage,
-  parseWasmMessageInstruction,
-} from "./messages";
-import { fetchUrlContent } from "./urlFetcher";
-
-// flag to indicate if the WASM module is ready
-let wasmReady: Promise<InitOutput> | null = null;
+  message_instruction as parseMessage,
+} from "../pkg/parse_message.js";
+import { initWasmCore } from "./wasmCore";
 
 export async function initWasmBridge(): Promise<InitOutput> {
-  wasmReady ??= initWasm().catch((error: unknown) => {
-    wasmReady = null;
+  try {
+    return await initWasmCore();
+  } catch (error) {
     new Notice("WASM initialization failed.");
-    throw new Error("WASM initialization failed.", { cause: error });
-  });
-  return wasmReady;
+    throw error;
+  }
 }
 
 export async function parseMessageWasm(
@@ -34,8 +28,7 @@ export async function parseMessageWasm(
 
   let instruction: MessageInstruction;
   try {
-    const result: unknown = parseMessage(message.content, prefix);
-    instruction = parseWasmMessageInstruction(result);
+    instruction = parseMessage(message.content, prefix);
   } catch (error) {
     throw new Error("Failed to parse Discord message.", { cause: error });
   }
@@ -60,4 +53,30 @@ export async function parseMessageWasm(
   }
 
   return createProcessedMessage(markdown, true, message, timeZone);
+}
+
+async function fetchUrlContent(value: string): Promise<string> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch (error) {
+    throw new Error("URL command requires a valid absolute URL.", {
+      cause: error,
+    });
+  }
+
+  if (url.protocol !== "https:") {
+    throw new Error("Only HTTPS URLs are supported.");
+  }
+
+  try {
+    const response = await requestUrl({
+      url: url.toString(),
+      method: "GET",
+      headers: { "User-Agent": "Obsidian Discord Sender" },
+    });
+    return response.text;
+  } catch (error) {
+    throw new Error("Failed to fetch URL content.", { cause: error });
+  }
 }

@@ -1,22 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import {
-  createChannelDirectory,
-  findDuplicateChannelPathSegment,
-  getChannelDisplayName,
-  getChannelNameValidationError,
-  getChannelPathSegment,
-  INVALID_CHANNEL_NAME_MESSAGE,
-} from "../src/channelPaths";
-import { renderNotificationTemplate } from "../src/notificationTemplates";
-import {
-  CURRENT_SETTINGS_SCHEMA_VERSION,
-  createMessageSyncSettingsSnapshot,
+  channel_directory as createChannelDirectory,
+  settings_snapshot as createMessageSyncSettingsSnapshot,
   type DiscordChannelSettings,
+  default_settings,
+  duplicate_channel_path as findDuplicateChannelPathSegment,
+  channel_display_name as getChannelDisplayName,
+  channel_name_error as getChannelNameValidationError,
+  channel_path_segment as getChannelPathSegment,
+  invalid_channel_name_message,
+  render_notification as renderNotificationTemplate,
+} from "../pkg/parse_message.js";
+import {
   getConfiguredChannels,
   migrateSettings,
   normalizeSettings,
   updateChannelId,
 } from "../src/settings";
+
+const INVALID_CHANNEL_NAME_MESSAGE = invalid_channel_name_message();
+const CURRENT_SETTINGS_SCHEMA_VERSION = default_settings().settingsVersion;
 
 describe("normalizeSettings", () => {
   test("migrates legacy channel fields into channels", () => {
@@ -326,10 +329,8 @@ describe("renderNotificationTemplate", () => {
   test("replaces supported variables", () => {
     const text = renderNotificationTemplate(
       "{count} saved from {channelName} ({channelId})",
-      {
-        count: 3,
-        channel: { id: "123", name: "inbox" },
-      },
+      { id: "123", name: "inbox" },
+      3,
     );
 
     expect(text).toBe("3 saved from inbox (123)");

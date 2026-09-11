@@ -56,13 +56,25 @@ export function prepareReleaseFileContents(
     );
   }
 
-  packageJson.version = version;
-  manifestJson.version = version;
-  versionsJson[version] = readString(
+  const minAppVersion = readString(
     manifestJson,
     "minAppVersion",
     "manifest.json",
   );
+  // Like the official sample's version-bump.mjs, preserve existing entries.
+  // A changed requirement needs a new plugin version, not a rewritten mapping.
+  if (
+    Object.hasOwn(versionsJson, version) &&
+    versionsJson[version] !== minAppVersion
+  ) {
+    throw new Error(
+      `Version ${version} already has a different minimum Obsidian version. Choose a new release version.`,
+    );
+  }
+
+  packageJson.version = version;
+  manifestJson.version = version;
+  versionsJson[version] = minAppVersion;
 
   return {
     packageJson: stringify(packageJson),

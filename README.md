@@ -31,7 +31,7 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
 ## ⚠️ Notes
 
 - **Security:** Since this uses the Discord API, avoid sending sensitive or confidential information.
-- **Supported Environment:** Requires Obsidian 1.8.10 or later and only works on desktop.
+- **Supported Environment:** Requires Obsidian 1.13.0 or later and only works on desktop.
 
 ## Setup Guide
 
@@ -141,6 +141,7 @@ Additional useful commands will be added in future releases.
 ## Development
 
 - [Release procedure](docs/releasing.md)
+- [Rust core and TypeScript adapters](docs/rust-core.md)
 
 ## References
 

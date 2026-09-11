@@ -47,7 +47,7 @@ versionファイルは開発中に次期versionへ変更しません。リリー
 
 tagから実行された`Release Plugin`は、tagのソースを改めてcheckoutし、固定したツールチェーンでテストとbuildを再実行します。生成した`main.js`と`manifest.json`へGitHub artifact attestationを付与し、この2ファイルだけをGitHub Releaseへ添付します。
 
-Rustのversionは`rust-toolchain.toml`、Bunのversionは`.bun-version`を参照します。wasm-packはworkflow内で固定します。これらのversionと依存関係はRenovateが週次で更新PRを作成するため、CIを確認してからマージしてください。GitHub Actionsは`@v7`のようなmajor tagを維持します。
+Rustのversionは`rust-toolchain.toml`、Bunのversionは`.bun-version`、Nodeのversionは`.node-version`を参照します。wasm-bindgen CLIはworkflow内、Binaryenはpackage.jsonとbun.lockで固定します。これらのversionと依存関係はRenovateが週次で更新PRを作成するため、CIを確認してからマージしてください。GitHub Actionsは`@v7`のようなmajor tagを維持します。
 
 Renovateを動作させるには、repositoryへRenovate GitHub Appをインストールする必要があります。設定は`renovate.json`へ集約し、次を更新対象とします。
 
@@ -55,7 +55,8 @@ Renovateを動作させるには、repositoryへRenovate GitHub Appをインス�
 - Cargo crateと`Cargo.lock`
 - Rust toolchain
 - Bun runtime
-- wasm-pack
+- Node runtime
+- wasm-bindgen CLIとBinaryen
 - GitHub Actions
 
 固定versionは、tagから同じ環境で再ビルドできるようにするために維持します。更新作業は手動編集せず、RenovateのPRとしてレビューします。
@@ -75,6 +76,34 @@ version更新処理は`scripts/prepare-release.ts`へ集約されています。
 - `versions.json`
 
 `manifest.json`の`minAppVersion`が、`versions.json`の新しいversionへ設定されます。
+
+次回は`0.5.0`として採番する予定です。[公式サンプルのversion更新処理](https://github.com/obsidianmd/obsidian-sample-plugin/blob/master/version-bump.mjs)と同じく、`manifest.json`の`minAppVersion`を読み、採番時に次のエントリーを`versions.json`へ追加します。
+
+```json
+"0.5.0": "1.13.0"
+```
+
+`0.4.0`以前のエントリーは`1.8.10`のまま維持します。既存versionの最低対応版が異なる場合、採番処理は上書きせず失敗します。同じversionと最低対応版での再実行は可能です。
+
+`Release Plugin`へ`0.5.0`を指定すると、package・manifest・Cargoのversion更新と上記エントリーの追加をまとめて実行します。開発中のversionファイルは採番前の値を維持します。
+
+Rust/TypeScriptの役割と開発時の検証方法は[実装構成](rust-core.md)を参照してください。
+
+## Obsidian 1.13対応とビルド再現性
+
+次のリリースから最低対応版をObsidian 1.13.0とし、設定画面は[Obsidian公式の移行ガイド](https://docs.obsidian.md/plugins/guides/migrate-declarative-settings)に従い、`getSettingDefinitions()`のみで描画します。公開済みリリースの`versions.json`エントリーは変更せず、次回のversion更新時に新しい最低対応版を追加します。
+
+CIとリリースはUbuntu 24.04と固定したNode/Bun/Rust/wasm-bindgen CLI/Binaryenを使います。`bun install --frozen-lockfile`とCargoの`--locked`で依存関係の意図しない再解決を防ぎ、WASMに含まれるソース・Cargoレジストリの絶対パスを共通のパスへ置換します。Viteの出力ターゲットはES2022です。WASMは圧縮せずbase64として`main.js`に埋め込みます。production buildは`main.js`の実ファイルサイズが1,000,000 bytes以上の場合に失敗します。
+
+```bash
+bun install --frozen-lockfile
+bun run build
+bun run verify:build
+```
+
+`verify:build`は別の一時ディレクトリでRust/WASMをキャッシュなしでビルドし、`dist/main.js`と`dist/manifest.json`をバイト単位で比較します。JavaScript依存は同じ固定済みインストールを使います。不一致がある場合はCIとリリースを停止します。この検証は同じOS・ツールチェーン内の比較であり、任意の別環境や過去のリリースとの一致を保証するものではありません。公開済みの添付ファイルは上書きせず、修正を含む新しいversionをリリースしてください。
+
+リリース前にObsidian 1.13以降で設定検索、チャンネルの追加・削除、設定の再読み込み、Bot tokenの表示切替を確認してください。
 
 ## v0.4.0の受入確認
 

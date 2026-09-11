@@ -1,18 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import {
-  getRateLimitDelay,
-  getRateLimitResetDelay,
-} from "../src/discordRateLimit";
-import {
-  DISCORD_API_VERSION,
-  DISCORD_MESSAGE_PAGE_SIZE,
-  getChannelMessagesPath,
-} from "../src/discordRoutes";
+  discord_retry_decision,
+  discord_messages_path as getChannelMessagesPath,
+  discord_api_version as getDiscordApiVersion,
+  discord_page_size as getDiscordMessagePageSize,
+  discord_rate_limit_delay as getRateLimitDelay,
+  discord_reset_delay as getRateLimitResetDelay,
+} from "../pkg/parse_message.js";
 
 describe("Discord message route", () => {
   test("uses API v10 and Discord's maximum page size", () => {
-    expect(DISCORD_API_VERSION).toBe(10);
-    expect(DISCORD_MESSAGE_PAGE_SIZE).toBe(100);
+    expect(getDiscordApiVersion()).toBe(10);
+    expect(getDiscordMessagePageSize()).toBe(100);
     expect(getChannelMessagesPath("123")).toBe(
       "/channels/123/messages?limit=100",
     );
@@ -53,5 +52,59 @@ describe("getRateLimitResetDelay", () => {
         "X-RateLimit-Reset-After": "10",
       }),
     ).toBe(0);
+  });
+});
+
+describe("Discord response header boundary", () => {
+  const headers = {
+    "set-cookie": ["session=example; HttpOnly", "other=example; Secure"],
+    "rEtRy-AfTeR": "1.25",
+    "X-RateLimit-Remaining": "0",
+    "x-ratelimit-reset-after": "0.25",
+  };
+
+  test("accepts array-valued cookies on success, failure, and retry responses", () => {
+    expect(discord_retry_decision(200, 0, headers, "[]")).toEqual({
+      kind: "success",
+    });
+    expect(discord_retry_decision(403, 0, headers, "")).toEqual({
+      kind: "fail",
+    });
+    expect(discord_retry_decision(429, 0, headers, "")).toEqual({
+      kind: "retry",
+      delay: 1250,
+      rateLimited: true,
+    });
+    expect(getRateLimitDelay(headers, "")).toBe(1250);
+    expect(getRateLimitResetDelay(headers)).toBe(250);
+  });
+
+  test("does not read unrelated response header values", () => {
+    const responseHeaders = {
+      ...headers,
+      get "set-cookie"(): string[] {
+        throw new Error("Unrelated header must not be read");
+      },
+    };
+    expect(discord_retry_decision(200, 0, responseHeaders, "[]")).toEqual({
+      kind: "success",
+    });
+    expect(getRateLimitDelay(responseHeaders, "")).toBe(1250);
+    expect(getRateLimitResetDelay(responseHeaders)).toBe(250);
+  });
+
+  test("falls back when rate-limit headers are not strings", () => {
+    const malformed = {
+      "Retry-After": ["invalid"],
+      "X-RateLimit-Remaining": null,
+      "X-RateLimit-Reset-After": {},
+    };
+    expect(getRateLimitDelay(malformed, '{"retry_after":2.5}')).toBe(2500);
+    expect(getRateLimitResetDelay(malformed)).toBe(0);
+    expect(discord_retry_decision(429, 0, malformed, "")).toEqual({
+      kind: "retry",
+      delay: 1000,
+      rateLimited: true,
+    });
   });
 });

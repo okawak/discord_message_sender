@@ -13,10 +13,8 @@ pub fn parse_html(html: &str) -> Result<Dom, ConvertError> {
     let sink = VecSink {
         dom: RefCell::new(Dom::new()),
     };
-    let sink = html5ever::parse_document(sink, Default::default())
-        .from_utf8()
-        .read_from(&mut html.as_bytes())
-        .map_err(|e| ConvertError::Parse(e.to_string()))?;
+    // The caller already provides valid UTF-8; feed it directly to the HTML parser.
+    let sink = html5ever::parse_document(sink, Default::default()).one(html);
     Ok(RefCell::into_inner(sink.dom)) // RefCell<Dom> -> Dom
 }
 

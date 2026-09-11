@@ -1,36 +1,30 @@
 import { Notice, Plugin } from "obsidian";
 import {
-  createChannelDirectory,
-  findDuplicateChannelPathSegment,
-  getChannelDisplayName,
-  getChannelNameValidationError,
-} from "./channelPaths";
+  channel_directory as createChannelDirectory,
+  type DiscordChannelSettings,
+  type DiscordMessage,
+  type DiscordPluginSettings,
+  channel_display_name as getChannelDisplayName,
+  type MessageSyncSettingsSnapshot,
+  prepare_sync,
+  type SyncPreparation,
+} from "../pkg/parse_message.js";
 import {
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
+  processDiscordMessageBatch,
   syncChannelMessages,
   syncChannelsSequentially,
 } from "./channelSync";
 import { fetchMessages, postNotification } from "./discordApi";
-import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
-import { getLocalTimeZone } from "./localDateTime";
-import { processDiscordMessageBatch } from "./messageBatch";
-import type { DiscordMessage } from "./messages";
-import {
-  createMessageSyncSettingsSnapshot,
-  type DiscordChannelSettings,
-  type DiscordPluginSettings,
-  getConfiguredChannels,
-  type MessageSyncSettingsSnapshot,
-  migrateSettings,
-  normalizeSettings,
-} from "./settings";
+import { migrateSettings } from "./settings";
 import { DiscordMessageSenderSettingTab } from "./settingTab";
 import { saveProcessedMessages } from "./vault";
 import { initWasmBridge, parseMessageWasm } from "./wasmBridge";
+import { DiscordApiError, getDiscordApiFailureNotice } from "./wasmCore";
 
 export default class DiscordMessageSenderPlugin extends Plugin {
-  override settings: DiscordPluginSettings = normalizeSettings(undefined);
+  declare settings: DiscordPluginSettings;
   private syncing = false;
 
   override async onload() {
@@ -58,34 +52,20 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       return;
     }
 
-    const channels = getConfiguredChannels(this.settings.channels);
-    if (!this.settings.botToken || channels.length === 0) {
-      new Notice(
-        "Discord message sender: bot token or channel is not configured.",
+    let preparation: SyncPreparation;
+    try {
+      preparation = prepare_sync(
+        this.settings,
+        Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
       );
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
       return;
     }
-
-    for (const channel of channels) {
-      const error = getChannelNameValidationError(channel.name);
-      if (error) {
-        new Notice(error);
-        return;
-      }
-    }
-
-    const duplicatePath = findDuplicateChannelPathSegment(channels);
-    if (duplicatePath) {
-      new Notice(
-        `Discord message sender: duplicate channel folder "${duplicatePath}". Use unique channel names.`,
-      );
-      return;
-    }
-
-    const settingsSnapshot = createMessageSyncSettingsSnapshot(
-      this.settings,
-      getLocalTimeZone(),
-    );
+    const channels = preparation.channelIndices
+      .map((index) => this.settings.channels[index])
+      .filter((channel): channel is DiscordChannelSettings => !!channel);
+    const settingsSnapshot = preparation.settings;
     this.syncing = true;
     new Notice("Starting Discord sync.");
 

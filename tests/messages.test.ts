@@ -1,37 +1,28 @@
 import { describe, expect, test } from "bun:test";
 import {
-  createProcessedMessage,
+  processed_message as createProcessedMessage,
   type DiscordMessage,
-  parseWasmMessageInstruction,
-} from "../src/messages";
+  message_instruction,
+} from "../pkg/parse_message.js";
 
-describe("parseWasmMessageInstruction", () => {
-  test("parses a regular message instruction", () => {
-    expect(parseWasmMessageInstruction(["message", "# title"])).toEqual({
+describe("Rust message instructions", () => {
+  test("returns a typed regular-message instruction", () => {
+    expect(message_instruction("# title", "!")).toEqual({
       kind: "message",
       markdown: "# title",
     });
   });
-
-  test("parses a URL instruction", () => {
-    expect(parseWasmMessageInstruction(["url", "https://example.com"])).toEqual(
-      {
-        kind: "url",
-        url: "https://example.com",
-      },
-    );
+  test("returns a typed URL instruction", () => {
+    expect(message_instruction("!url https://example.com", "!")).toEqual({
+      kind: "url",
+      url: "https://example.com",
+    });
   });
-
-  test("rejects malformed wasm responses", () => {
-    expect(() => parseWasmMessageInstruction(["message", false])).toThrow(
-      "WASM returned an invalid message instruction.",
-    );
+  test("rejects a URL command without an argument", () => {
+    expect(() => message_instruction("!url", "!")).toThrow();
   });
-
-  test("rejects unknown message kinds", () => {
-    expect(() => parseWasmMessageInstruction(["unknown", "value"])).toThrow(
-      'WASM returned unknown message kind "unknown".',
-    );
+  test("rejects unknown commands", () => {
+    expect(() => message_instruction("!unknown", "!")).toThrow();
   });
 });
 

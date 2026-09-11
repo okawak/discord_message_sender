@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { TFile, TFolder, Vault } from "obsidian";
-import { createProcessedMessage, type ProcessedMessage } from "../src/messages";
 import {
+  processed_message as createProcessedMessage,
   type MessageStorageOptions,
-  saveProcessedMessages,
-} from "../src/vault";
+  type ProcessedMessage,
+} from "../pkg/parse_message.js";
+import { saveProcessedMessages } from "../src/vault";
 
 function createVaultMock() {
   const files = new Map<string, string>();
