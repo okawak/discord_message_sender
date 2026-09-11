@@ -54,7 +54,6 @@
    - 查看频道（View Channels）
    - 发送消息（Send Messages，仅在启用同步通知时需要）
    - 读取消息历史（Read Message History）
-   - 添加表情（Add Reactions）
 4. 使用生成的 URL 邀请机器人
 
 ### 3. 获取频道 ID

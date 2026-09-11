@@ -20,7 +20,8 @@ versionファイルは開発中に次期versionへ変更しません。リリー
 - リリースversionが`0.4.0`のような`x.y.z`形式である
 - versionに`v`接頭辞やprerelease文字列を付けていない
 - 同じversionのtagが別のコミットを指していない
-- GitHub Actionsに`actions: write`、`contents: write`、`attestations: write`、`id-token: write`権限と`main`へのpush権限がある
+- version更新用jobに`actions: write`と`contents: write`、公開用jobに`attestations: write`、`contents: write`、`id-token: write`が設定されている
+- version更新用jobが`main`へpushできる
 
 `main`へbranch protectionを追加する場合は、release workflowのbot pushを許可する必要があります。
 手動workflowの実行権限はGitHubのrepository write権限で管理します。リリース担当者以外へwrite権限を付与する場合は、Actionsの実行権限も併せて見直してください。
@@ -77,21 +78,21 @@ version更新処理は`scripts/prepare-release.ts`へ集約されています。
 
 `manifest.json`の`minAppVersion`が、`versions.json`の新しいversionへ設定されます。
 
-次回は`0.5.0`として採番する予定です。[公式サンプルのversion更新処理](https://github.com/obsidianmd/obsidian-sample-plugin/blob/master/version-bump.mjs)と同じく、`manifest.json`の`minAppVersion`を読み、採番時に次のエントリーを`versions.json`へ追加します。
+`0.5.0`は採番済みで、最低対応版は次のように記録されています。
 
 ```json
 "0.5.0": "1.13.0"
 ```
 
-`0.4.0`以前のエントリーは`1.8.10`のまま維持します。既存versionの最低対応版が異なる場合、採番処理は上書きせず失敗します。同じversionと最低対応版での再実行は可能です。
+今後の採番では、[公式サンプルのversion更新処理](https://github.com/obsidianmd/obsidian-sample-plugin/blob/master/version-bump.mjs)と同じく、`manifest.json`の現在の`minAppVersion`を新しいversionの値として`versions.json`へ追加します。`0.4.0`以前のエントリーは`1.8.10`、`0.5.0`は`1.13.0`のまま維持します。既存versionの最低対応版が異なる場合、採番処理は上書きせず失敗します。同じversionと最低対応版での再実行は可能です。
 
-`Release Plugin`へ`0.5.0`を指定すると、package・manifest・Cargoのversion更新と上記エントリーの追加をまとめて実行します。開発中のversionファイルは採番前の値を維持します。
+`Release Plugin`へ新しいversionを指定すると、package・manifest・Cargoのversion更新と`versions.json`へのエントリー追加をまとめて実行します。開発中のversionファイルは採番前の値を維持します。
 
 Rust/TypeScriptの役割と開発時の検証方法は[実装構成](rust-core.md)を参照してください。
 
-## Obsidian 1.13対応とビルド再現性
+## Obsidian 1.13以降への対応とビルド再現性
 
-次のリリースから最低対応版をObsidian 1.13.0とし、設定画面は[Obsidian公式の移行ガイド](https://docs.obsidian.md/plugins/guides/migrate-declarative-settings)に従い、`getSettingDefinitions()`のみで描画します。公開済みリリースの`versions.json`エントリーは変更せず、次回のversion更新時に新しい最低対応版を追加します。
+`0.5.0`以降の最低対応版はObsidian 1.13.0です。設定画面は[Obsidian公式の移行ガイド](https://docs.obsidian.md/plugins/guides/migrate-declarative-settings)に従い、`getSettingDefinitions()`のみで描画します。公開済みリリースの`versions.json`エントリーは変更せず、最低対応版を変更する場合は新しいプラグインversionとして追加します。
 
 CIとリリースはUbuntu 24.04と固定したNode/Bun/Rust/wasm-bindgen CLI/Binaryenを使います。`bun install --frozen-lockfile`とCargoの`--locked`で依存関係の意図しない再解決を防ぎ、WASMに含まれるソース・Cargoレジストリの絶対パスを共通のパスへ置換します。Viteの出力ターゲットはES2022です。WASMは圧縮せずbase64として`main.js`に埋め込みます。production buildは`main.js`の実ファイルサイズが1,000,000 bytes以上の場合に失敗します。
 
@@ -105,11 +106,11 @@ bun run verify:build
 
 リリース前にObsidian 1.13以降で設定検索、チャンネルの追加・削除、設定の再読み込み、Bot tokenの表示切替を確認してください。
 
-## v0.4.0の受入確認
+## リリース前の受入確認
 
 自動テストに加えて、リリースPRをマージする前にデスクトップ版Obsidianで次の項目を確認します。確認結果はリリースPRへ記録します。
 
-- [ ] v0.3系の`data.json`が、チャンネルと`lastProcessedMessageId`を維持して移行される
+- [ ] 旧形式の`data.json`が、チャンネルと`lastProcessedMessageId`を維持して移行される
 - [ ] 1メッセージ1ファイル、日次、週次、月次の各形式で保存できる
 - [ ] 日次ログは日付が見出し1になり、週次・月次ログは日付が見出し2になる
 - [ ] 投稿者名・投稿時刻の各トグルがまとめたログへ反映される
@@ -144,11 +145,12 @@ bun run build
 CLIでは次のように確認できます。
 
 ```bash
-gh release view 0.4.0
-gh release download 0.4.0 --pattern main.js
+release_version=0.5.0 # 確認するversionへ置き換える
+gh release view "$release_version"
+gh release download "$release_version" --pattern main.js
 gh attestation verify main.js --repo okawak/discord_message_sender
 git fetch --tags
-git rev-parse 0.4.0^{}
+git rev-parse "${release_version}^{}"
 git rev-parse origin/main
 ```
 
