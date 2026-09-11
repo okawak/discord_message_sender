@@ -220,6 +220,47 @@ impl Media {
         }
     }
 
+    fn normalize_link_label(content: &str) -> String {
+        let mut result = String::with_capacity(content.len());
+        let mut chars = content.chars().peekable();
+        let mut code_delimiter = None;
+        let mut pending_space = false;
+
+        while let Some(character) = chars.next() {
+            if character == '`' {
+                if pending_space && !result.is_empty() {
+                    result.push(' ');
+                }
+                pending_space = false;
+
+                let mut delimiter_length = 1;
+                while chars.next_if_eq(&'`').is_some() {
+                    delimiter_length += 1;
+                }
+                result.extend(std::iter::repeat_n('`', delimiter_length));
+                code_delimiter = match code_delimiter {
+                    None => Some(delimiter_length),
+                    Some(opening_length) if opening_length == delimiter_length => None,
+                    current => current,
+                };
+                continue;
+            }
+
+            if code_delimiter.is_none() && character.is_whitespace() {
+                pending_space = true;
+                continue;
+            }
+
+            if pending_space && !result.is_empty() {
+                result.push(' ');
+            }
+            pending_space = false;
+            result.push(character);
+        }
+
+        result
+    }
+
     fn render_complex_link(
         &self,
         url: &str,
@@ -283,6 +324,11 @@ impl Renderer for Media {
                         return self.render_complex_link(url, dom, id, ctx, resolved_url);
                     }
 
+                    if self.has_structured_block_content(dom, id) {
+                        let content = render_children(url, dom, id, ctx)?;
+                        return Ok(Self::append_standalone_destination(content, &resolved_url));
+                    }
+
                     ctx.in_inline = true;
                     let old_in_link_label = ctx.in_link_label;
                     ctx.in_link_label = true;
@@ -291,12 +337,8 @@ impl Renderer for Media {
                     ctx.in_link_label = old_in_link_label;
                     let content = rendered?;
 
-                    if self.has_structured_block_content(dom, id) {
-                        return Ok(Self::append_standalone_destination(content, &resolved_url));
-                    }
-
                     let content = if has_block_content {
-                        content.trim().to_string()
+                        Self::normalize_link_label(&content)
                     } else {
                         content
                     };
@@ -730,6 +772,14 @@ mod tests {
         r#"<a href="/target"><p><code>a  b</code></p></a>"#,
         "[`a  b`](https://example.com/target)"
     )]
+    #[case(
+        r#"<a href="/target">Before<p>After</p></a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><p>Before</p>After</a>"#,
+        "[Before After](https://example.com/target)"
+    )]
     fn test_text_block_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
@@ -755,6 +805,10 @@ mod tests {
     #[case(
         "<a href=\"/target\"><div data-lang=\"rust\"><code>fn main() {}</code></div></a>",
         "```rust\nfn main() {}\n```\n\n[https://example.com/target](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><ul><li><p>First</p><p>Second</p></li></ul></a>",
+        "- First\n\n  Second\n\n[https://example.com/target](https://example.com/target)"
     )]
     fn test_structured_block_link_preserves_code_and_destination(
         #[case] html: &str,

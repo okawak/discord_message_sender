@@ -33,7 +33,7 @@ impl Renderer for Paragraph {
         }
 
         if ctx.in_link_label {
-            return Ok(format!("{} ", content.trim()));
+            return Ok(format!(" {} ", content.trim()));
         }
 
         // Handle the first item in a list differently

@@ -43,7 +43,7 @@ impl Renderer for GenericBlock {
             // div elements are treated transparently - just render children without any formatting
             let content = render_children(url, dom, id, ctx)?;
             return if ctx.in_link_label && !content.trim().is_empty() {
-                Ok(format!("{} ", content.trim()))
+                Ok(format!(" {} ", content.trim()))
             } else {
                 Ok(content)
             };
@@ -54,7 +54,7 @@ impl Renderer for GenericBlock {
         if content.trim().is_empty() {
             Ok(String::new())
         } else if ctx.in_link_label {
-            Ok(format!("{} ", content.trim()))
+            Ok(format!(" {} ", content.trim()))
         } else {
             Ok(format!("{indent}{}\n\n", content.trim()))
         }
