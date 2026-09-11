@@ -156,6 +156,19 @@ fn render_child_nodes(
     children: &[NodeId],
     ctx: &mut Context,
 ) -> Result<String, ConvertError> {
+    render_child_nodes_with(url, dom, children, ctx, |_, _, _, _| {})
+}
+
+fn render_child_nodes_with<F>(
+    url: &str,
+    dom: &Dom,
+    children: &[NodeId],
+    ctx: &mut Context,
+    mut before_append: F,
+) -> Result<String, ConvertError>
+where
+    F: FnMut(&mut String, NodeId, &str, &mut Context),
+{
     let mut result = String::with_capacity(children.len() * CHARS_PER_CHILD);
     let mut previous_was_inline = false;
     let mut pending_whitespace = false;
@@ -189,6 +202,7 @@ fn render_child_nodes(
                 result.push_str("\n\n");
             }
         }
+        before_append(&mut result, child_id, &rendered, ctx);
         result.push_str(&rendered);
         previous_was_inline = current_is_inline;
         pending_whitespace = false;
