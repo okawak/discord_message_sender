@@ -35,11 +35,12 @@ export async function saveProcessedMessages(
   };
   // Rust determines which files need inspection, including previous time zones/modes.
   const paths = storage_candidate_paths(input);
-  input.existingIds = findIndividualMessageIds(vault, messageDirectory);
-  input.existingClippingIds = findIndividualMessageIds(
-    vault,
-    clippingDirectory,
-  );
+  input.existingIds = [
+    ...getExistingIndividualMessageIds(vault, messageDirectory),
+  ];
+  input.existingClippingIds = [
+    ...getExistingIndividualMessageIds(vault, clippingDirectory),
+  ];
   for (const path of paths) {
     const file = vault.getFileByPath(path);
     if (!file) continue;
@@ -69,13 +70,16 @@ export async function saveProcessedMessages(
   return savedCount;
 }
 
-function findIndividualMessageIds(vault: Vault, directory: string): string[] {
-  const ids: string[] = [];
+export function getExistingIndividualMessageIds(
+  vault: Vault,
+  directory: string,
+): ReadonlySet<string> {
+  const ids = new Set<string>();
   const folder = vault.getFolderByPath(directory);
   for (const child of folder?.children ?? []) {
     const file = vault.getFileByPath(child.path);
     const id = file ? individual_message_id(file.name) : undefined;
-    if (id) ids.push(id);
+    if (id) ids.add(id);
   }
   return ids;
 }
