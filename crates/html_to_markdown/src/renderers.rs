@@ -180,7 +180,11 @@ fn render_child_nodes(
         let current_is_inline = rendered_node_is_inline(&rendered);
         if pending_whitespace && previous_was_inline {
             if current_is_inline {
-                result.push(' ');
+                let already_separated = result.chars().next_back().is_some_and(char::is_whitespace)
+                    || rendered.chars().next().is_some_and(char::is_whitespace);
+                if !already_separated {
+                    result.push(' ');
+                }
             } else if !result.ends_with('\n') && !rendered.starts_with('\n') {
                 result.push_str("\n\n");
             }
@@ -282,6 +286,8 @@ mod tests {
         "<p><strong>Hello</strong> <span></span> <script>ignored</script> <em>world</em></p>",
         "**Hello** *world*\n\n"
     )]
+    #[case("<p><span>Hello </span> <span>world</span></p>", "Hello world\n\n")]
+    #[case("<p><span>Hello</span> <span> world</span></p>", "Hello world\n\n")]
     #[case("<p>A&nbsp;B 👩‍💻 A‌B</p>", "A B 👩‍💻 A‌B\n\n")]
     #[case(
         "<div><span>Published</span> <div><span>Updated</span></div></div>",
