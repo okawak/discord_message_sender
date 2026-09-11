@@ -1,8 +1,8 @@
-use super::{Context, Renderer, render_children};
+use super::{Context, Renderer, is_block_element, render_children, render_node};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::format_list_content,
+    utils::{filtering, format_list_content},
 };
 use std::{borrow::Cow, collections::HashMap};
 
@@ -107,23 +107,249 @@ impl Media {
             .unwrap_or_default()
     }
 
-    fn has_multiple_elements(&self, dom: &Dom, link_id: NodeId) -> bool {
-        let Ok(children) = dom.iter_children(link_id) else {
+    fn has_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        let Ok(children) = dom.iter_children(node_id) else {
             return false;
         };
 
-        let mut element_count = 0;
-        for &child_id in children {
-            if let Some(child_node) = dom.node(child_id)
-                && let NodeData::Element { .. } = &child_node.data
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, attrs } = &child_node.data else {
+                return false;
+            };
+            let tag_name = tag.local.as_ref();
+
+            !Self::is_ignored_element(tag_name, attrs)
+                && (is_block_element(tag_name) || self.has_block_content(dom, child_id))
+        })
+    }
+
+    fn is_card_link_element(tag_name: &str) -> bool {
+        matches!(tag_name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "img")
+    }
+
+    fn is_ignored_element(tag_name: &str, attrs: &HashMap<String, String>) -> bool {
+        matches!(tag_name, "script" | "style" | "noscript" | "footer" | "nav")
+            || matches!(tag_name, "div" | "aside")
+                && attrs
+                    .get("class")
+                    .is_some_and(|class| filtering::should_ignore_class(class))
+    }
+
+    fn has_heading_link_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+
+            match &child_node.data {
+                NodeData::Text(text) => !text.trim().is_empty(),
+                NodeData::Element { tag, attrs } => {
+                    let tag_name = tag.local.as_ref();
+                    if Self::is_ignored_element(tag_name, attrs) {
+                        false
+                    } else if matches!(tag_name, "code" | "pre") {
+                        !dom.collect_text_content(child_id).trim().is_empty()
+                    } else if tag_name == "img" {
+                        !self.get_alt_text(attrs).is_empty()
+                    } else {
+                        self.has_heading_link_content(dom, child_id)
+                    }
+                }
+                _ => false,
+            }
+        })
+    }
+
+    fn has_card_link_content(&self, url: &str, dom: &Dom, node_id: NodeId) -> bool {
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, attrs } = &child_node.data else {
+                return false;
+            };
+
+            let tag_name = tag.local.as_ref();
+            if Self::is_ignored_element(tag_name, attrs) {
+                return false;
+            }
+            if tag_name == "code"
+                || Self::is_structured_block_element(tag_name)
+                || attrs.contains_key("data-lang")
+                || attrs
+                    .get("class")
+                    .is_some_and(|class| class.contains("code-frame"))
             {
-                element_count += 1;
-                if element_count > 1 {
-                    return true;
+                return false;
+            }
+            if tag_name == "img" {
+                return !self.get_alt_text(attrs).is_empty()
+                    || attrs
+                        .get("src")
+                        .and_then(|src| self.resolve_url(url, src))
+                        .is_some();
+            }
+            if Self::is_card_link_element(tag_name) {
+                return self.has_heading_link_content(dom, child_id);
+            }
+
+            self.has_card_link_content(url, dom, child_id)
+        })
+    }
+
+    fn is_structured_block_element(tag_name: &str) -> bool {
+        matches!(
+            tag_name,
+            "aside"
+                | "blockquote"
+                | "dl"
+                | "fieldset"
+                | "form"
+                | "li"
+                | "ol"
+                | "pre"
+                | "table"
+                | "ul"
+        )
+    }
+
+    fn has_structured_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, attrs } = &child_node.data else {
+                return false;
+            };
+
+            let tag_name = tag.local.as_ref();
+            if Self::is_ignored_element(tag_name, attrs) {
+                return false;
+            }
+
+            Self::is_structured_block_element(tag_name)
+                || attrs.contains_key("data-lang")
+                || attrs
+                    .get("class")
+                    .is_some_and(|class| class.contains("code-frame"))
+                || self.has_structured_block_content(dom, child_id)
+        })
+    }
+
+    fn append_standalone_destination(
+        content: String,
+        resolved_url: &str,
+        list_depth: usize,
+        has_following_content: bool,
+    ) -> String {
+        let content = content.trim_end();
+        let indent = " ".repeat(list_depth);
+        let trailing_separator = if list_depth == 0 {
+            "\n\n".to_string()
+        } else if has_following_content {
+            format!("\n{indent}")
+        } else {
+            String::new()
+        };
+        if content.is_empty() {
+            format!("{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
+        } else {
+            format!("{content}\n\n{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
+        }
+    }
+
+    fn has_following_content(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &Context,
+    ) -> Result<bool, ConvertError> {
+        let mut current_id = id;
+        let mut probe_ctx = ctx.clone();
+        probe_ctx.suppress_link_boundary_probe = true;
+
+        while let Ok(Some(parent_id)) = dom.get_parent(current_id) {
+            let Ok(children) = dom.iter_children(parent_id) else {
+                return Ok(false);
+            };
+            for &child_id in children
+                .skip_while(|&&child_id| child_id != current_id)
+                .skip(1)
+            {
+                if !render_node(url, dom, child_id, &mut probe_ctx)?
+                    .trim()
+                    .is_empty()
+                {
+                    return Ok(true);
                 }
             }
+
+            if dom.node(parent_id).is_some_and(|node| {
+                matches!(&node.data, NodeData::Element { tag, .. } if tag.local.as_ref() == "li")
+            }) {
+                break;
+            }
+            current_id = parent_id;
         }
-        false
+
+        Ok(false)
+    }
+
+    fn normalize_link_label(content: &str) -> String {
+        let mut result = String::with_capacity(content.len());
+        let mut chars = content.chars().peekable();
+        let mut code_delimiter = None;
+        let mut pending_space = false;
+
+        while let Some(character) = chars.next() {
+            if character == '`' {
+                if pending_space && !result.is_empty() {
+                    result.push(' ');
+                }
+                pending_space = false;
+
+                let mut delimiter_length = 1;
+                while chars.next_if_eq(&'`').is_some() {
+                    delimiter_length += 1;
+                }
+                result.extend(std::iter::repeat_n('`', delimiter_length));
+                code_delimiter = match code_delimiter {
+                    None => Some(delimiter_length),
+                    Some(opening_length) if opening_length == delimiter_length => None,
+                    current => current,
+                };
+                continue;
+            }
+
+            if code_delimiter.is_none() && character.is_whitespace() {
+                pending_space = true;
+                continue;
+            }
+
+            if pending_space && !result.is_empty() {
+                result.push(' ');
+            }
+            pending_space = false;
+            result.push(character);
+        }
+
+        result
     }
 
     fn render_complex_link(
@@ -184,15 +410,51 @@ impl Renderer for Media {
                     //   <span>Link Text</span>
                     //   <p>Additional Info</p>
                     // </a>
-                    if self.has_multiple_elements(dom, id) {
+                    let has_block_content = self.has_block_content(dom, id);
+                    if has_block_content && self.has_card_link_content(url, dom, id) {
                         return self.render_complex_link(url, dom, id, ctx, resolved_url);
                     }
 
-                    ctx.in_inline = true;
-                    let content = render_children(url, dom, id, ctx)?;
-                    ctx.in_inline = old_inline_status;
+                    if self.has_structured_block_content(dom, id) {
+                        let content = render_children(url, dom, id, ctx)?;
+                        let has_following_content = !ctx.suppress_link_boundary_probe
+                            && self.has_following_content(url, dom, id, ctx)?;
+                        return Ok(Self::append_standalone_destination(
+                            content,
+                            &resolved_url,
+                            ctx.list_depth,
+                            has_following_content,
+                        ));
+                    }
 
-                    Ok(format!("[{content}]({resolved_url})"))
+                    ctx.in_inline = true;
+                    let old_in_link_label = ctx.in_link_label;
+                    ctx.in_link_label = true;
+                    let rendered = render_children(url, dom, id, ctx);
+                    ctx.in_inline = old_inline_status;
+                    ctx.in_link_label = old_in_link_label;
+                    let content = rendered?;
+
+                    let content = if has_block_content {
+                        Self::normalize_link_label(&content)
+                    } else {
+                        content
+                    };
+
+                    let trailing_separator = if !ctx.suppress_link_boundary_probe
+                        && has_block_content
+                        && self.has_following_content(url, dom, id, ctx)?
+                    {
+                        if ctx.list_depth == 0 {
+                            "\n\n".to_string()
+                        } else {
+                            format!("\n{}", " ".repeat(ctx.list_depth))
+                        }
+                    } else {
+                        String::new()
+                    };
+
+                    Ok(format!("[{content}]({resolved_url}){trailing_separator}"))
                 } else {
                     ctx.in_inline = true;
                     let content = render_children(url, dom, id, ctx)?;
@@ -579,6 +841,217 @@ mod tests {
         let mut context = Context::default();
         let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
             .expect("Failed to render external links");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        r#"<a href="https://target.example.com"><span>Hello</span><span>World</span></a>"#,
+        "[HelloWorld](https://target.example.com/)"
+    )]
+    #[case(
+        r#"<a href="/formatted"><strong>Bold</strong> and <em>italic</em></a>"#,
+        "[**Bold** and *italic*](https://example.com/formatted)"
+    )]
+    #[case(
+        r#"<a href="/product"><img src="/product.png" alt="Product"><span>Details</span></a>"#,
+        "[![Product](https://example.com/product.png)Details](https://example.com/product)"
+    )]
+    #[case(
+        r#"<a href="/target"><div class="sidebar">ignored</div>Text</a>After"#,
+        "[Text](https://example.com/target)After"
+    )]
+    fn test_inline_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render inline link children");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        r#"<a href="/target"><div>Details</div></a>"#,
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><p>First</p><p>Second</p></a>"#,
+        "[First Second](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><p><code>a  b</code></p></a>"#,
+        "[`a  b`](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<p>After</p></a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><p>Before</p>After</a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<figure>After</figure></a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><figure>Before</figure>After</a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<address>Middle</address>After</a>"#,
+        "[Before Middle After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<details>Middle</details>After</a>"#,
+        "[Before Middle After](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target">Before<hr>After</a>"#,
+        "[Before After](https://example.com/target)"
+    )]
+    fn test_text_block_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render text block link children");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        "<a href=\"/target\"><pre><code>line1\n  line2</code></pre></a>",
+        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)\n\n"
+    )]
+    #[case(
+        "<a href=\"/target\"><div class=\"code-frame\"><code>line1\n  line2</code></div></a>",
+        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)\n\n"
+    )]
+    #[case(
+        "<a href=\"/target\"><div data-lang=\"rust\"><code>fn main() {}</code></div></a>",
+        "```rust\nfn main() {}\n```\n\n[https://example.com/target](https://example.com/target)\n\n"
+    )]
+    #[case(
+        "<a href=\"/target\"><ul><li><p>First</p><p>Second</p></li></ul></a>",
+        "- First\n\n  Second\n\n[https://example.com/target](https://example.com/target)\n\n"
+    )]
+    fn test_structured_block_link_preserves_code_and_destination(
+        #[case] html: &str,
+        #[case] expected: &str,
+    ) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render structured block link");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        "<a href=\"/target\"><pre><code>x</code></pre></a>After",
+        "```\nx\n```\n\n[https://example.com/target](https://example.com/target)\n\nAfter"
+    )]
+    #[case(
+        "<a href=\"/target\"><p>Before</p></a>After",
+        "[Before](https://example.com/target)\n\nAfter"
+    )]
+    #[case(
+        "<a href=\"/target\"><h2></h2><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><img><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><img src=\"javascript:alert(1)\"><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><h2><img src=\"/icon.png\"></h2><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a></li><li>Next</li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
+    )]
+    #[case(
+        "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a><h2>After</h2></li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n  ## After\n\n"
+    )]
+    #[case(
+        "<ul><li><div><a href=\"/target\"><pre><code>x</code></pre></a></div><h2>After</h2></li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n  ## After\n\n"
+    )]
+    #[case(
+        "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a><div class=\"sidebar\">ignored</div></li><li>Next</li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
+    )]
+    #[case(
+        "<ul><li><div><a href=\"/target\"><pre><code>x</code></pre></a></div><section></section></li><li>Next</li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
+    )]
+    #[case(
+        "<a href=\"/target\"><div><div class=\"sidebar\"><h2>Ignored</h2></div><span>Details</span></div></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><div class=\"sidebar\"><pre>ignored</pre></div><span>Details</span></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><div><code><img src=\"/icon.png\" alt=\"Icon\"></code><span>Details</span></div></a>",
+        "[`![Icon](https://example.com/icon.png)`Details](https://example.com/target)"
+    )]
+    fn test_complex_link_boundaries(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render complex link boundaries");
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_many_sibling_block_links_without_recursive_boundary_probes() {
+        const LINK_COUNT: usize = 800;
+        let html = (0..LINK_COUNT)
+            .map(|index| format!(r#"<a href="/{index}"><p>{index}</p></a>"#))
+            .collect::<String>();
+        let expected = (0..LINK_COUNT)
+            .map(|index| format!("[{index}](https://example.com/{index})"))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let dom = parser::parse_html(&html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render sibling block links");
+
         assert_eq!(result, expected);
     }
 

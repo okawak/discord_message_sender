@@ -32,6 +32,10 @@ impl Renderer for Paragraph {
             return Ok(String::new());
         }
 
+        if ctx.in_link_label {
+            return Ok(format!(" {} ", content.trim()));
+        }
+
         // Handle the first item in a list differently
         Ok(format_list_content(ctx, &content))
     }

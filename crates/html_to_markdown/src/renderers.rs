@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::sync::LazyLock;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Context {
     pub in_inline: bool,
     /// Depth of nested lists, used for rendering list items
@@ -27,7 +27,9 @@ pub struct Context {
     pub in_table: bool,
     pub preserve_whitespace: bool,
     pub in_heading: bool,
+    pub in_link_label: bool,
     pub link_info: Option<String>,
+    pub suppress_link_boundary_probe: bool,
     /// Last character of the previous output to determine if block separation is needed
     pub last_char: Option<char>,
 }
@@ -106,6 +108,44 @@ static GENERIC_RENDERERS: LazyLock<Vec<&'static dyn Renderer>> = LazyLock::new(|
     ]
 });
 
+pub(crate) fn is_block_element(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "address"
+            | "article"
+            | "aside"
+            | "blockquote"
+            | "details"
+            | "div"
+            | "dl"
+            | "dt"
+            | "dd"
+            | "fieldset"
+            | "figcaption"
+            | "figure"
+            | "footer"
+            | "form"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "header"
+            | "hr"
+            | "li"
+            | "main"
+            | "nav"
+            | "ol"
+            | "p"
+            | "pre"
+            | "section"
+            | "summary"
+            | "table"
+            | "ul"
+    )
+}
+
 pub fn render_node(
     url: &str,
     dom: &Dom,
@@ -129,6 +169,14 @@ pub fn render_node(
         if renderer.matches(dom, id) {
             return renderer.render(url, dom, id, ctx);
         }
+    }
+
+    if let NodeData::Element { tag, .. } = &node.data
+        && ctx.in_link_label
+        && is_block_element(tag.local.as_ref())
+    {
+        let content = render_children(url, dom, id, ctx)?;
+        return Ok(format!(" {} ", content.trim()));
     }
 
     // default case: render children recursively

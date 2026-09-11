@@ -41,13 +41,20 @@ impl Renderer for GenericBlock {
             }
 
             // div elements are treated transparently - just render children without any formatting
-            return render_children(url, dom, id, ctx);
+            let content = render_children(url, dom, id, ctx)?;
+            return if ctx.in_link_label && !content.trim().is_empty() {
+                Ok(format!(" {} ", content.trim()))
+            } else {
+                Ok(content)
+            };
         }
 
         let indent = " ".repeat(ctx.list_depth);
         let content = render_children(url, dom, id, ctx)?;
         if content.trim().is_empty() {
             Ok(String::new())
+        } else if ctx.in_link_label {
+            Ok(format!(" {} ", content.trim()))
         } else {
             Ok(format!("{indent}{}\n\n", content.trim()))
         }

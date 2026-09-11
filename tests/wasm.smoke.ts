@@ -59,6 +59,14 @@ if (resolvedUrls.includes("javascript:")) {
   throw new Error("WASM URL resolution restored an unsafe scheme.");
 }
 
+const inlineLink = convertHtml(
+  "https://example.com",
+  '<a href="/target"><span>Hello</span><span>World</span></a>',
+);
+if (!inlineLink.includes("[HelloWorld](https://example.com/target)")) {
+  throw new Error("WASM inline link destination was not preserved.");
+}
+
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;
 for (let index = 0; index < 100; index += 1) {
   convertHtml("https://example.com", repeatedHtml);
