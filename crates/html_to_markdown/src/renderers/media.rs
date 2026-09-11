@@ -2,7 +2,7 @@ use super::{Context, Renderer, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::format_list_content,
+    utils::{format_list_content, normalize_heading_content},
 };
 use std::{borrow::Cow, collections::HashMap};
 
@@ -146,6 +146,18 @@ impl Media {
     }
 
     fn has_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        Self::contains_element(dom, node_id, Self::is_block_element)
+    }
+
+    fn is_card_link_element(tag_name: &str) -> bool {
+        matches!(tag_name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "img")
+    }
+
+    fn has_card_link_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        Self::contains_element(dom, node_id, Self::is_card_link_element)
+    }
+
+    fn contains_element(dom: &Dom, node_id: NodeId, predicate: fn(&str) -> bool) -> bool {
         let Ok(children) = dom.iter_children(node_id) else {
             return false;
         };
@@ -157,7 +169,7 @@ impl Media {
             let NodeData::Element { tag, .. } = &child_node.data else {
                 return false;
             };
-            Self::is_block_element(tag.local.as_ref()) || self.has_block_content(dom, child_id)
+            predicate(tag.local.as_ref()) || Self::contains_element(dom, child_id, predicate)
         })
     }
 
@@ -219,13 +231,21 @@ impl Renderer for Media {
                     //   <span>Link Text</span>
                     //   <p>Additional Info</p>
                     // </a>
-                    if self.has_block_content(dom, id) {
+                    let has_block_content = self.has_block_content(dom, id);
+                    if has_block_content && self.has_card_link_content(dom, id) {
                         return self.render_complex_link(url, dom, id, ctx, resolved_url);
                     }
 
                     ctx.in_inline = true;
-                    let content = render_children(url, dom, id, ctx)?;
+                    let rendered = render_children(url, dom, id, ctx);
                     ctx.in_inline = old_inline_status;
+                    let content = rendered?;
+
+                    let content = if has_block_content {
+                        normalize_heading_content(&content).into_owned()
+                    } else {
+                        content
+                    };
 
                     Ok(format!("[{content}]({resolved_url})"))
                 } else {
@@ -640,6 +660,28 @@ mod tests {
             &mut context,
         )
         .expect("Failed to render inline link children");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        r#"<a href="/target"><div>Details</div></a>"#,
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        r#"<a href="/target"><p>First</p><p>Second</p></a>"#,
+        "[First Second](https://example.com/target)"
+    )]
+    fn test_text_block_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render text block link children");
         assert_eq!(result, expected);
     }
 
