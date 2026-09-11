@@ -153,7 +153,7 @@ impl Media {
         matches!(tag_name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "img")
     }
 
-    fn has_card_link_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+    fn has_card_link_content(&self, url: &str, dom: &Dom, node_id: NodeId) -> bool {
         let Ok(children) = dom.iter_children(node_id) else {
             return false;
         };
@@ -162,13 +162,17 @@ impl Media {
             let Some(child_node) = dom.node(child_id) else {
                 return false;
             };
-            let NodeData::Element { tag, .. } = &child_node.data else {
+            let NodeData::Element { tag, attrs } = &child_node.data else {
                 return false;
             };
 
             let tag_name = tag.local.as_ref();
             if tag_name == "img" {
-                return true;
+                return !self.get_alt_text(attrs).is_empty()
+                    || attrs
+                        .get("src")
+                        .and_then(|src| self.resolve_url(url, src))
+                        .is_some();
             }
             if Self::is_card_link_element(tag_name)
                 && !dom.collect_text_content(child_id).trim().is_empty()
@@ -176,7 +180,7 @@ impl Media {
                 return true;
             }
 
-            self.has_card_link_content(dom, child_id)
+            self.has_card_link_content(url, dom, child_id)
         })
     }
 
@@ -245,9 +249,7 @@ impl Media {
         if content.is_empty() {
             format!("{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
         } else {
-            format!(
-                "{content}\n\n{indent}[{resolved_url}]({resolved_url}){trailing_separator}"
-            )
+            format!("{content}\n\n{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
         }
     }
 
@@ -351,7 +353,7 @@ impl Renderer for Media {
                     //   <p>Additional Info</p>
                     // </a>
                     let has_block_content = self.has_block_content(dom, id);
-                    if has_block_content && self.has_card_link_content(dom, id) {
+                    if has_block_content && self.has_card_link_content(url, dom, id) {
                         return self.render_complex_link(url, dom, id, ctx, resolved_url);
                     }
 
@@ -868,6 +870,14 @@ mod tests {
     )]
     #[case(
         "<a href=\"/target\"><h2></h2><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><img><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><img src=\"javascript:alert(1)\"><p>Details</p></a>",
         "[Details](https://example.com/target)"
     )]
     #[case(
