@@ -57,7 +57,6 @@ DiscordでメモをとってObsidianに自動で同期できるプラグイン�
    - View Channels
    - Send Messages（同期通知を有効にする場合のみ必要）
    - Read Message History
-   - Add Reactions
 
 4. 生成されたURLでボットを招待
 

@@ -55,7 +55,6 @@ This is a Obsidian plugin that allows you to take notes in Discord and automatic
     - View Channels
     - Send Messages (only required when sync notifications are enabled)
     - Read Message History
-    - Add Reactions
 4. Use the generated URL to invite your bot
 
 ### 3. Get Channel IDs
