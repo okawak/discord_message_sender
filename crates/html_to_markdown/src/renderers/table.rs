@@ -11,15 +11,22 @@ struct TableRow {
     is_header: bool,
 }
 
+struct TableRowGroup {
+    row_ids: Vec<NodeId>,
+    is_header: bool,
+}
+
 const MAX_COLSPAN: usize = 1_000;
 
 impl Table {
-    fn collect_rows(dom: &Dom, id: NodeId, in_header: bool, rows: &mut Vec<(NodeId, bool)>) {
-        let Some(node) = dom.node(id) else {
-            return;
+    fn collect_row_groups(dom: &Dom, table_id: NodeId) -> Vec<TableRowGroup> {
+        let mut groups = Vec::new();
+        let mut implicit_rows = Vec::new();
+        let Some(table) = dom.node(table_id) else {
+            return groups;
         };
 
-        for &child_id in &node.children {
+        for &child_id in &table.children {
             let Some(child) = dom.node(child_id) else {
                 continue;
             };
@@ -28,14 +35,45 @@ impl Table {
             };
 
             match tag.local.as_ref() {
-                "tr" => rows.push((child_id, in_header)),
-                "thead" => Self::collect_rows(dom, child_id, true, rows),
-                "tbody" | "tfoot" => Self::collect_rows(dom, child_id, false, rows),
-                // Nested tables belong to their containing cell, not this table.
-                "table" => {}
+                "tr" => implicit_rows.push(child_id),
+                "thead" | "tbody" | "tfoot" => {
+                    if !implicit_rows.is_empty() {
+                        groups.push(TableRowGroup {
+                            row_ids: std::mem::take(&mut implicit_rows),
+                            is_header: false,
+                        });
+                    }
+
+                    let row_ids = child
+                        .children
+                        .iter()
+                        .copied()
+                        .filter(|&row_id| {
+                            matches!(
+                                dom.node(row_id).map(|row| &row.data),
+                                Some(NodeData::Element { tag, .. }) if tag.local.as_ref() == "tr"
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    if !row_ids.is_empty() {
+                        groups.push(TableRowGroup {
+                            row_ids,
+                            is_header: tag.local.as_ref() == "thead",
+                        });
+                    }
+                }
                 _ => {}
             }
         }
+
+        if !implicit_rows.is_empty() {
+            groups.push(TableRowGroup {
+                row_ids: implicit_rows,
+                is_header: false,
+            });
+        }
+
+        groups
     }
 
     fn escape_cell_pipes(content: &str) -> String {
@@ -97,7 +135,7 @@ impl Table {
         }
     }
 
-    fn has_preceding_inline_content(dom: &Dom, id: NodeId) -> bool {
+    fn has_preceding_unseparated_content(dom: &Dom, id: NodeId) -> bool {
         let Ok(Some(parent_id)) = dom.get_parent(id) else {
             return false;
         };
@@ -117,7 +155,10 @@ impl Table {
                 NodeData::Text(text) if text.trim().is_empty() => continue,
                 NodeData::Text(_) => return true,
                 NodeData::Element { tag, .. } => {
-                    return !is_block_element(tag.local.as_ref());
+                    let tag_name = tag.local.as_ref();
+                    // GenericBlock renders div transparently, so its tag alone does not
+                    // guarantee a trailing Markdown block boundary.
+                    return tag_name == "div" || !is_block_element(tag_name);
                 }
                 _ => continue,
             }
@@ -248,38 +289,12 @@ impl Table {
         ctx: &Context,
     ) -> Result<String, ConvertError> {
         let caption = self.render_caption(url, dom, id, ctx)?;
-        let mut row_ids = Vec::new();
-        Self::collect_rows(dom, id, false, &mut row_ids);
-
-        let mut rows = Vec::with_capacity(row_ids.len());
-        let mut active_rowspans = Vec::new();
-        let row_count = row_ids.len();
-        for (index, (row_id, in_header)) in row_ids.into_iter().enumerate() {
-            if let Some(row) = Self::render_row(
-                url,
-                dom,
-                row_id,
-                in_header,
-                ctx,
-                row_count - index,
-                &mut active_rowspans,
-            )? {
-                rows.push(row);
-            }
-        }
-
-        let Some(column_count) = rows.iter().map(|row| row.cells.len()).max() else {
-            return if caption.is_empty() {
-                Ok(String::new())
-            } else {
-                Ok(format!("{caption}\n\n"))
-            };
-        };
+        let row_groups = Self::collect_row_groups(dom, id);
 
         let list_indent = " ".repeat(ctx.list_depth);
         let starts_after_list_content = ctx.list_depth > 0 && !ctx.list_first_item;
         let needs_leading_boundary = starts_after_list_content
-            || (ctx.list_depth == 0 && Self::has_preceding_inline_content(dom, id));
+            || (ctx.list_depth == 0 && Self::has_preceding_unseparated_content(dom, id));
         let first_line_indent = if starts_after_list_content {
             list_indent.as_str()
         } else {
@@ -289,6 +304,43 @@ impl Table {
             list_indent.as_str()
         } else {
             ""
+        };
+
+        let row_capacity = row_groups.iter().map(|group| group.row_ids.len()).sum();
+        let mut rows = Vec::with_capacity(row_capacity);
+        for group in row_groups {
+            // HTML row spans are scoped to their row group and cannot shift cells in a
+            // following thead, tbody, or tfoot.
+            let mut active_rowspans = Vec::new();
+            let row_count = group.row_ids.len();
+            for (index, row_id) in group.row_ids.into_iter().enumerate() {
+                if let Some(row) = Self::render_row(
+                    url,
+                    dom,
+                    row_id,
+                    group.is_header,
+                    ctx,
+                    row_count - index,
+                    &mut active_rowspans,
+                )? {
+                    rows.push(row);
+                }
+            }
+        }
+
+        let Some(column_count) = rows.iter().map(|row| row.cells.len()).max() else {
+            return if caption.is_empty() {
+                Ok(String::new())
+            } else {
+                let mut output = String::new();
+                if needs_leading_boundary {
+                    output.push_str("\n\n");
+                }
+                output.push_str(first_line_indent);
+                output.push_str(&caption);
+                output.push_str("\n\n");
+                Ok(output)
+            };
         };
 
         let mut output = String::new();
@@ -449,6 +501,19 @@ mod tests {
         );
     }
 
+    #[rstest]
+    #[case(
+        r#"<table><thead><tr><th rowspan="2">A</th><th>B</th></tr></thead><tbody><tr><td>C</td><td>D</td></tr></tbody></table>"#,
+        "| A | B |\n| --- | --- |\n| C | D |\n\n"
+    )]
+    #[case(
+        r#"<table><tbody><tr><td rowspan="0">A</td><td>B</td></tr><tr><td>C</td></tr></tbody><tbody><tr><td>D</td><td>E</td></tr></tbody></table>"#,
+        "|  |  |\n| --- | --- |\n| A | B |\n|  | C |\n| D | E |\n\n"
+    )]
+    fn limits_rowspans_to_their_row_group(#[case] html: &str, #[case] expected: &str) {
+        assert_eq!(render(html), expected);
+    }
+
     #[test]
     fn escapes_cell_pipes_and_flattens_block_line_breaks() {
         let html = r#"<table><tr><th>A|B</th><th>Plain</th></tr><tr><td><p>One</p><p>Two | Three</p></td><td>Last<br>Line</td></tr></table>"#;
@@ -475,6 +540,14 @@ mod tests {
     #[case(
         "<div>Before<table><tr><th>A</th></tr><tr><td>1</td></tr></table></div>",
         "Before\n\n| A |\n| --- |\n| 1 |\n\n"
+    )]
+    #[case(
+        "<div>Before</div><table><tr><th>A</th></tr><tr><td>1</td></tr></table>",
+        "Before\n\n| A |\n| --- |\n| 1 |\n\n"
+    )]
+    #[case(
+        "Before<table><caption>Results</caption></table>",
+        "Before\n\nResults\n\n"
     )]
     #[case(
         "<ul><li><table><tr><th>A</th></tr><tr><td>1</td></tr></table></li></ul>",
