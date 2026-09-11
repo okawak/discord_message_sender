@@ -67,6 +67,17 @@ if (!inlineLink.includes("[HelloWorld](https://example.com/target)")) {
   throw new Error("WASM inline link destination was not preserved.");
 }
 
+const markdownTable = convertHtml(
+  "https://example.com",
+  "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>",
+);
+if (
+  !markdownTable.includes("| A | B |\n| --- | --- |\n| 1 | 2 |") ||
+  !Bun.markdown.html(markdownTable).includes("<table>")
+) {
+  throw new Error("WASM HTML table did not produce a valid Markdown table.");
+}
+
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;
 for (let index = 0; index < 100; index += 1) {
   convertHtml("https://example.com", repeatedHtml);
