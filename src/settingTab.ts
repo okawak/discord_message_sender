@@ -2,12 +2,9 @@ import {
   type App,
   Notice,
   PluginSettingTab,
-  Setting,
-  type SettingControl,
+  type Setting,
   type SettingDefinition,
-  type SettingDefinitionGroup,
   type SettingDefinitionItem,
-  type SettingDefinitionList,
   type TextComponent,
 } from "obsidian";
 import {
@@ -47,19 +44,6 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: DiscordMessageSenderPlugin) {
     super(app, plugin);
     this.plugin = plugin;
-  }
-
-  /**
-   * Compatibility renderer for Obsidian versions before 1.13.
-   * Newer versions render getSettingDefinitions() without calling this method.
-   */
-  override display(): void {
-    this.containerEl.empty();
-    for (const item of this.getSettingDefinitions()) {
-      if ("type" in item && (item.type === "group" || item.type === "list")) {
-        this.renderLegacyGroup(item);
-      }
-    }
   }
 
   override getSettingDefinitions(): SettingDefinitionItem<SettingKey>[] {
@@ -117,16 +101,14 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         emptyState: "No channels configured",
         addItem: {
           name: "Add channel",
-          action: async () => {
+          action: () => {
             this.plugin.settings.channels.push({ id: "", name: "" });
-            await this.plugin.saveSettings();
-            this.refresh();
+            this.saveChannelChanges();
           },
         },
-        onDelete: async (index) => {
+        onDelete: (index) => {
           this.plugin.settings.channels.splice(index, 1);
-          await this.plugin.saveSettings();
-          this.refresh();
+          this.saveChannelChanges();
         },
         items: this.plugin.settings.channels.map((channel, index) =>
           this.getChannelDefinition(channel, index),
@@ -262,116 +244,15 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings();
   }
 
-  private renderLegacyGroup(group: SettingDefinitionGroup<SettingKey>): void {
-    const list =
-      group.type === "list"
-        ? (group as SettingDefinitionList<SettingKey>)
-        : undefined;
-
-    if (group.heading) {
-      const heading = new Setting(this.containerEl).setName(group.heading);
-      if (list?.addItem) {
-        const { addItem } = list;
-        heading.addButton((button) =>
-          button
-            .setButtonText(addItem.name)
-            .setCta()
-            .onClick(() => addItem.action(button.buttonEl)),
-        );
-      } else {
-        heading.setHeading();
-      }
-    }
-
-    if (list?.emptyState && group.items?.length === 0) {
-      new Setting(this.containerEl).setName(list.emptyState);
-    }
-
-    group.items?.forEach((definition, index) => {
-      if ("type" in definition) {
-        return;
-      }
-      const setting = new Setting(this.containerEl).setName(definition.name);
-      if (definition.desc) {
-        setting.setDesc(definition.desc);
-      }
-      if ("control" in definition && definition.control) {
-        this.renderLegacyControl(setting, definition.control);
-      } else if ("render" in definition) {
-        const render = definition.render as (setting: Setting) => void;
-        render(setting);
-      }
-      if (list?.onDelete) {
-        const { onDelete } = list;
-        setting.addExtraButton((button) =>
-          button
-            .setIcon("trash")
-            .setTooltip("Remove channel")
-            .onClick(() => onDelete(index)),
-        );
-      }
-    });
-  }
-
-  private renderLegacyControl(
-    setting: Setting,
-    control: SettingControl<SettingKey>,
-  ): void {
-    const value = this.getControlValue(control.key) ?? control.defaultValue;
-    switch (control.type) {
-      case "text":
-        setting.addText((text) =>
-          text
-            .setPlaceholder(control.placeholder ?? "")
-            .setValue(typeof value === "string" ? value : "")
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      case "textarea":
-        setting.addTextArea((text) =>
-          text
-            .setPlaceholder(control.placeholder ?? "")
-            .setValue(typeof value === "string" ? value : "")
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      case "dropdown":
-        setting.addDropdown((dropdown) =>
-          dropdown
-            .addOptions(control.options)
-            .setValue(typeof value === "string" ? value : "")
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      case "toggle":
-        setting.addToggle((toggle) =>
-          toggle
-            .setValue(value === true)
-            .onChange((nextValue) =>
-              this.setControlValue(control.key, nextValue),
-            ),
-        );
-        return;
-      default:
-        throw new Error(
-          `Unsupported legacy setting control "${control.type}".`,
-        );
-    }
-  }
-
-  private refresh(): void {
-    const update: unknown = Reflect.get(this, "update");
-    if (typeof update === "function") {
-      update.call(this);
-    } else {
-      this.display();
-    }
+  private saveChannelChanges(): void {
+    // Obsidian's list callbacks return void; handle persistence failures here.
+    void this.plugin.saveSettings().then(
+      () => this.update(),
+      () => {
+        new Notice("Could not save Discord channels. Please try again.");
+        this.update();
+      },
+    );
   }
 
   private getChannelDefinition(
