@@ -10,6 +10,7 @@ import {
   type SyncPreparation,
 } from "../pkg/parse_message.js";
 import {
+  getChannelNotificationFailureNotice,
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
   processDiscordMessageBatch,
@@ -104,6 +105,14 @@ export default class DiscordMessageSenderPlugin extends Plugin {
           failure.error,
         );
         new Notice(getChannelSyncFailureNotice(failure));
+      }
+
+      for (const failure of summary.notificationFailures) {
+        console.error(
+          `Discord sync notification failed for ${getChannelDisplayName(failure.channel)}:`,
+          failure.error,
+        );
+        new Notice(getChannelNotificationFailureNotice(failure));
       }
 
       new Notice(getSyncCompletionNotice(summary));
