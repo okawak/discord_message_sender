@@ -146,8 +146,15 @@ pub(crate) fn is_block_element(tag_name: &str) -> bool {
     )
 }
 
-fn rendered_node_is_inline(rendered: &str) -> bool {
-    rendered != "<br>" && !rendered.starts_with('\n') && !rendered.ends_with('\n')
+fn rendered_node_is_inline(dom: &Dom, id: NodeId, rendered: &str) -> bool {
+    if rendered == "<br>" {
+        return false;
+    }
+
+    matches!(
+        dom.node(id).map(|node| &node.data),
+        Some(NodeData::Element { tag, .. }) if tag.local.as_ref() == "img"
+    ) || (!rendered.starts_with('\n') && !rendered.ends_with('\n'))
 }
 
 fn render_child_nodes(
@@ -204,7 +211,7 @@ where
             continue;
         }
 
-        let current_is_inline = rendered_node_is_inline(&rendered);
+        let current_is_inline = rendered_node_is_inline(dom, child_id, &rendered);
         if rendered != "<br>" && pending_whitespace && previous_was_inline {
             if current_is_inline {
                 let already_separated = result.chars().next_back().is_some_and(char::is_whitespace)
@@ -321,6 +328,10 @@ mod tests {
     #[case("<p><strong>A</strong>&nbsp;B</p>", "**A** B\n\n")]
     #[case("<p>A   <strong>B</strong></p>", "A **B**\n\n")]
     #[case("<p>Hello \n<br>\n world</p>", "Hello<br>world\n\n")]
+    #[case(
+        "<p>A <img src=\"https://example.com/x\" alt=\"X\"> B</p>",
+        "A ![X](https://example.com/x)\n\n B\n\n"
+    )]
     #[case(
         "<div><span>Published</span> <div><span>Updated</span></div></div>",
         "Published Updated"
