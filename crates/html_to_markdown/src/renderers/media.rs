@@ -2,7 +2,7 @@ use super::{Context, Renderer, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
-    utils::format_list_content,
+    utils::{filtering, format_list_content},
 };
 use std::{borrow::Cow, collections::HashMap};
 
@@ -167,6 +167,14 @@ impl Media {
             };
 
             let tag_name = tag.local.as_ref();
+            if matches!(tag_name, "script" | "style" | "noscript" | "footer" | "nav")
+                || matches!(tag_name, "div" | "aside")
+                    && attrs
+                        .get("class")
+                        .is_some_and(|class| filtering::should_ignore_class(class))
+            {
+                return false;
+            }
             if tag_name == "img" {
                 return !self.get_alt_text(attrs).is_empty()
                     || attrs
@@ -242,15 +250,42 @@ impl Media {
         content: String,
         resolved_url: &str,
         list_depth: usize,
+        has_following_content: bool,
     ) -> String {
         let content = content.trim_end();
         let indent = " ".repeat(list_depth);
-        let trailing_separator = if list_depth == 0 { "\n\n" } else { "\n" };
+        let trailing_separator = if list_depth == 0 {
+            "\n\n".to_string()
+        } else if has_following_content {
+            format!("\n{indent}")
+        } else {
+            String::new()
+        };
         if content.is_empty() {
             format!("{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
         } else {
             format!("{content}\n\n{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
         }
+    }
+
+    fn has_following_content(dom: &Dom, id: NodeId) -> bool {
+        let Ok(Some(parent_id)) = dom.get_parent(id) else {
+            return false;
+        };
+        let Ok(children) = dom.iter_children(parent_id) else {
+            return false;
+        };
+
+        children
+            .skip_while(|&&child_id| child_id != id)
+            .skip(1)
+            .any(|&child_id| {
+                dom.node(child_id).is_some_and(|node| match &node.data {
+                    NodeData::Text(text) => !text.trim().is_empty(),
+                    NodeData::Element { .. } => true,
+                    _ => false,
+                })
+            })
     }
 
     fn normalize_link_label(content: &str) -> String {
@@ -363,6 +398,7 @@ impl Renderer for Media {
                             content,
                             &resolved_url,
                             ctx.list_depth,
+                            Self::has_following_content(dom, id),
                         ));
                     }
 
@@ -882,7 +918,15 @@ mod tests {
     )]
     #[case(
         "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a></li><li>Next</li></ul>",
-        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n\n- Next\n\n"
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
+    )]
+    #[case(
+        "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a><h2>After</h2></li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n  ## After\n\n"
+    )]
+    #[case(
+        "<a href=\"/target\"><div><div class=\"sidebar\"><h2>Ignored</h2></div><span>Details</span></div></a>",
+        "[Details](https://example.com/target)"
     )]
     fn test_complex_link_boundaries(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
