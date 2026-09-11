@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-  createAggregatedLog,
-  getAggregatedMessageIds,
-  hasAggregatedLogMarker,
-  isManagedAggregatedLog,
-  mergeAggregatedLog,
-} from "../src/aggregatedLog";
+  create_aggregated_log as createAggregatedLog,
+  aggregated_message_ids as getAggregatedMessageIds,
+  has_aggregated_log_marker as hasAggregatedLogMarker,
+  is_managed_log as isManagedAggregatedLog,
+  merge_aggregated_log as mergeAggregatedLog,
+} from "../pkg/parse_message.js";
 
 const entry = {
   messageId: "123",

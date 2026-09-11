@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
-  getPossibleLocalDateTimes,
-  toLocalDateTime,
-} from "../src/localDateTime";
+  possible_local_dates as getPossibleLocalDateTimes,
+  local_date_time as toLocalDateTime,
+} from "../pkg/parse_message.js";
 
 describe("toLocalDateTime", () => {
   test("uses the requested time zone at a UTC month boundary", () => {

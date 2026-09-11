@@ -1,45 +1,18 @@
 import type { Vault } from "obsidian";
 import {
-  type AggregatedLogEntry,
-  type AggregatedStorageMode,
-  createAggregatedLog,
-  getAggregatedMessageIds,
-  hasAggregatedLogMarker,
-  isManagedAggregatedLog,
-  mergeAggregatedLog,
-} from "./aggregatedLog";
-import {
-  getPossibleLocalDateTimes,
-  type LocalDateTime,
-  toLocalDateTime,
-} from "./localDateTime";
-import type { ProcessedMessage } from "./messages";
-import type { MessageStorageMode } from "./settings";
-
-export interface MessageStorageOptions {
-  messageStorageMode: MessageStorageMode;
-  showAuthorNames: boolean;
-  showMessageTime: boolean;
-  timeZone: string;
-}
-
-interface PreparedMessage {
-  message: ProcessedMessage;
-  localDateTime: LocalDateTime;
-}
-
-interface AggregatedLogTarget {
-  mode: AggregatedStorageMode;
-  period: string;
-  path: string;
-}
-
-interface AggregatedLogGroup extends AggregatedLogTarget {
-  entries: AggregatedLogEntry[];
-}
-
-const AGGREGATED_STORAGE_MODES = ["daily", "weekly", "monthly"] as const;
-const INDIVIDUAL_MESSAGE_ID_PATTERN = /^\d{8}_\d{6}_(\d+)\.md$/;
+  type AggregatedLogGroup,
+  create_aggregated_log as createAggregatedLog,
+  aggregated_message_ids as getAggregatedMessageIds,
+  has_aggregated_log_marker as hasAggregatedLogMarker,
+  individual_message_id,
+  is_managed_log as isManagedAggregatedLog,
+  type MessageStorageOptions,
+  merge_aggregated_log as mergeAggregatedLog,
+  type ProcessedMessage,
+  plan_message_storage,
+  type StorageInput,
+  storage_candidate_paths,
+} from "../pkg/parse_message.js";
 
 export class MessageStorageError extends Error {
   override name = "MessageStorageError";
@@ -52,138 +25,51 @@ export async function saveProcessedMessages(
   messages: readonly ProcessedMessage[],
   options: MessageStorageOptions,
 ): Promise<number> {
-  const prepared = messages.map((message) => ({
-    message,
-    localDateTime: toLocalDateTime(message.timestamp, options.timeZone),
-  }));
-  const regularMessages = prepared.filter(({ message }) => !message.isClipping);
-  const existingClippingIds = findIndividualMessageIds(
+  const input: StorageInput = {
+    messageDirectory,
+    clippingDirectory,
+    messages: [...messages],
+    options,
+    existingIds: [],
+    existingClippingIds: [],
+  };
+  // Rust determines which files need inspection, including previous time zones/modes.
+  const paths = storage_candidate_paths(input);
+  input.existingIds = findIndividualMessageIds(vault, messageDirectory);
+  input.existingClippingIds = findIndividualMessageIds(
     vault,
     clippingDirectory,
   );
-  const existingIds = await findExistingMessageIds(
-    vault,
-    messageDirectory,
-    regularMessages,
-  );
-  const groups = new Map<string, AggregatedLogGroup>();
+  for (const path of paths) {
+    const file = vault.getFileByPath(path);
+    if (!file) continue;
+    const content = await vault.read(file);
+    if (isManagedAggregatedLog(content))
+      input.existingIds.push(...getAggregatedMessageIds(content));
+  }
+
+  const plan = plan_message_storage(input);
   let savedCount = 0;
-
-  for (const preparedMessage of prepared) {
-    const { message, localDateTime } = preparedMessage;
-    if (message.isClipping) {
-      if (existingClippingIds.has(message.messageId)) {
-        continue;
-      }
-      existingClippingIds.add(message.messageId);
-      if (
-        (await saveIndividualMessage(vault, clippingDirectory, message)) ===
-        "saved"
-      ) {
-        savedCount++;
-      }
-      continue;
-    }
-
-    if (existingIds.has(message.messageId)) {
-      continue;
-    }
-    existingIds.add(message.messageId);
-
-    if (options.messageStorageMode === "individual") {
-      if (
-        (await saveIndividualMessage(vault, messageDirectory, message)) ===
-        "saved"
-      ) {
-        savedCount++;
-      }
-      continue;
-    }
-
-    const target = getAggregatedLogTarget(
-      messageDirectory,
-      options.messageStorageMode,
-      localDateTime,
-    );
-    const group = groups.get(target.path) ?? { ...target, entries: [] };
-    group.entries.push({
-      messageId: message.messageId,
-      date: localDateTime.date,
-      time: localDateTime.time,
-      authorName: message.authorName,
-      markdown: message.markdown,
-    });
-    groups.set(target.path, group);
+  for (const write of plan.individual) {
+    await ensureDir(vault, write.directory);
+    if (vault.getAbstractFileByPath(write.path)) continue;
+    await vault.create(write.path, write.content);
+    savedCount++;
   }
-
-  for (const group of groups.values()) {
+  for (const group of plan.groups)
     savedCount += await saveAggregatedLog(vault, group, options);
-  }
   return savedCount;
 }
 
-async function findExistingMessageIds(
-  vault: Vault,
-  messageDirectory: string,
-  messages: readonly PreparedMessage[],
-): Promise<Set<string>> {
-  const messageIds = findIndividualMessageIds(vault, messageDirectory);
-  const paths = new Set<string>();
-  for (const { message } of messages) {
-    for (const localDateTime of getPossibleLocalDateTimes(message.timestamp)) {
-      for (const mode of AGGREGATED_STORAGE_MODES) {
-        paths.add(
-          getAggregatedLogTarget(messageDirectory, mode, localDateTime).path,
-        );
-      }
-    }
-  }
-
-  for (const path of paths) {
-    const file = vault.getFileByPath(path);
-    if (!file) {
-      continue;
-    }
-    const content = await vault.read(file);
-    if (isManagedAggregatedLog(content)) {
-      for (const messageId of getAggregatedMessageIds(content)) {
-        messageIds.add(messageId);
-      }
-    }
-  }
-  return messageIds;
-}
-
-function findIndividualMessageIds(
-  vault: Vault,
-  directory: string,
-): Set<string> {
-  const messageIds = new Set<string>();
+function findIndividualMessageIds(vault: Vault, directory: string): string[] {
+  const ids: string[] = [];
   const folder = vault.getFolderByPath(directory);
   for (const child of folder?.children ?? []) {
     const file = vault.getFileByPath(child.path);
-    const messageId = file?.name.match(INDIVIDUAL_MESSAGE_ID_PATTERN)?.[1];
-    if (messageId) {
-      messageIds.add(messageId);
-    }
+    const id = file ? individual_message_id(file.name) : undefined;
+    if (id) ids.push(id);
   }
-  return messageIds;
-}
-
-async function saveIndividualMessage(
-  vault: Vault,
-  directory: string,
-  message: ProcessedMessage,
-): Promise<"saved" | "duplicate"> {
-  await ensureDir(vault, directory);
-
-  const path = `${directory}/${message.fileName}.md`;
-  if (vault.getAbstractFileByPath(path)) {
-    return "duplicate";
-  }
-
-  await vault.create(path, message.markdown);
-  return "saved";
+  return ids;
 }
 
 async function saveAggregatedLog(
@@ -227,20 +113,6 @@ async function saveAggregatedLog(
     return result.content;
   });
   return addedCount;
-}
-
-function getAggregatedLogTarget(
-  directory: string,
-  mode: AggregatedStorageMode,
-  localDateTime: LocalDateTime,
-): AggregatedLogTarget {
-  const period =
-    mode === "daily"
-      ? localDateTime.date
-      : mode === "weekly"
-        ? localDateTime.week
-        : localDateTime.month;
-  return { mode, period, path: `${directory}/${period}.md` };
 }
 
 async function ensureDir(vault: Vault, path: string): Promise<void> {

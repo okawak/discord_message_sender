@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { processDiscordMessageBatch } from "../src/messageBatch";
-import type { DiscordMessage, ProcessedMessage } from "../src/messages";
+import type { DiscordMessage, ProcessedMessage } from "../pkg/parse_message.js";
+import { processDiscordMessageBatch } from "../src/channelSync";
 
 function message(id: string, bot = false): DiscordMessage {
   return {

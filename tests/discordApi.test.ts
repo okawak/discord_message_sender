@@ -1,18 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
-  getRateLimitDelay,
-  getRateLimitResetDelay,
-} from "../src/discordRateLimit";
-import {
-  DISCORD_API_VERSION,
-  DISCORD_MESSAGE_PAGE_SIZE,
-  getChannelMessagesPath,
-} from "../src/discordRoutes";
+  discord_messages_path as getChannelMessagesPath,
+  discord_api_version as getDiscordApiVersion,
+  discord_page_size as getDiscordMessagePageSize,
+  discord_rate_limit_delay as getRateLimitDelay,
+  discord_reset_delay as getRateLimitResetDelay,
+} from "../pkg/parse_message.js";
 
 describe("Discord message route", () => {
   test("uses API v10 and Discord's maximum page size", () => {
-    expect(DISCORD_API_VERSION).toBe(10);
-    expect(DISCORD_MESSAGE_PAGE_SIZE).toBe(100);
+    expect(getDiscordApiVersion()).toBe(10);
+    expect(getDiscordMessagePageSize()).toBe(100);
     expect(getChannelMessagesPath("123")).toBe(
       "/channels/123/messages?limit=100",
     );

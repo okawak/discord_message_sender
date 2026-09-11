@@ -8,10 +8,10 @@ repository.workspace = true
 license-file.workspace = true
 
 [dependencies]
-thiserror = "2"
-html5ever = "0.39"
+thiserror.workspace = true
+html5ever.workspace = true
 
 [dev-dependencies]
-pretty_assertions = "1"
-rstest = "0.26"
-indoc = "2"
+pretty_assertions.workspace = true
+rstest.workspace = true
+indoc.workspace = true

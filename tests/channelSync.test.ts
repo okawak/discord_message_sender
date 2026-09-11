@@ -1,15 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import {
+  type DiscordChannelSettings,
+  type DiscordMessage,
+  discord_page_size as getDiscordMessagePageSize,
+} from "../pkg/parse_message.js";
+import {
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
   syncChannelMessages,
   syncChannelsSequentially,
 } from "../src/channelSync";
-import { DiscordApiError } from "../src/discordApiError";
-import { DISCORD_MESSAGE_PAGE_SIZE } from "../src/discordRoutes";
-import type { DiscordMessage } from "../src/messages";
-import type { DiscordChannelSettings } from "../src/settings";
 import { MessageStorageError } from "../src/vault";
+import { DiscordApiError } from "../src/wasmCore";
 
 const firstChannel = { id: "111", name: "first" };
 const secondChannel = { id: "222", name: "second" };
@@ -47,7 +49,7 @@ function getHistoryPage(
 ): DiscordMessage[] {
   return history
     .filter((message) => !before || BigInt(message.id) < BigInt(before))
-    .slice(0, DISCORD_MESSAGE_PAGE_SIZE);
+    .slice(0, getDiscordMessagePageSize());
 }
 
 describe("syncChannelsSequentially", () => {
@@ -273,13 +275,13 @@ describe("syncChannelMessages", () => {
         ),
       );
       expect(requests.length).toBe(
-        Math.floor(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE) + 1,
+        Math.floor(newMessageCount / getDiscordMessagePageSize()) + 1,
       );
       expect(cursors.length).toBe(
-        Math.ceil(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE),
+        Math.ceil(newMessageCount / getDiscordMessagePageSize()),
       );
       expect(processCalls).toBe(
-        Math.ceil(newMessageCount / DISCORD_MESSAGE_PAGE_SIZE),
+        Math.ceil(newMessageCount / getDiscordMessagePageSize()),
       );
       expect(cursors.at(-1)).toBe((cursor + newMessageCount).toString());
     });

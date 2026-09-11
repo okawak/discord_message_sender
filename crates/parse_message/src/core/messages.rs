@@ -1,0 +1,46 @@
+use super::{dates, models::*, trim};
+use crate::command::{MessageAction, parse_message};
+
+pub fn instruction(input: &str, prefix: &str) -> Result<MessageInstruction, String> {
+    match parse_message(input, prefix).map_err(|e| e.to_string())? {
+        MessageAction::Message(markdown) => Ok(MessageInstruction::Message { markdown }),
+        MessageAction::Url(url) => Ok(MessageInstruction::Url { url }),
+    }
+}
+pub fn processed(
+    markdown: String,
+    is_clipping: bool,
+    message: DiscordMessage,
+    zone: &str,
+) -> Result<ProcessedMessage, String> {
+    let author = message.author.as_ref();
+    let name = [
+        message.member.as_ref().and_then(|m| m.nick.as_deref()),
+        author.and_then(|a| a.global_name.as_deref()),
+        author.and_then(|a| a.username.as_deref()),
+    ]
+    .into_iter()
+    .flatten()
+    .map(trim)
+    .find(|s| !s.is_empty())
+    .or_else(|| {
+        author
+            .and_then(|a| a.id.as_deref())
+            .filter(|s| !s.is_empty())
+    })
+    .unwrap_or("Unknown")
+    .to_string();
+    Ok(ProcessedMessage {
+        file_name: format!(
+            "{}_{}",
+            dates::local(&message.timestamp, zone)?.file_timestamp,
+            message.id
+        ),
+        author_id: author.and_then(|a| a.id.clone()).unwrap_or_default(),
+        author_name: name,
+        message_id: message.id,
+        timestamp: message.timestamp,
+        markdown,
+        is_clipping,
+    })
+}

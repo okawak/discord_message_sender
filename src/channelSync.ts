@@ -1,11 +1,18 @@
-import { getChannelDisplayName } from "./channelPaths";
+import {
+  type DiscordChannelSettings,
+  type DiscordMessage,
+  type NotificationTemplates,
+  type ProcessedMessage,
+  select_message_page,
+  should_process_message,
+  sync_batches,
+  sync_completion_notice,
+  sync_failure_notice,
+  sync_notification_text,
+} from "../pkg/parse_message.js";
 import type { DiscordMessagePage } from "./discordApi";
-import { DiscordApiError, getDiscordApiFailureNotice } from "./discordApiError";
-import { DISCORD_MESSAGE_PAGE_SIZE } from "./discordRoutes";
-import type { DiscordMessage } from "./messages";
-import { renderNotificationTemplate } from "./notificationTemplates";
-import type { DiscordChannelSettings, NotificationTemplates } from "./settings";
 import { MessageStorageError } from "./vault";
+import { DiscordApiError, getDiscordApiFailureNotice } from "./wasmCore";
 
 export interface SingleChannelSyncOptions {
   botToken: string;
@@ -59,57 +66,33 @@ export async function syncChannelMessages(
 
   while (true) {
     const page = await dependencies.fetchMessages(botToken, channel.id, before);
-    const messages = lastMessageId
-      ? page.messages.filter(
-          (message) => BigInt(message.id) > BigInt(lastMessageId),
-        )
-      : page.messages;
-    if (messages.length > 0) {
-      pages.push(messages);
-    }
-
-    if (
-      !lastMessageId ||
-      page.messages.length < DISCORD_MESSAGE_PAGE_SIZE ||
-      messages.length < page.messages.length
-    ) {
-      break;
-    }
-
-    const oldestMessage = page.messages.at(-1);
-    if (!oldestMessage) {
-      break;
-    }
-    before = oldestMessage.id;
+    const selection = select_message_page(page.messages, lastMessageId);
+    if (selection.messages.length > 0) pages.push(selection.messages);
+    if (!selection.before) break;
+    before = selection.before;
     if (page.nextRequestDelayMs > 0) {
       await dependencies.sleep(page.nextRequestDelayMs);
     }
   }
 
-  for (const messages of pages.reverse()) {
+  for (const batch of sync_batches(pages)) {
     processedMessageCount += await dependencies.processMessages(
-      [...messages].reverse(),
+      batch.messages,
       channel,
     );
-
-    const newestMessage = messages[0];
-    if (newestMessage) {
-      await dependencies.persistCursor(channel, newestMessage.id);
-    }
+    // Persist only after all storage operations for this page have succeeded.
+    await dependencies.persistCursor(channel, batch.cursor);
   }
 
   if (sendSyncNotifications) {
-    const template =
-      processedMessageCount === 0
-        ? notificationTemplates.noNew
-        : notificationTemplates.saved;
     await dependencies.postNotification(
       botToken,
       channel.id,
-      renderNotificationTemplate(template, {
+      sync_notification_text(
+        notificationTemplates,
         channel,
-        count: processedMessageCount,
-      }),
+        processedMessageCount,
+      ),
     );
   }
 
@@ -140,7 +123,6 @@ export async function syncChannelsSequentially(
 export function getChannelSyncFailureNotice(
   failure: ChannelSyncFailure,
 ): string {
-  const channelName = getChannelDisplayName(failure.channel);
   const reason =
     failure.error instanceof DiscordApiError
       ? getDiscordApiFailureNotice(failure.error)
@@ -148,22 +130,40 @@ export function getChannelSyncFailureNotice(
         ? failure.error.message
         : "unexpected error; see console for details";
 
-  return `Discord sync skipped "${channelName}": ${reason}.`;
+  return sync_failure_notice(failure.channel, reason);
 }
 
 export function getSyncCompletionNotice(summary: ChannelSyncSummary): string {
-  const saved =
-    summary.processedMessageCount === 0
-      ? "No new messages"
-      : `${summary.processedMessageCount} messages saved`;
+  return sync_completion_notice(
+    summary.processedMessageCount,
+    summary.failures.length,
+  );
+}
 
-  if (summary.failures.length === 0) {
-    return `Discord sync finished. ${saved}.`;
+export async function processDiscordMessageBatch(
+  messages: readonly DiscordMessage[],
+  parseMessage: (message: DiscordMessage) => Promise<ProcessedMessage>,
+  saveMessages: (messages: readonly ProcessedMessage[]) => Promise<number>,
+): Promise<number> {
+  const processedMessages: ProcessedMessage[] = [];
+
+  try {
+    for (const message of messages) {
+      if (!should_process_message(message)) {
+        continue;
+      }
+
+      const processedMessage = await parseMessage(message);
+      if (processedMessage.markdown) {
+        processedMessages.push(processedMessage);
+      }
+    }
+  } catch (error) {
+    if (processedMessages.length > 0) {
+      await saveMessages(processedMessages);
+    }
+    throw error;
   }
 
-  const channels =
-    summary.failures.length === 1
-      ? "1 channel failed"
-      : `${summary.failures.length} channels failed`;
-  return `Discord sync finished. ${saved}; ${channels}.`;
+  return saveMessages(processedMessages);
 }

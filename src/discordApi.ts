@@ -1,12 +1,12 @@
 import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
-import { DiscordApiError, type DiscordRequestMethod } from "./discordApiError";
-import { getRateLimitDelay, getRateLimitResetDelay } from "./discordRateLimit";
-import { DISCORD_API_VERSION, getChannelMessagesPath } from "./discordRoutes";
-import type { DiscordMessage } from "./messages";
-
-const DISCORD_API_BASE_URL = `https://discord.com/api/v${DISCORD_API_VERSION}`;
-const RATE_LIMIT_STATUS_CODE = 429;
-const MAX_RETRIES = 3;
+import {
+  type DiscordMessage,
+  discord_retry_decision,
+  discord_messages_path as getChannelMessagesPath,
+  discord_api_version as getDiscordApiVersion,
+  discord_reset_delay as getRateLimitResetDelay,
+} from "../pkg/parse_message.js";
+import { DiscordApiError, type DiscordRequestMethod } from "./wasmCore";
 
 export interface DiscordMessagePage {
   messages: DiscordMessage[];
@@ -52,11 +52,11 @@ async function discordRequest(
   path: string,
   body?: string,
 ): Promise<RequestUrlResponse> {
-  for (let i = 0; i <= MAX_RETRIES; i++) {
+  for (let attempt = 0; ; attempt++) {
     let res: RequestUrlResponse;
     try {
       res = await requestUrl({
-        url: DISCORD_API_BASE_URL + path,
+        url: `https://discord.com/api/v${getDiscordApiVersion()}${path}`,
         method,
         headers: {
           Authorization: `Bot ${botToken}`,
@@ -67,37 +67,29 @@ async function discordRequest(
         throw: false,
       });
     } catch (error) {
-      if (i === MAX_RETRIES) {
+      const decision = discord_retry_decision(undefined, attempt, {}, "");
+      if (decision.kind !== "retry") {
         throw new Error(`Discord API ${method} ${path} request failed.`, {
           cause: error,
         });
       }
-      await sleep(1000 * (i + 1));
+      await sleep(decision.delay);
       continue;
     }
 
-    // Handle rate limiting
-    if (res.status === RATE_LIMIT_STATUS_CODE) {
-      if (i === MAX_RETRIES) {
-        throw new DiscordApiError(res.status, method, path, res.text);
-      }
-
-      const wait = getRateLimitDelay(res.headers, res.text);
-      new Notice(`Rate-limited. Retry after ${Math.ceil(wait / 1000)}s`);
-      await sleep(wait);
-      continue;
-    }
-
-    if (res.status >= 200 && res.status < 300) return res;
-
-    const error = new DiscordApiError(res.status, method, path, res.text);
-
-    if (res.status < 500 || i === MAX_RETRIES) {
-      throw error;
-    }
-
-    await sleep(1000 * (i + 1));
+    const decision = discord_retry_decision(
+      res.status,
+      attempt,
+      res.headers,
+      res.text,
+    );
+    if (decision.kind === "success") return res;
+    if (decision.kind === "fail")
+      throw new DiscordApiError(res.status, method, path, res.text);
+    if (decision.rateLimited)
+      new Notice(
+        `Rate-limited. Retry after ${Math.ceil(decision.delay / 1000)}s`,
+      );
+    await sleep(decision.delay);
   }
-
-  throw new Error("Discord request: unrecoverable error");
 }
