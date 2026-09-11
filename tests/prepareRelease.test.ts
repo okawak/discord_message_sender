@@ -10,7 +10,7 @@ const FILES: ReleaseFileContents = {
   manifestJson:
     '{\n  "id": "plugin",\n  "version": "0.2.8",\n  "minAppVersion": "1.8.10"\n}\n',
   cargoToml:
-    '[workspace]\nmembers = []\n\n[workspace.package]\nversion = "0.2.8"\nedition = "2024"\n\n[profile.release]\nlto = true\n',
+    '[workspace]\nmembers = []\n\n[workspace.package]\nversion = "0.2.8"\nedition = "2024"\n\n[workspace.dependencies]\nthiserror = "2"\nchrono = { version = "0.4", default-features = false, features = ["std"] }\n\n[profile.release]\nlto = true\n',
   versionsJson: '{\n  "0.2.0": "1.8.10"\n}\n',
 };
 
@@ -39,6 +39,9 @@ describe("prepareReleaseFileContents", () => {
     expect(updated.cargoToml).toContain(
       '[workspace.package]\nversion = "0.3.0"',
     );
+    expect(updated.cargoToml).toBe(
+      FILES.cargoToml.replace('version = "0.2.8"', 'version = "0.3.0"'),
+    );
     expect(JSON.parse(updated.versionsJson)).toMatchObject({
       "0.2.0": "1.8.10",
       "0.3.0": "1.8.10",
@@ -48,6 +51,38 @@ describe("prepareReleaseFileContents", () => {
   test("allows an idempotent retry of the current version", () => {
     const first = prepareReleaseFileContents(FILES, "0.3.0");
     expect(prepareReleaseFileContents(first, "0.3.0")).toEqual(first);
+  });
+
+  test("records 0.5.0's Obsidian requirement without changing earlier releases", () => {
+    const previousVersions = {
+      "0.2.0": "1.8.10",
+      "0.3.0": "1.8.10",
+      "0.3.1": "1.8.10",
+      "0.4.0": "1.8.10",
+    };
+    const files = {
+      packageJson: FILES.packageJson.replace("0.2.8", "0.4.0"),
+      manifestJson: FILES.manifestJson
+        .replace("0.2.8", "0.4.0")
+        .replace("1.8.10", "1.13.0"),
+      cargoToml: FILES.cargoToml.replace("0.2.8", "0.4.0"),
+      versionsJson: JSON.stringify(previousVersions),
+    };
+    const updated = prepareReleaseFileContents(files, "0.5.0");
+    expect(JSON.parse(updated.packageJson).version).toBe("0.5.0");
+    expect(JSON.parse(updated.manifestJson)).toMatchObject({
+      version: "0.5.0",
+      minAppVersion: "1.13.0",
+    });
+    expect(updated.cargoToml).toContain('version = "0.5.0"');
+    expect(JSON.parse(updated.versionsJson)).toEqual({
+      ...previousVersions,
+      "0.5.0": "1.13.0",
+    });
+    expect(prepareReleaseFileContents(updated, "0.5.0")).toEqual(updated);
+    expect(() => prepareReleaseFileContents(files, "0.4.0")).toThrow(
+      "already has a different minimum Obsidian version",
+    );
   });
 
   test("rejects a version older than the current source version", () => {

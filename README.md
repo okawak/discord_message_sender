@@ -141,6 +141,7 @@ Additional useful commands will be added in future releases.
 ## Development
 
 - [Release procedure](docs/releasing.md)
+- [Rust core and TypeScript adapters](docs/rust-core.md)
 
 ## References
 
