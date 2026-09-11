@@ -153,6 +153,41 @@ impl Media {
         matches!(tag_name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "img")
     }
 
+    fn is_ignored_element(tag_name: &str, attrs: &HashMap<String, String>) -> bool {
+        matches!(tag_name, "script" | "style" | "noscript" | "footer" | "nav")
+            || matches!(tag_name, "div" | "aside")
+                && attrs
+                    .get("class")
+                    .is_some_and(|class| filtering::should_ignore_class(class))
+    }
+
+    fn has_heading_link_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+
+            match &child_node.data {
+                NodeData::Text(text) => !text.trim().is_empty(),
+                NodeData::Element { tag, attrs } => {
+                    let tag_name = tag.local.as_ref();
+                    if Self::is_ignored_element(tag_name, attrs) {
+                        false
+                    } else if tag_name == "img" {
+                        !self.get_alt_text(attrs).is_empty()
+                    } else {
+                        self.has_heading_link_content(dom, child_id)
+                    }
+                }
+                _ => false,
+            }
+        })
+    }
+
     fn has_card_link_content(&self, url: &str, dom: &Dom, node_id: NodeId) -> bool {
         let Ok(children) = dom.iter_children(node_id) else {
             return false;
@@ -167,12 +202,7 @@ impl Media {
             };
 
             let tag_name = tag.local.as_ref();
-            if matches!(tag_name, "script" | "style" | "noscript" | "footer" | "nav")
-                || matches!(tag_name, "div" | "aside")
-                    && attrs
-                        .get("class")
-                        .is_some_and(|class| filtering::should_ignore_class(class))
-            {
+            if Self::is_ignored_element(tag_name, attrs) {
                 return false;
             }
             if tag_name == "img" {
@@ -182,10 +212,8 @@ impl Media {
                         .and_then(|src| self.resolve_url(url, src))
                         .is_some();
             }
-            if Self::is_card_link_element(tag_name)
-                && !dom.collect_text_content(child_id).trim().is_empty()
-            {
-                return true;
+            if Self::is_card_link_element(tag_name) {
+                return self.has_heading_link_content(dom, child_id);
             }
 
             self.has_card_link_content(url, dom, child_id)
@@ -221,7 +249,12 @@ impl Media {
                 return false;
             };
 
-            Self::is_structured_block_element(tag.local.as_ref())
+            let tag_name = tag.local.as_ref();
+            if Self::is_ignored_element(tag_name, attrs) {
+                return false;
+            }
+
+            Self::is_structured_block_element(tag_name)
                 || attrs.contains_key("data-lang")
                 || attrs
                     .get("class")
@@ -917,6 +950,10 @@ mod tests {
         "[Details](https://example.com/target)"
     )]
     #[case(
+        "<a href=\"/target\"><h2><img src=\"/icon.png\"></h2><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
         "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a></li><li>Next</li></ul>",
         "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
     )]
@@ -926,6 +963,10 @@ mod tests {
     )]
     #[case(
         "<a href=\"/target\"><div><div class=\"sidebar\"><h2>Ignored</h2></div><span>Details</span></div></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<a href=\"/target\"><div class=\"sidebar\"><pre>ignored</pre></div><span>Details</span></a>",
         "[Details](https://example.com/target)"
     )]
     fn test_complex_link_boundaries(#[case] html: &str, #[case] expected: &str) {
