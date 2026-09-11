@@ -107,23 +107,58 @@ impl Media {
             .unwrap_or_default()
     }
 
-    fn has_multiple_elements(&self, dom: &Dom, link_id: NodeId) -> bool {
-        let Ok(children) = dom.iter_children(link_id) else {
+    fn is_block_element(tag_name: &str) -> bool {
+        matches!(
+            tag_name,
+            "address"
+                | "article"
+                | "aside"
+                | "blockquote"
+                | "details"
+                | "div"
+                | "dl"
+                | "dt"
+                | "dd"
+                | "fieldset"
+                | "figcaption"
+                | "figure"
+                | "footer"
+                | "form"
+                | "h1"
+                | "h2"
+                | "h3"
+                | "h4"
+                | "h5"
+                | "h6"
+                | "header"
+                | "hr"
+                | "li"
+                | "main"
+                | "nav"
+                | "ol"
+                | "p"
+                | "pre"
+                | "section"
+                | "summary"
+                | "table"
+                | "ul"
+        )
+    }
+
+    fn has_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
+        let Ok(children) = dom.iter_children(node_id) else {
             return false;
         };
 
-        let mut element_count = 0;
-        for &child_id in children {
-            if let Some(child_node) = dom.node(child_id)
-                && let NodeData::Element { .. } = &child_node.data
-            {
-                element_count += 1;
-                if element_count > 1 {
-                    return true;
-                }
-            }
-        }
-        false
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, .. } = &child_node.data else {
+                return false;
+            };
+            Self::is_block_element(tag.local.as_ref()) || self.has_block_content(dom, child_id)
+        })
     }
 
     fn render_complex_link(
@@ -184,7 +219,7 @@ impl Renderer for Media {
                     //   <span>Link Text</span>
                     //   <p>Additional Info</p>
                     // </a>
-                    if self.has_multiple_elements(dom, id) {
+                    if self.has_block_content(dom, id) {
                         return self.render_complex_link(url, dom, id, ctx, resolved_url);
                     }
 
@@ -579,6 +614,32 @@ mod tests {
         let mut context = Context::default();
         let result = renderers::render_node(base_url, &dom, dom.document, &mut context)
             .expect("Failed to render external links");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        r#"<a href="https://target.example.com"><span>Hello</span><span>World</span></a>"#,
+        "[HelloWorld](https://target.example.com/)"
+    )]
+    #[case(
+        r#"<a href="/formatted"><strong>Bold</strong> and <em>italic</em></a>"#,
+        "[**Bold** and *italic*](https://example.com/formatted)"
+    )]
+    #[case(
+        r#"<a href="/product"><img src="/product.png" alt="Product"><span>Details</span></a>"#,
+        "[![Product](https://example.com/product.png)Details](https://example.com/product)"
+    )]
+    fn test_inline_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render inline link children");
         assert_eq!(result, expected);
     }
 
