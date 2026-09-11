@@ -409,6 +409,42 @@ describe("saveProcessedMessages", () => {
     ).rejects.toThrow('a folder exists at "DiscordLogs/general/2026-06.md"');
   });
 
+  test("rejects folder collisions at individual message paths", async () => {
+    for (const [isClipping, directory, mode] of [
+      [false, "DiscordLogs/general", "individual"],
+      [true, "DiscordClippings/general", "monthly"],
+    ] as const) {
+      const { vault, files, folders, createdPaths } = createVaultMock();
+      const path = `${directory}/20260629_213400_123.md`;
+      const [root] = directory.split("/");
+      if (!root) throw new Error("Expected a root directory.");
+      folders.add(root);
+      folders.add(directory);
+      folders.add(path);
+
+      await expect(
+        saveProcessedMessages(
+          vault,
+          "DiscordLogs/general",
+          "DiscordClippings/general",
+          [
+            createMessage(
+              "123",
+              "2026-06-29T12:34:00.000Z",
+              "content",
+              isClipping,
+            ),
+          ],
+          storageOptions(mode),
+        ),
+      ).rejects.toThrow(
+        `a folder exists at "${path}"; move or rename it, then sync again`,
+      );
+      expect(files.size).toBe(0);
+      expect(createdPaths).toEqual([]);
+    }
+  });
+
   test("ignores unrelated files and folders when detecting individual IDs", async () => {
     const { vault, files, folders } = createVaultMock();
     folders.add("DiscordLogs");

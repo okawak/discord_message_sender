@@ -52,7 +52,15 @@ export async function saveProcessedMessages(
   let savedCount = 0;
   for (const write of plan.individual) {
     await ensureDir(vault, write.directory);
-    if (vault.getAbstractFileByPath(write.path)) continue;
+    const existing = vault.getAbstractFileByPath(write.path);
+    if (existing) {
+      if (!vault.getFileByPath(write.path)) {
+        throw new MessageStorageError(
+          `a folder exists at "${write.path}"; move or rename it, then sync again`,
+        );
+      }
+      continue;
+    }
     await vault.create(write.path, write.content);
     savedCount++;
   }
