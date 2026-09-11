@@ -69,6 +69,41 @@ static SUPPORTED_LANGUAGES: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 pub struct CodeBlock;
 
 impl CodeBlock {
+    fn longest_delimiter_run(content: &str, delimiter: char) -> usize {
+        let mut longest = 0;
+        let mut current = 0;
+
+        for character in content.chars() {
+            if character == delimiter {
+                current += 1;
+                longest = longest.max(current);
+            } else {
+                current = 0;
+            }
+        }
+
+        longest
+    }
+
+    fn create_inline_code(&self, content: &str) -> String {
+        if content.is_empty() {
+            return String::new();
+        }
+
+        let delimiter_length = Self::longest_delimiter_run(content, '`') + 1;
+        let delimiter: String = std::iter::repeat_n('`', delimiter_length).collect();
+        let has_boundary_backtick = content.starts_with('`') || content.ends_with('`');
+        let has_two_whitespace_edges = content.starts_with(char::is_whitespace)
+            && content.ends_with(char::is_whitespace)
+            && !content.chars().all(char::is_whitespace);
+
+        if has_boundary_backtick || has_two_whitespace_edges {
+            format!("{delimiter} {content} {delimiter}")
+        } else {
+            format!("{delimiter}{content}{delimiter}")
+        }
+    }
+
     fn create_code_block(
         &self,
         content: &str,
@@ -76,14 +111,23 @@ impl CodeBlock {
         ctx: &mut Context,
     ) -> String {
         let indent = " ".repeat(ctx.list_depth);
-        let capacity = content.len() + language.as_ref().map_or(0, |l| l.len()) + 10; // "```", newlines, etc.
+        let fence_character = if language.as_ref().is_some_and(|value| value.contains('`')) {
+            '~'
+        } else {
+            '`'
+        };
+        let fence_length = (Self::longest_delimiter_run(content, fence_character) + 1).max(3);
+        let fence: String = std::iter::repeat_n(fence_character, fence_length).collect();
+        let capacity =
+            content.len() + language.as_ref().map_or(0, |l| l.len()) + fence.len() * 2 + 4;
 
         let mut result = String::with_capacity(capacity);
         if ctx.list_depth > 0 {
             result.push_str("\n\n");
         }
 
-        result.push_str(&format!("{indent}```"));
+        result.push_str(&indent);
+        result.push_str(&fence);
         if let Some(lang) = &language {
             result.push_str(lang);
         }
@@ -92,7 +136,8 @@ impl CodeBlock {
         if !content.ends_with('\n') {
             result.push('\n');
         }
-        result.push_str(&format!("{indent}```"));
+        result.push_str(&indent);
+        result.push_str(&fence);
 
         if ctx.list_depth == 0 {
             result.push_str("\n\n");
@@ -270,7 +315,7 @@ impl Renderer for CodeBlock {
             "code" => {
                 // inline code
                 let content = self.render_with_preserved_whitespace(url, dom, id, ctx)?;
-                Ok(format!("`{content}`"))
+                Ok(self.create_inline_code(&content))
             }
             _ => render_children(url, dom, id, ctx),
         }
@@ -299,6 +344,12 @@ mod tests {
     #[case(r#"<code class="not-a-language">code</code>"#, "`code`")]
     #[case(r#"<code>code</code>"#, "`code`")]
     #[case(r#"<code><strong>  x  </strong></code>"#, "`**  x  **`")]
+    #[case(r#"<code>a`b</code>"#, "``a`b``")]
+    #[case(r#"<code>a``b</code>"#, "```a``b```")]
+    #[case(r#"<code>`</code>"#, "`` ` ``")]
+    #[case(r#"<code>`edge`</code>"#, "`` `edge` ``")]
+    #[case(r#"<code> code </code>"#, "`  code  `")]
+    #[case(r#"<code>   </code>"#, "`   `")]
     fn test_inline_code_elements(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
@@ -372,6 +423,14 @@ mod tests {
             "#}
     )]
     #[case(r#"<pre><strong>  x  </strong></pre>"#, "```\n**  x  **\n```\n\n")]
+    #[case(
+        "<pre><code>before\n```\nafter</code></pre>",
+        "````\nbefore\n```\nafter\n````\n\n"
+    )]
+    #[case(
+        "<pre data-lang=\"rust`custom\"><code>~~~~\ncode</code></pre>",
+        "~~~~~rust`custom\n~~~~\ncode\n~~~~~\n\n"
+    )]
     fn test_pre_code_blocks(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
@@ -544,7 +603,7 @@ mod tests {
     /// empty code blocks
     #[rstest]
     #[case(r#"<pre><code></code></pre>"#, "```\n\n```\n\n")]
-    #[case(r#"<code></code>"#, "``")]
+    #[case(r#"<code></code>"#, "")]
     #[case(
         r#"<div class="code-frame"><pre><code></code></pre></div>"#,
         "```\n\n```\n\n"
