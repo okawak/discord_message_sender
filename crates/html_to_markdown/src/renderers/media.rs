@@ -154,7 +154,30 @@ impl Media {
     }
 
     fn has_card_link_content(&self, dom: &Dom, node_id: NodeId) -> bool {
-        Self::contains_element(dom, node_id, Self::is_card_link_element)
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, .. } = &child_node.data else {
+                return false;
+            };
+
+            let tag_name = tag.local.as_ref();
+            if tag_name == "img" {
+                return true;
+            }
+            if Self::is_card_link_element(tag_name)
+                && !dom.collect_text_content(child_id).trim().is_empty()
+            {
+                return true;
+            }
+
+            self.has_card_link_content(dom, child_id)
+        })
     }
 
     fn is_structured_block_element(tag_name: &str) -> bool {
@@ -211,12 +234,20 @@ impl Media {
         })
     }
 
-    fn append_standalone_destination(content: String, resolved_url: &str) -> String {
+    fn append_standalone_destination(
+        content: String,
+        resolved_url: &str,
+        list_depth: usize,
+    ) -> String {
         let content = content.trim_end();
+        let indent = " ".repeat(list_depth);
+        let trailing_separator = if list_depth == 0 { "\n\n" } else { "\n" };
         if content.is_empty() {
-            format!("[{resolved_url}]({resolved_url})")
+            format!("{indent}[{resolved_url}]({resolved_url}){trailing_separator}")
         } else {
-            format!("{content}\n\n[{resolved_url}]({resolved_url})")
+            format!(
+                "{content}\n\n{indent}[{resolved_url}]({resolved_url}){trailing_separator}"
+            )
         }
     }
 
@@ -326,7 +357,11 @@ impl Renderer for Media {
 
                     if self.has_structured_block_content(dom, id) {
                         let content = render_children(url, dom, id, ctx)?;
-                        return Ok(Self::append_standalone_destination(content, &resolved_url));
+                        return Ok(Self::append_standalone_destination(
+                            content,
+                            &resolved_url,
+                            ctx.list_depth,
+                        ));
                     }
 
                     ctx.in_inline = true;
@@ -796,19 +831,19 @@ mod tests {
     #[rstest]
     #[case(
         "<a href=\"/target\"><pre><code>line1\n  line2</code></pre></a>",
-        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)"
+        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)\n\n"
     )]
     #[case(
         "<a href=\"/target\"><div class=\"code-frame\"><code>line1\n  line2</code></div></a>",
-        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)"
+        "```\nline1\n  line2\n```\n\n[https://example.com/target](https://example.com/target)\n\n"
     )]
     #[case(
         "<a href=\"/target\"><div data-lang=\"rust\"><code>fn main() {}</code></div></a>",
-        "```rust\nfn main() {}\n```\n\n[https://example.com/target](https://example.com/target)"
+        "```rust\nfn main() {}\n```\n\n[https://example.com/target](https://example.com/target)\n\n"
     )]
     #[case(
         "<a href=\"/target\"><ul><li><p>First</p><p>Second</p></li></ul></a>",
-        "- First\n\n  Second\n\n[https://example.com/target](https://example.com/target)"
+        "- First\n\n  Second\n\n[https://example.com/target](https://example.com/target)\n\n"
     )]
     fn test_structured_block_link_preserves_code_and_destination(
         #[case] html: &str,
@@ -823,6 +858,32 @@ mod tests {
             &mut context,
         )
         .expect("Failed to render structured block link");
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(
+        "<a href=\"/target\"><pre><code>x</code></pre></a>After",
+        "```\nx\n```\n\n[https://example.com/target](https://example.com/target)\n\nAfter"
+    )]
+    #[case(
+        "<a href=\"/target\"><h2></h2><p>Details</p></a>",
+        "[Details](https://example.com/target)"
+    )]
+    #[case(
+        "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a></li><li>Next</li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n\n- Next\n\n"
+    )]
+    fn test_complex_link_boundaries(#[case] html: &str, #[case] expected: &str) {
+        let dom = parser::parse_html(html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render complex link boundaries");
         assert_eq!(result, expected);
     }
 
