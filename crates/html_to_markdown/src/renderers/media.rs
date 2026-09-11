@@ -108,7 +108,22 @@ impl Media {
     }
 
     fn has_block_content(&self, dom: &Dom, node_id: NodeId) -> bool {
-        Self::contains_element(dom, node_id, is_block_element)
+        let Ok(children) = dom.iter_children(node_id) else {
+            return false;
+        };
+
+        children.clone().any(|&child_id| {
+            let Some(child_node) = dom.node(child_id) else {
+                return false;
+            };
+            let NodeData::Element { tag, attrs } = &child_node.data else {
+                return false;
+            };
+            let tag_name = tag.local.as_ref();
+
+            !Self::is_ignored_element(tag_name, attrs)
+                && (is_block_element(tag_name) || self.has_block_content(dom, child_id))
+        })
     }
 
     fn is_card_link_element(tag_name: &str) -> bool {
@@ -233,22 +248,6 @@ impl Media {
                     .get("class")
                     .is_some_and(|class| class.contains("code-frame"))
                 || self.has_structured_block_content(dom, child_id)
-        })
-    }
-
-    fn contains_element(dom: &Dom, node_id: NodeId, predicate: fn(&str) -> bool) -> bool {
-        let Ok(children) = dom.iter_children(node_id) else {
-            return false;
-        };
-
-        children.clone().any(|&child_id| {
-            let Some(child_node) = dom.node(child_id) else {
-                return false;
-            };
-            let NodeData::Element { tag, .. } = &child_node.data else {
-                return false;
-            };
-            predicate(tag.local.as_ref()) || Self::contains_element(dom, child_id, predicate)
         })
     }
 
@@ -857,6 +856,10 @@ mod tests {
     #[case(
         r#"<a href="/product"><img src="/product.png" alt="Product"><span>Details</span></a>"#,
         "[![Product](https://example.com/product.png)Details](https://example.com/product)"
+    )]
+    #[case(
+        r#"<a href="/target"><div class="sidebar">ignored</div>Text</a>After"#,
+        "[Text](https://example.com/target)After"
     )]
     fn test_inline_children_keep_link_destination(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
