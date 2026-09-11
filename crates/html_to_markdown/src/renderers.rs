@@ -147,7 +147,7 @@ pub(crate) fn is_block_element(tag_name: &str) -> bool {
 }
 
 fn rendered_node_is_inline(rendered: &str) -> bool {
-    !rendered.starts_with('\n') && !rendered.ends_with('\n')
+    rendered != "<br>" && !rendered.starts_with('\n') && !rendered.ends_with('\n')
 }
 
 fn render_child_nodes(
@@ -185,13 +185,27 @@ where
             continue;
         }
 
+        let (starts_with_whitespace, ends_with_whitespace) = if ctx.preserve_whitespace {
+            (false, false)
+        } else {
+            match dom.node(child_id).map(|child| &child.data) {
+                Some(NodeData::Text(text)) => (
+                    text.starts_with(char::is_whitespace),
+                    text.ends_with(char::is_whitespace),
+                ),
+                _ => (false, false),
+            }
+        };
+        pending_whitespace |= starts_with_whitespace && previous_was_inline;
+
         let rendered = render_node(url, dom, child_id, ctx)?;
         if rendered.is_empty() {
+            pending_whitespace |= ends_with_whitespace && previous_was_inline;
             continue;
         }
 
         let current_is_inline = rendered_node_is_inline(&rendered);
-        if pending_whitespace && previous_was_inline {
+        if rendered != "<br>" && pending_whitespace && previous_was_inline {
             if current_is_inline {
                 let already_separated = result.chars().next_back().is_some_and(char::is_whitespace)
                     || rendered.chars().next().is_some_and(char::is_whitespace);
@@ -205,7 +219,7 @@ where
         before_append(&mut result, child_id, &rendered, ctx);
         result.push_str(&rendered);
         previous_was_inline = current_is_inline;
-        pending_whitespace = false;
+        pending_whitespace = ends_with_whitespace && current_is_inline;
     }
 
     Ok(result)
@@ -303,6 +317,10 @@ mod tests {
     #[case("<p><span>Hello </span> <span>world</span></p>", "Hello world\n\n")]
     #[case("<p><span>Hello</span> <span> world</span></p>", "Hello world\n\n")]
     #[case("<p>A&nbsp;B 👩‍💻 A‌B</p>", "A B 👩‍💻 A‌B\n\n")]
+    #[case("<p>A&nbsp;<strong>B</strong></p>", "A **B**\n\n")]
+    #[case("<p><strong>A</strong>&nbsp;B</p>", "**A** B\n\n")]
+    #[case("<p>A   <strong>B</strong></p>", "A **B**\n\n")]
+    #[case("<p>Hello \n<br>\n world</p>", "Hello<br>world\n\n")]
     #[case(
         "<div><span>Published</span> <div><span>Updated</span></div></div>",
         "Published Updated"

@@ -80,11 +80,12 @@ if (
 
 const semanticWhitespace = convertHtml(
   "https://example.com",
-  "<p><strong>Hello</strong> <em>world</em></p><p>A&nbsp;B 👩&#x200D;💻 A&#x200C;B</p>",
+  "<p><strong>Hello</strong> <em>world</em></p><p>A&nbsp;B 👩&#x200D;💻 A&#x200C;B</p><p>A&nbsp;<strong>B</strong></p>",
 );
 if (
   !semanticWhitespace.includes("**Hello** *world*") ||
-  !semanticWhitespace.includes("A B 👩‍💻 A‌B")
+  !semanticWhitespace.includes("A B 👩‍💻 A‌B") ||
+  !semanticWhitespace.includes("A **B**")
 ) {
   throw new Error("WASM HTML conversion changed semantic Unicode whitespace.");
 }
