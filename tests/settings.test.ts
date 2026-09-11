@@ -15,6 +15,7 @@ import {
   getConfiguredChannels,
   migrateSettings,
   normalizeSettings,
+  persistChannelCursor,
   updateChannelId,
 } from "../src/settings";
 
@@ -127,6 +128,86 @@ describe("normalizeSettings", () => {
 
     expect(settings.showAuthorNames).toBe(true);
     expect(settings.showMessageTime).toBe(true);
+  });
+});
+
+describe("persistChannelCursor", () => {
+  test("persists an updated cursor", async () => {
+    const channel: DiscordChannelSettings = {
+      id: "111",
+      name: "inbox",
+      lastProcessedMessageId: "1",
+    };
+    let persistedCursor: string | undefined;
+
+    await persistChannelCursor(channel, "111", "2", async () => {
+      persistedCursor = channel.lastProcessedMessageId;
+    });
+
+    expect(channel.lastProcessedMessageId).toBe("2");
+    expect(persistedCursor).toBe("2");
+  });
+
+  test("restores the previous cursor and propagates persistence failures", async () => {
+    const channel: DiscordChannelSettings = {
+      id: "111",
+      name: "inbox",
+      lastProcessedMessageId: "1",
+    };
+    const persistenceError = new Error("settings write failed");
+
+    await expect(
+      persistChannelCursor(channel, "111", "2", async () => {
+        throw persistenceError;
+      }),
+    ).rejects.toBe(persistenceError);
+
+    expect(channel.lastProcessedMessageId).toBe("1");
+  });
+
+  test("restores an absent cursor after a persistence failure", async () => {
+    const channel: DiscordChannelSettings = { id: "111", name: "inbox" };
+
+    await expect(
+      persistChannelCursor(channel, "111", "2", async () => {
+        throw new Error("settings write failed");
+      }),
+    ).rejects.toThrow("settings write failed");
+
+    expect(Object.hasOwn(channel, "lastProcessedMessageId")).toBe(false);
+  });
+
+  test("does not overwrite a concurrent channel edit while rolling back", async () => {
+    const channel: DiscordChannelSettings = {
+      id: "111",
+      name: "inbox",
+      lastProcessedMessageId: "1",
+    };
+    const pending = Promise.withResolvers<void>();
+    const persistence = persistChannelCursor(
+      channel,
+      "111",
+      "2",
+      () => pending.promise,
+    );
+
+    updateChannelId(channel, "222");
+    pending.reject(new Error("settings write failed"));
+
+    await expect(persistence).rejects.toThrow("settings write failed");
+    expect(channel).toEqual({ id: "222", name: "inbox" });
+  });
+
+  test("ignores a cursor from a stale channel snapshot", async () => {
+    const channel: DiscordChannelSettings = { id: "222", name: "inbox" };
+    let persistCount = 0;
+
+    await persistChannelCursor(channel, "111", "2", async () => {
+      persistCount++;
+    });
+
+    expect(channel.lastProcessedMessageId).toBeUndefined();
+    expect(persistCount).toBe(0);
   });
 });
 

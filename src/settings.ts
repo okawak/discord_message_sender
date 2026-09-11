@@ -31,3 +31,31 @@ export function updateChannelId(
   delete channel.lastProcessedMessageId;
   Object.assign(channel, updated);
 }
+
+export async function persistChannelCursor(
+  channel: DiscordChannelSettings,
+  expectedChannelId: string,
+  messageId: string,
+  persistSettings: () => Promise<void>,
+): Promise<void> {
+  if (channel.id !== expectedChannelId) return;
+
+  const previousMessageId = channel.lastProcessedMessageId;
+  channel.lastProcessedMessageId = messageId;
+
+  try {
+    await persistSettings();
+  } catch (error) {
+    if (
+      channel.id === expectedChannelId &&
+      channel.lastProcessedMessageId === messageId
+    ) {
+      if (previousMessageId === undefined) {
+        delete channel.lastProcessedMessageId;
+      } else {
+        channel.lastProcessedMessageId = previousMessageId;
+      }
+    }
+    throw error;
+  }
+}
