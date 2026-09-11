@@ -27,7 +27,11 @@ impl Renderer for Paragraph {
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
-        let content = render_children(url, dom, id, ctx)?;
+        let old_paragraph_status = ctx.in_paragraph;
+        ctx.in_paragraph = true;
+        let rendered = render_children(url, dom, id, ctx);
+        ctx.in_paragraph = old_paragraph_status;
+        let content = rendered?;
         if content.trim().is_empty() {
             return Ok(String::new());
         }

@@ -21,6 +21,7 @@ use std::sync::LazyLock;
 #[derive(Clone, Debug, Default)]
 pub struct Context {
     pub in_inline: bool,
+    pub in_paragraph: bool,
     /// Depth of nested lists, used for rendering list items
     pub list_depth: usize,
     pub list_first_item: bool,
@@ -212,10 +213,22 @@ where
         }
 
         let current_is_inline = rendered_node_is_inline(dom, child_id, &rendered);
+        let rendered_to_append = if current_is_inline
+            && previous_was_inline
+            && result.chars().next_back().is_some_and(char::is_whitespace)
+            && rendered.chars().next().is_some_and(char::is_whitespace)
+        {
+            rendered.trim_start_matches(char::is_whitespace)
+        } else {
+            &rendered
+        };
         if rendered != "<br>" && pending_whitespace && previous_was_inline {
             if current_is_inline {
                 let already_separated = result.chars().next_back().is_some_and(char::is_whitespace)
-                    || rendered.chars().next().is_some_and(char::is_whitespace);
+                    || rendered_to_append
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_whitespace);
                 if !already_separated {
                     result.push(' ');
                 }
@@ -223,8 +236,8 @@ where
                 result.push_str("\n\n");
             }
         }
-        before_append(&mut result, child_id, &rendered, ctx);
-        result.push_str(&rendered);
+        before_append(&mut result, child_id, rendered_to_append, ctx);
+        result.push_str(rendered_to_append);
         previous_was_inline = current_is_inline;
         pending_whitespace = ends_with_whitespace && current_is_inline;
     }
@@ -330,11 +343,14 @@ mod tests {
     #[case("<p><strong>A&nbsp;</strong>B</p>", "**A** B\n\n")]
     #[case("<p>A<em>&nbsp;B</em></p>", "A *B*\n\n")]
     #[case("<p><em>A&nbsp;</em>B</p>", "*A* B\n\n")]
+    #[case("<p>A <strong> B</strong></p>", "A **B**\n\n")]
+    #[case("<p><strong>A </strong> B</p>", "**A** B\n\n")]
+    #[case("<p><strong>A </strong><em> B</em></p>", "**A** *B*\n\n")]
     #[case("<p>A   <strong>B</strong></p>", "A **B**\n\n")]
     #[case("<p>Hello \n<br>\n world</p>", "Hello<br>world\n\n")]
     #[case(
         "<p>A <img src=\"https://example.com/x\" alt=\"X\"> B</p>",
-        "A ![X](https://example.com/x)\n\n B\n\n"
+        "A ![X](https://example.com/x) B\n\n"
     )]
     #[case(
         "<div><span>Published</span> <div><span>Updated</span></div></div>",
