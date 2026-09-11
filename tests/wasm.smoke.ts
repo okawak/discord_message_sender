@@ -78,6 +78,18 @@ if (
   throw new Error("WASM HTML table did not produce a valid Markdown table.");
 }
 
+const semanticWhitespace = convertHtml(
+  "https://example.com",
+  "<p><strong>Hello</strong> <em>world</em></p><p>A&nbsp;B 👩&#x200D;💻 A&#x200C;B</p><p>A&nbsp;<strong>B</strong></p>",
+);
+if (
+  !semanticWhitespace.includes("**Hello** *world*") ||
+  !semanticWhitespace.includes("A B 👩‍💻 A‌B") ||
+  !semanticWhitespace.includes("A **B**")
+) {
+  throw new Error("WASM HTML conversion changed semantic Unicode whitespace.");
+}
+
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;
 for (let index = 0; index < 100; index += 1) {
   convertHtml("https://example.com", repeatedHtml);

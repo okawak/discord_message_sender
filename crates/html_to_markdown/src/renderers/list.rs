@@ -1,4 +1,4 @@
-use super::{Context, Renderer, render_children};
+use super::{Context, Renderer, render_child_nodes_with, render_children};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
@@ -108,41 +108,34 @@ impl List {
         id: NodeId,
         ctx: &mut Context,
     ) -> Result<String, ConvertError> {
-        let mut result = String::new();
         let indent = " ".repeat(ctx.list_depth);
 
-        let children: Vec<_> = dom.iter_children(id)?.collect();
+        let children: Vec<_> = dom.iter_children(id)?.copied().collect();
         let mut prev_was_code_block = false;
 
-        for (index, &child_id) in children.iter().enumerate() {
-            let child_result = super::render_node(url, dom, *child_id, ctx)?;
+        render_child_nodes_with(
+            url,
+            dom,
+            &children,
+            ctx,
+            |result, child_id, rendered, ctx| {
+                if prev_was_code_block && !rendered.trim().is_empty() {
+                    result.push_str(&format!("\n\n{indent}"));
+                }
 
-            if prev_was_code_block && index > 0 && !child_result.trim().is_empty() {
-                result.push_str(&format!("\n\n{indent}"));
-            }
+                if !rendered.trim().is_empty() {
+                    ctx.list_first_item = false;
+                }
 
-            result.push_str(&child_result);
-
-            if !child_result.trim().is_empty() {
-                ctx.list_first_item = false;
-            }
-
-            if let Some(child_node) = dom.node(*child_id) {
-                prev_was_code_block = match &child_node.data {
-                    NodeData::Element { tag, .. } => tag.local.as_ref() == "pre",
-                    NodeData::Text(text) => {
-                        if !text.trim().is_empty() {
-                            false
-                        } else {
-                            prev_was_code_block
-                        }
-                    }
-                    _ => false,
-                };
-            }
-        }
-
-        Ok(result)
+                if let Some(child_node) = dom.node(child_id) {
+                    prev_was_code_block = match &child_node.data {
+                        NodeData::Element { tag, .. } => tag.local.as_ref() == "pre",
+                        NodeData::Text(_) => false,
+                        _ => false,
+                    };
+                }
+            },
+        )
     }
 }
 
@@ -340,6 +333,14 @@ mod tests {
             - [Link](https://example.com) in list
 
             "#}
+    )]
+    #[case(
+        "<ul><li><strong>Hello</strong> <em>world</em></li></ul>",
+        "- **Hello** *world*\n\n"
+    )]
+    #[case(
+        "<ul><li><span>Hello </span> <span>world</span></li></ul>",
+        "- Hello world\n\n"
     )]
     fn test_lists_with_inline_formatting(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");

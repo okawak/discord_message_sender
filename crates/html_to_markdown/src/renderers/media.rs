@@ -483,7 +483,7 @@ impl Renderer for Media {
                     alt
                 };
 
-                if ctx.in_inline && ctx.link_info.is_none() {
+                if (ctx.in_inline || ctx.in_paragraph) && ctx.link_info.is_none() {
                     Ok(result)
                 } else {
                     Ok(format_list_content(ctx, &result))

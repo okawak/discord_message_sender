@@ -298,6 +298,7 @@ mod tests {
     #[case(r#"<code class="unknown-language">code</code>"#, "`code`")]
     #[case(r#"<code class="not-a-language">code</code>"#, "`code`")]
     #[case(r#"<code>code</code>"#, "`code`")]
+    #[case(r#"<code><strong>  x  </strong></code>"#, "`**  x  **`")]
     fn test_inline_code_elements(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
@@ -370,6 +371,7 @@ mod tests {
 
             "#}
     )]
+    #[case(r#"<pre><strong>  x  </strong></pre>"#, "```\n**  x  **\n```\n\n")]
     fn test_pre_code_blocks(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
         let mut context = Context::default();
