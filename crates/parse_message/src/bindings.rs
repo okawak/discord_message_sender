@@ -5,7 +5,7 @@ use crate::core::{
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tsify::{Ts, Tsify};
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{JsCast, prelude::*};
 
 fn error(message: impl std::fmt::Display) -> JsError {
     JsError::new(&message.to_string())
@@ -201,18 +201,47 @@ pub fn discord_api_version() -> u32 {
 pub fn discord_page_size() -> usize {
     discord::PAGE_SIZE
 }
+// Obsidian can return array-valued headers such as Set-Cookie at runtime.
+// Read only the scalar headers used by the core; never deserialize cookie values.
+fn rate_limit_headers(value: &JsValue) -> BTreeMap<String, String> {
+    let mut headers = BTreeMap::new();
+    let Some(object) = value.dyn_ref::<js_sys::Object>() else {
+        return headers;
+    };
+    for key in js_sys::Object::keys(object).iter() {
+        let Some(name) = key.as_string() else {
+            continue;
+        };
+        if ![
+            "Retry-After",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset-After",
+        ]
+        .iter()
+        .any(|expected| name.eq_ignore_ascii_case(expected))
+        {
+            continue;
+        }
+        if let Some(text) = js_sys::Reflect::get(value, &key)
+            .ok()
+            .and_then(|value| value.as_string())
+        {
+            headers.insert(name, text);
+        }
+    }
+    headers
+}
+
 #[wasm_bindgen]
 pub fn discord_rate_limit_delay(headers: JsValue, text: &str) -> Result<f64, JsError> {
     Ok(discord::rate_limit_delay(
-        &serde_wasm_bindgen::from_value::<BTreeMap<String, String>>(headers).map_err(error)?,
+        &rate_limit_headers(&headers),
         text,
     ))
 }
 #[wasm_bindgen]
 pub fn discord_reset_delay(headers: JsValue) -> Result<f64, JsError> {
-    Ok(discord::reset_delay(
-        &serde_wasm_bindgen::from_value::<BTreeMap<String, String>>(headers).map_err(error)?,
-    ))
+    Ok(discord::reset_delay(&rate_limit_headers(&headers)))
 }
 #[wasm_bindgen]
 pub fn discord_failure_notice(status: u32, method: &str) -> String {
@@ -241,13 +270,7 @@ pub fn discord_retry_decision(
     headers: JsValue,
     text: &str,
 ) -> Result<Ts<discord::RetryDecision>, JsError> {
-    Ok(discord::retry(
-        status,
-        attempt,
-        &serde_wasm_bindgen::from_value::<BTreeMap<String, String>>(headers).map_err(error)?,
-        text,
-    )
-    .into_ts()?)
+    Ok(discord::retry(status, attempt, &rate_limit_headers(&headers), text).into_ts()?)
 }
 
 #[wasm_bindgen]
