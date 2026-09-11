@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::sync::LazyLock;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Context {
     pub in_inline: bool,
     /// Depth of nested lists, used for rendering list items

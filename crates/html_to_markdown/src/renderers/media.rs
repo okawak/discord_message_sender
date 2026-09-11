@@ -1,4 +1,4 @@
-use super::{Context, Renderer, render_children};
+use super::{Context, Renderer, render_children, render_node};
 use crate::{
     dom::{Dom, NodeData, NodeId},
     error::ConvertError,
@@ -312,25 +312,30 @@ impl Media {
         }
     }
 
-    fn has_following_content(dom: &Dom, id: NodeId) -> bool {
+    fn has_following_content(
+        &self,
+        url: &str,
+        dom: &Dom,
+        id: NodeId,
+        ctx: &Context,
+    ) -> Result<bool, ConvertError> {
         let mut current_id = id;
+        let mut probe_ctx = ctx.clone();
 
         while let Ok(Some(parent_id)) = dom.get_parent(current_id) {
             let Ok(children) = dom.iter_children(parent_id) else {
-                return false;
+                return Ok(false);
             };
-            if children
+            for &child_id in children
                 .skip_while(|&&child_id| child_id != current_id)
                 .skip(1)
-                .any(|&child_id| {
-                    dom.node(child_id).is_some_and(|node| match &node.data {
-                        NodeData::Text(text) => !text.trim().is_empty(),
-                        NodeData::Element { .. } => true,
-                        _ => false,
-                    })
-                })
             {
-                return true;
+                if !render_node(url, dom, child_id, &mut probe_ctx)?
+                    .trim()
+                    .is_empty()
+                {
+                    return Ok(true);
+                }
             }
 
             if dom.node(parent_id).is_some_and(|node| {
@@ -341,7 +346,7 @@ impl Media {
             current_id = parent_id;
         }
 
-        false
+        Ok(false)
     }
 
     fn normalize_link_label(content: &str) -> String {
@@ -454,7 +459,7 @@ impl Renderer for Media {
                             content,
                             &resolved_url,
                             ctx.list_depth,
-                            Self::has_following_content(dom, id),
+                            self.has_following_content(url, dom, id, ctx)?,
                         ));
                     }
 
@@ -987,6 +992,14 @@ mod tests {
     #[case(
         "<ul><li><div><a href=\"/target\"><pre><code>x</code></pre></a></div><h2>After</h2></li></ul>",
         "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n  ## After\n\n"
+    )]
+    #[case(
+        "<ul><li><a href=\"/target\"><pre><code>x</code></pre></a><div class=\"sidebar\">ignored</div></li><li>Next</li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
+    )]
+    #[case(
+        "<ul><li><div><a href=\"/target\"><pre><code>x</code></pre></a></div><section></section></li><li>Next</li></ul>",
+        "- \n\n  ```\n  x\n  ```\n\n  [https://example.com/target](https://example.com/target)\n- Next\n\n"
     )]
     #[case(
         "<a href=\"/target\"><div><div class=\"sidebar\"><h2>Ignored</h2></div><span>Details</span></div></a>",
