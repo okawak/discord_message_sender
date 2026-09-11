@@ -135,8 +135,8 @@ export default class DiscordMessageSenderPlugin extends Plugin {
       settings.clippingDirectoryName,
       channel,
     );
-    // Clippings are always individual files, so skip their IDs before parsing
-    // to avoid fetching the same external URL again during a retry.
+    // Clippings are always individual files, so their IDs can prevent another
+    // external fetch after the current message is confirmed to be a URL command.
     const existingClippingIds = getExistingIndividualMessageIds(
       this.app.vault,
       clippingDirectory,
@@ -145,7 +145,12 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     return processDiscordMessageBatch(
       messages,
       (message) =>
-        parseMessageWasm(message, settings.messagePrefix, settings.timeZone),
+        parseMessageWasm(
+          message,
+          settings.messagePrefix,
+          settings.timeZone,
+          existingClippingIds,
+        ),
       (processedMessages) =>
         saveProcessedMessages(
           this.app.vault,
@@ -154,7 +159,6 @@ export default class DiscordMessageSenderPlugin extends Plugin {
           processedMessages,
           settings,
         ),
-      existingClippingIds,
     );
   }
 

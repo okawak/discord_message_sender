@@ -8,6 +8,7 @@ import {
   type ProcessedMessage,
   message_instruction as parseMessage,
 } from "../pkg/parse_message.js";
+import { isSavedClippingInstruction } from "./messageParsing";
 import { initWasmCore } from "./wasmCore";
 
 export async function initWasmBridge(): Promise<InitOutput> {
@@ -23,7 +24,8 @@ export async function parseMessageWasm(
   message: DiscordMessage,
   prefix: string,
   timeZone: string,
-): Promise<ProcessedMessage> {
+  existingClippingIds: ReadonlySet<string> = new Set(),
+): Promise<ProcessedMessage | undefined> {
   await initWasmBridge();
 
   let instruction: MessageInstruction;
@@ -41,6 +43,9 @@ export async function parseMessageWasm(
       timeZone,
     );
   }
+
+  if (isSavedClippingInstruction(message.id, instruction, existingClippingIds))
+    return undefined;
 
   const html = await fetchUrlContent(instruction.url);
   let markdown: string;

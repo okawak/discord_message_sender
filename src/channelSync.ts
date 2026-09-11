@@ -142,23 +142,21 @@ export function getSyncCompletionNotice(summary: ChannelSyncSummary): string {
 
 export async function processDiscordMessageBatch(
   messages: readonly DiscordMessage[],
-  parseMessage: (message: DiscordMessage) => Promise<ProcessedMessage>,
+  parseMessage: (
+    message: DiscordMessage,
+  ) => Promise<ProcessedMessage | undefined>,
   saveMessages: (messages: readonly ProcessedMessage[]) => Promise<number>,
-  alreadyProcessedMessageIds: ReadonlySet<string> = new Set(),
 ): Promise<number> {
   const processedMessages: ProcessedMessage[] = [];
 
   try {
     for (const message of messages) {
-      if (
-        !should_process_message(message) ||
-        alreadyProcessedMessageIds.has(message.id)
-      ) {
+      if (!should_process_message(message)) {
         continue;
       }
 
       const processedMessage = await parseMessage(message);
-      if (processedMessage.markdown) {
+      if (processedMessage?.markdown) {
         processedMessages.push(processedMessage);
       }
     }

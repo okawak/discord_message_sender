@@ -62,9 +62,10 @@ describe("processDiscordMessageBatch", () => {
     expect(saved).toEqual([["1", "2"]]);
   });
 
-  test("skips an existing clipping before parsing it again", async () => {
+  test("does not save a clipping omitted by the parser", async () => {
     const parsed: string[] = [];
     const saved: string[][] = [];
+    const existingClippingIds = new Set(["existing"]);
     const existingClipping = {
       ...message("existing"),
       content: "!url https://example.com/article",
@@ -74,17 +75,17 @@ describe("processDiscordMessageBatch", () => {
       [existingClipping, message("new")],
       async (source) => {
         parsed.push(source.id);
+        if (existingClippingIds.has(source.id)) return undefined;
         return processed(source);
       },
       async (messages) => {
         saved.push(messages.map(({ messageId }) => messageId));
         return messages.length;
       },
-      new Set(["existing"]),
     );
 
     expect(count).toBe(1);
-    expect(parsed).toEqual(["new"]);
+    expect(parsed).toEqual(["existing", "new"]);
     expect(saved).toEqual([["new"]]);
   });
 });
