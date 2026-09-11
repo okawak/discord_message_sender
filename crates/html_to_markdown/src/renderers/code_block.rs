@@ -129,6 +129,9 @@ impl CodeBlock {
         result.push_str(&indent);
         result.push_str(&fence);
         if let Some(lang) = &language {
+            if lang.starts_with(fence_character) {
+                result.push(' ');
+            }
             result.push_str(lang);
         }
         result.push('\n');
@@ -430,6 +433,10 @@ mod tests {
     #[case(
         "<pre data-lang=\"rust`custom\"><code>~~~~\ncode</code></pre>",
         "~~~~~rust`custom\n~~~~\ncode\n~~~~~\n\n"
+    )]
+    #[case(
+        "<pre data-lang=\"~`custom\"><code>code</code></pre>",
+        "~~~ ~`custom\ncode\n~~~\n\n"
     )]
     fn test_pre_code_blocks(#[case] html: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
