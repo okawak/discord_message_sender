@@ -29,6 +29,7 @@ pub struct Context {
     pub in_heading: bool,
     pub in_link_label: bool,
     pub link_info: Option<String>,
+    pub suppress_link_boundary_probe: bool,
     /// Last character of the previous output to determine if block separation is needed
     pub last_char: Option<char>,
 }

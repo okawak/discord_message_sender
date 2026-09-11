@@ -283,6 +283,7 @@ impl Media {
     ) -> Result<bool, ConvertError> {
         let mut current_id = id;
         let mut probe_ctx = ctx.clone();
+        probe_ctx.suppress_link_boundary_probe = true;
 
         while let Ok(Some(parent_id)) = dom.get_parent(current_id) {
             let Ok(children) = dom.iter_children(parent_id) else {
@@ -417,11 +418,13 @@ impl Renderer for Media {
 
                     if self.has_structured_block_content(dom, id) {
                         let content = render_children(url, dom, id, ctx)?;
+                        let has_following_content = !ctx.suppress_link_boundary_probe
+                            && self.has_following_content(url, dom, id, ctx)?;
                         return Ok(Self::append_standalone_destination(
                             content,
                             &resolved_url,
                             ctx.list_depth,
-                            self.has_following_content(url, dom, id, ctx)?,
+                            has_following_content,
                         ));
                     }
 
@@ -439,16 +442,18 @@ impl Renderer for Media {
                         content
                     };
 
-                    let trailing_separator =
-                        if has_block_content && self.has_following_content(url, dom, id, ctx)? {
-                            if ctx.list_depth == 0 {
-                                "\n\n".to_string()
-                            } else {
-                                format!("\n{}", " ".repeat(ctx.list_depth))
-                            }
+                    let trailing_separator = if !ctx.suppress_link_boundary_probe
+                        && has_block_content
+                        && self.has_following_content(url, dom, id, ctx)?
+                    {
+                        if ctx.list_depth == 0 {
+                            "\n\n".to_string()
                         } else {
-                            String::new()
-                        };
+                            format!("\n{}", " ".repeat(ctx.list_depth))
+                        }
+                    } else {
+                        String::new()
+                    };
 
                     Ok(format!("[{content}]({resolved_url}){trailing_separator}"))
                 } else {
@@ -1020,6 +1025,30 @@ mod tests {
             &mut context,
         )
         .expect("Failed to render complex link boundaries");
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_many_sibling_block_links_without_recursive_boundary_probes() {
+        const LINK_COUNT: usize = 800;
+        let html = (0..LINK_COUNT)
+            .map(|index| format!(r#"<a href="/{index}"><p>{index}</p></a>"#))
+            .collect::<String>();
+        let expected = (0..LINK_COUNT)
+            .map(|index| format!("[{index}](https://example.com/{index})"))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let dom = parser::parse_html(&html).expect("Failed to parse HTML");
+        let mut context = Context::default();
+
+        let result = renderers::render_node(
+            "https://example.com/articles/page",
+            &dom,
+            dom.document,
+            &mut context,
+        )
+        .expect("Failed to render sibling block links");
+
         assert_eq!(result, expected);
     }
 
