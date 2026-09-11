@@ -42,6 +42,7 @@ const resolvedUrls = convertHtml(
     '<a href="?q=x">Query</a>',
     '<img src="//cdn.example.com/image.png" alt="CDN">',
     '<a href="HTTPS://other.example/x">Other</a>',
+    '<a href="java&#10;script:alert(1)">Unsafe</a>',
   ].join(""),
 );
 for (const expectedUrl of [
@@ -53,6 +54,9 @@ for (const expectedUrl of [
   if (!resolvedUrls.includes(expectedUrl)) {
     throw new Error(`WASM URL resolution failed for "${expectedUrl}".`);
   }
+}
+if (resolvedUrls.includes("javascript:")) {
+  throw new Error("WASM URL resolution restored an unsafe scheme.");
 }
 
 const repeatedHtml = `<html><body>${"<p>Content</p>".repeat(200)}</body></html>`;

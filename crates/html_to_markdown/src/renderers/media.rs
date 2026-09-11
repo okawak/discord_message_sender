@@ -4,7 +4,7 @@ use crate::{
     error::ConvertError,
     utils::format_list_content,
 };
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 #[cfg(not(target_arch = "wasm32"))]
 use url::Url;
@@ -31,17 +31,22 @@ pub struct Media;
 
 impl Media {
     /// Resolves a relative URL to an absolute URL using the base URL
-    fn resolve_url(&self, base_url: &str, url: &str) -> Result<String, ConvertError> {
+    fn resolve_url(&self, base_url: &str, url: &str) -> Option<String> {
         let url = url.trim();
+        if !self.is_safe_url(url) {
+            return None;
+        }
+
         if !base_url
             .trim()
             .get(..8)
             .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
         {
-            return Ok(url.to_string());
+            return Some(url.to_string());
         }
 
-        Ok(Self::resolve_standard_url(base_url.trim(), url).unwrap_or_else(|| url.to_string()))
+        let resolved = Self::resolve_standard_url(base_url.trim(), url)?;
+        self.is_safe_url(&resolved).then_some(resolved)
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -58,17 +63,40 @@ impl Media {
     /// Validates if the URL is safe to include in markdown
     fn is_safe_url(&self, url: &str) -> bool {
         let trimmed = url.trim();
-        if trimmed.is_empty() {
+        if trimmed.is_empty() || trimmed.starts_with('#') {
             return false;
         }
 
-        let lower_url = trimmed.to_lowercase();
+        let Some(scheme) = Self::url_scheme(trimmed) else {
+            return true;
+        };
 
-        !lower_url.starts_with("http://") // accept only https
-            && !lower_url.starts_with("#") // anchor links are safe but not treated as links in markdown
-            && !lower_url.starts_with("javascript:")
-            && !lower_url.starts_with("data:")
-            && !lower_url.starts_with("vbscript:")
+        ["https", "mailto", "tel", "ftp"]
+            .iter()
+            .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
+    }
+
+    fn url_scheme(url: &str) -> Option<Cow<'_, str>> {
+        let (raw_scheme, _) = url.split_once(':')?;
+        let scheme = if raw_scheme.contains(['\t', '\n', '\r']) {
+            Cow::Owned(
+                raw_scheme
+                    .chars()
+                    .filter(|character| !matches!(character, '\t' | '\n' | '\r'))
+                    .collect(),
+            )
+        } else {
+            Cow::Borrowed(raw_scheme)
+        };
+        (!scheme.is_empty()
+            && scheme
+                .bytes()
+                .next()
+                .is_some_and(|byte| byte.is_ascii_alphabetic())
+            && scheme
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.')))
+        .then_some(scheme)
     }
 
     /// Extracts and cleans alt text for images
@@ -146,11 +174,10 @@ impl Renderer for Media {
 
         match tag.local.as_ref() {
             "a" => {
-                if let Some(href) = attrs.get("href")
-                    && self.is_safe_url(href)
+                if let Some(resolved_url) = attrs
+                    .get("href")
+                    .and_then(|href| self.resolve_url(url, href))
                 {
-                    let resolved_url = self.resolve_url(url, href)?;
-
                     // in case of complex links, like bookmark, example:
                     // <a href="https://example.com/path?query#fragment">
                     //   <img src="/assets/image.png" alt="Image">
@@ -183,14 +210,12 @@ impl Renderer for Media {
 
                 // check link context
                 let result = if let Some(link_info) = &ctx.link_info {
-                    if self.is_safe_url(&src) {
-                        let resolved_src = self.resolve_url(url, &src)?;
+                    if let Some(resolved_src) = self.resolve_url(url, &src) {
                         format!("[![{alt}]({resolved_src})]({link_info})",)
                     } else {
                         format!("[{alt}]({link_info})")
                     }
-                } else if self.is_safe_url(&src) {
-                    let resolved_src = self.resolve_url(url, &src)?;
+                } else if let Some(resolved_src) = self.resolve_url(url, &src) {
                     format!("![{alt}]({resolved_src})")
                 } else {
                     alt
@@ -526,6 +551,8 @@ mod tests {
     #[case("vbscript:msgbox('xss')", false)]
     #[case("data:image/png;base64,iVBORw0K", false)]
     #[case("JAVASCRIPT:alert(1)", false)]
+    #[case("java\nscript:alert(1)", false)]
+    #[case("jav\tascript:alert(1)", false)]
     fn test_url_safety(#[case] url: &str, #[case] expected: bool) {
         let media = Media;
         assert_eq!(media.is_safe_url(url), expected);
@@ -689,6 +716,16 @@ mod tests {
         r#"<img src="data:image/svg+xml;base64,PHN2Zz4KPC9zdmc+" alt="Data URI Image">"#,
         "https://example.com",
         "Data URI Image\n\n"
+    )]
+    #[case(
+        r#"<a href="java&#10;script:alert(1)">Encoded Malicious Link</a>"#,
+        "https://example.com",
+        "Encoded Malicious Link"
+    )]
+    #[case(
+        r#"<img src="java&#10;script:alert(1)" alt="Encoded Malicious Image">"#,
+        "https://example.com",
+        "Encoded Malicious Image\n\n"
     )]
     fn test_security_cases(#[case] html: &str, #[case] base_url: &str, #[case] expected: &str) {
         let dom = parser::parse_html(html).expect("Failed to parse HTML");
