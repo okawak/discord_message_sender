@@ -15,7 +15,7 @@
     "node": ">=22.12.0"
   },
   "license": "MIT",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.2",
   "private": true,
   "scripts": {
     "wasm:build": "bun scripts/build-wasm.ts",
