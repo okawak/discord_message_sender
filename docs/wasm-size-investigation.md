@@ -11,7 +11,7 @@
 | 成果物 | 移行前 | 公式API移行後 | 削減量 |
 | --- | ---: | ---: | ---: |
 | `pkg/parse_message_bg.wasm` | 674,098 bytes | **258,856 bytes** | 415,242 bytes（61.6%） |
-| `dist/main.js` | 926,208 bytes | **372,953 bytes** | 553,255 bytes（59.7%） |
+| `dist/main.js` | 926,208 bytes | **372,998 bytes** | 553,210 bytes（59.7%） |
 
 削減の大半は、HTMLパーサー、文字参照データ、独自MarkdownレンダラーがWASMから不要になった効果です。生成済みWASMは従来どおりbase64として`main.js`へ直接埋め込み、`atob`で復号します。
 

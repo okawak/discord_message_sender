@@ -16,6 +16,9 @@ const TITLE_SELECTORS = [
 ] as const;
 
 export function convertHtml(url: string, html: string): string {
+  const title = extractTitle(
+    new DOMParser().parseFromString(html, "text/html"),
+  );
   const fragment = sanitizeHTMLToDom(html);
   resolveResourceUrls(fragment, url);
 
@@ -23,7 +26,6 @@ export function convertHtml(url: string, html: string): string {
     fragment.querySelector<HTMLElement>("article") ??
     fragment.querySelector<HTMLElement>("body") ??
     fragment;
-  const title = extractTitle(fragment);
   const frontmatter = title ? { title, source: url } : { source: url };
   const yaml = stringifyYaml(frontmatter).trimEnd();
   const markdown = htmlToMarkdown(content).trim();
@@ -61,9 +63,9 @@ function resolveResourceUrls(
   }
 }
 
-function extractTitle(fragment: DocumentFragment): string | undefined {
+function extractTitle(root: ParentNode): string | undefined {
   for (const selector of TITLE_SELECTORS) {
-    const element = fragment.querySelector<HTMLElement>(selector);
+    const element = root.querySelector<HTMLElement>(selector);
     const value =
       element?.getAttribute("content") ?? element?.textContent ?? undefined;
     const normalized = value
