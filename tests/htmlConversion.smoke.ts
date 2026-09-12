@@ -72,6 +72,7 @@ const backslashImage = createResource(
   { src: "//cdn.qiita.com/backslash.png" },
   String.raw`x\](https://attacker.invalid/p)![y`,
 );
+const fragmentImage = createResource("img", { src: "#icon" }, "Icon");
 const reservedImage = createResource(
   "img",
   { "data-dms-src": "https://tracker.example/pixel" },
@@ -108,7 +109,7 @@ const root = {
     const footerHtml = footerAttached
       ? `<footer><article>${footerImage.serialize()}</article></footer>`
       : "";
-    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${backslashImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
+    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${backslashImage.serialize()}${fragmentImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
   },
   get textContent() {
     return "HTML <img src=x> guide Article Guide";
@@ -122,16 +123,25 @@ const root = {
             footerImage,
             unsafeImage,
             backslashImage,
+            fragmentImage,
             reservedImage,
             iframe,
           ]
-        : [articleImage, unsafeImage, backslashImage, reservedImage, iframe];
+        : [
+            articleImage,
+            unsafeImage,
+            backslashImage,
+            fragmentImage,
+            reservedImage,
+            iframe,
+          ];
     }
     if (selector === "[href], [src]") {
       return [
         articleImage,
         unsafeImage,
         backslashImage,
+        fragmentImage,
         reservedImage,
         iframe,
         anchor,
@@ -142,7 +152,13 @@ const root = {
       );
     }
     if (selector === "img") {
-      return [articleImage, unsafeImage, backslashImage, reservedImage];
+      return [
+        articleImage,
+        unsafeImage,
+        backslashImage,
+        fragmentImage,
+        reservedImage,
+      ];
     }
     return [];
   },
@@ -219,6 +235,7 @@ if (
     String.raw`![x\\\](https://attacker.invalid/p)!\[y](<https://cdn.qiita.com/backslash.png>)`,
   ) ||
   !markdown.includes("https://example.com/DMSIMAGETOKEN0X0END") ||
+  markdown.includes("https://qiita.com/example#icon") ||
   markdown.includes("tracker.example")
 ) {
   throw new Error(`Image restoration damaged Markdown: ${markdown}`);
