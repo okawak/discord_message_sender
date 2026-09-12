@@ -74,7 +74,7 @@ const reservedImage = createResource(
 );
 const iframe = createResource("iframe", { src: "/embed" });
 const anchor = createResource("a", {
-  href: "https://example.com/DMSIMAGETOKEN0END",
+  href: "https://example.com/DMSIMAGETOKEN0X0END",
 });
 let footerAttached = true;
 const footer = { remove: () => (footerAttached = false) };
@@ -196,7 +196,7 @@ if (serializedFrontmatter.title !== "HTML <img src=x> guide") {
 }
 if (
   !markdown.includes("![Article](<https://cdn.qiita.com/article.png>)") ||
-  !markdown.includes("https://example.com/DMSIMAGETOKEN0END") ||
+  !markdown.includes("https://example.com/DMSIMAGETOKEN0X0END") ||
   markdown.includes("tracker.example")
 ) {
   throw new Error(`Image restoration damaged Markdown: ${markdown}`);
