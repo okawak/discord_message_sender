@@ -148,8 +148,13 @@ export async function resolveWasmBindgenCli(
     );
   }
 
-  // Use one verified release binary everywhere. Locally compiled CLIs with the
-  // same version can still produce byte-different WASM glue.
+  // CI installs this executable up front; clean external builders use the
+  // verified release download below as a fallback.
+  const pathExecutable = Bun.which("wasm-bindgen");
+  if (pathExecutable && (await hasExpectedVersion(pathExecutable))) {
+    return pathExecutable;
+  }
+
   const release = getWasmBindgenRelease(process.platform, process.arch);
   const toolsRoot = join(targetDirectory, "build-tools");
   const installation = join(
