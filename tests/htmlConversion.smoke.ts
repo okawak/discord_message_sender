@@ -1,5 +1,6 @@
 import { mock } from "bun:test";
 
+let parsedInput = "";
 let sanitizedInput = "";
 
 mock.module("obsidian", () => ({
@@ -8,33 +9,31 @@ mock.module("obsidian", () => ({
     return {};
   },
   htmlToMarkdown() {
-    return "Converted article";
+    return sanitizedInput;
   },
   stringifyYaml() {
     return "source: https://qiita.com/example";
   },
 }));
 
-function createResource(value: string) {
-  let src: string | undefined = value;
+function createImage(source: string, alt: string) {
+  let replacement: string | undefined;
   return {
+    alt,
     getAttribute(name: string) {
-      return name === "src" ? (src ?? null) : null;
+      return name === "data-dms-src" ? source : null;
     },
-    setAttribute(name: string, next: string) {
-      if (name === "src") src = next;
-    },
-    removeAttribute(name: string) {
-      if (name === "src") src = undefined;
+    replaceWith(value: string) {
+      replacement = value;
     },
     serialize() {
-      return src ? `<img src="${src}">` : "<img>";
+      return replacement ?? `<img data-dms-src="${source}">`;
     },
   };
 }
 
-const articleImage = createResource("//cdn.qiita.com/article.png");
-const footerImage = createResource("//cdn.qiita.com/footer.png");
+const articleImage = createImage("//cdn.qiita.com/article.png", "Article");
+const footerImage = createImage("//cdn.qiita.com/footer.png", "Footer");
 let footerAttached = true;
 const footer = { remove: () => (footerAttached = false) };
 const body = {
@@ -44,9 +43,12 @@ const body = {
       : "";
     return `<p>Article</p>${articleImage.serialize()}${footerHtml}`;
   },
+  get textContent() {
+    return this.innerHTML;
+  },
   querySelectorAll(selector: string) {
     if (selector === "nav, footer") return footerAttached ? [footer] : [];
-    if (selector === "[href], [src]") {
+    if (selector === "img") {
       return footerAttached ? [articleImage, footerImage] : [articleImage];
     }
     return [];
@@ -62,23 +64,33 @@ const body = {
 const parsedDocument = { body, querySelector: () => null };
 
 const originalDOMParser = globalThis.DOMParser;
+let markdown = "";
 try {
   globalThis.DOMParser = class {
-    parseFromString() {
+    parseFromString(html: string) {
+      parsedInput = html;
       return parsedDocument;
     }
   } as unknown as typeof DOMParser;
   const { convertHtml } = await import("../src/htmlConversion");
-  convertHtml("https://qiita.com/example", "<html />");
+  markdown = convertHtml(
+    "https://qiita.com/example",
+    '<main><img src="//cdn.qiita.com/article.png"><iframe src="/embed"></iframe></main>',
+  );
 } finally {
   globalThis.DOMParser = originalDOMParser;
 }
 
-const expected = '<p>Article</p><img src="https://cdn.qiita.com/article.png">';
-if (sanitizedInput !== expected) {
-  throw new Error(`Unexpected HTML passed to sanitizer: ${sanitizedInput}`);
+if (parsedInput.includes(" src=") || !parsedInput.includes("data-dms-src=")) {
+  throw new Error(`Loadable attributes reached DOMParser: ${parsedInput}`);
+}
+if (sanitizedInput !== "<p>Article</p>DMSIMAGETOKEN0END") {
+  throw new Error(`Loadable elements reached the sanitizer: ${sanitizedInput}`);
+}
+if (!markdown.includes("![Article](<https://cdn.qiita.com/article.png>)")) {
+  throw new Error(`Image URL was not restored in Markdown: ${markdown}`);
 }
 
 console.log(
-  "HTML conversion removes non-content and resolves resource URLs before sanitizing.",
+  "HTML conversion masks resources before parsing and restores safe Markdown image URLs.",
 );

@@ -2,6 +2,11 @@ import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
 
 const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
 const URL_ATTRIBUTES = ["href", "src"] as const;
+const MASKED_ATTRIBUTE_PREFIX = "data-dms-";
+const LOADABLE_ELEMENT_PATTERN =
+  /<(?:audio|embed|feimage|iframe|image|img|input|link|object|source|track|use|video)\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi;
+const LOADABLE_ATTRIBUTE_PATTERN =
+  /(\s)(src|srcdoc|srcset|poster|data|href|xlink:href)(\s*=)/gi;
 const TITLE_SELECTORS = [
   "head > title",
   'head meta[name="title"]',
@@ -16,7 +21,10 @@ const TITLE_SELECTORS = [
 ] as const;
 
 export function convertHtml(url: string, html: string): string {
-  const document = new DOMParser().parseFromString(html, "text/html");
+  const document = new DOMParser().parseFromString(
+    maskLoadableAttributes(html),
+    "text/html",
+  );
   const title = extractTitle(document);
   const body = document.body;
   removeNonContentElements(body);
@@ -25,13 +33,55 @@ export function convertHtml(url: string, html: string): string {
     body.querySelector<HTMLElement>("main") ??
     body;
   resolveResourceUrls(content, url);
+  const imageReplacements = replaceImagesWithTokens(content, url);
 
   const fragment = sanitizeHTMLToDom(content.innerHTML);
   const frontmatter = title ? { title, source: url } : { source: url };
   const yaml = stringifyYaml(frontmatter).trimEnd();
-  const markdown = htmlToMarkdown(fragment).trim();
+  let markdown = htmlToMarkdown(fragment);
+  for (const [token, image] of imageReplacements) {
+    markdown = markdown.replaceAll(token, image);
+  }
 
-  return `---\n${yaml}\n---\n\n${markdown}`;
+  return `---\n${yaml}\n---\n\n${markdown.trim()}`;
+}
+
+function maskLoadableAttributes(html: string): string {
+  return html.replace(LOADABLE_ELEMENT_PATTERN, (element) =>
+    element.replace(
+      LOADABLE_ATTRIBUTE_PATTERN,
+      (_, whitespace: string, name: string, equals: string) =>
+        `${whitespace}${MASKED_ATTRIBUTE_PREFIX}${name.toLowerCase()}${equals}`,
+    ),
+  );
+}
+
+function replaceImagesWithTokens(
+  root: ParentNode,
+  baseUrl: string,
+): Array<readonly [string, string]> {
+  const replacements: Array<readonly [string, string]> = [];
+  let index = 0;
+
+  for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
+    const source = image.getAttribute(`${MASKED_ATTRIBUTE_PREFIX}src`)?.trim();
+    const alt = image.alt.replace(/\s+/g, " ").trim();
+    const resolved = source ? resolveUrl(source, baseUrl) : undefined;
+    if (!resolved) {
+      image.replaceWith(alt);
+      continue;
+    }
+
+    let token = `DMSIMAGETOKEN${index++}END`;
+    while (root.textContent?.includes(token)) token += "X";
+    image.replaceWith(token);
+    replacements.push([
+      token,
+      `![${alt.replace(/([\\[\]])/g, "\\$1")}](<${resolved}>)`,
+    ]);
+  }
+
+  return replacements;
 }
 
 function removeNonContentElements(root: ParentNode): void {
@@ -55,17 +105,24 @@ function resolveResourceUrls(root: ParentNode, baseUrl: string): void {
         continue;
       }
 
-      try {
-        const resolved = new URL(value, baseUrl);
-        if (!SAFE_PROTOCOLS.has(resolved.protocol)) {
-          element.removeAttribute(attribute);
-          continue;
-        }
-        element.setAttribute(attribute, resolved.toString());
-      } catch {
+      const resolved = resolveUrl(value, baseUrl);
+      if (!resolved) {
         element.removeAttribute(attribute);
+        continue;
       }
+      element.setAttribute(attribute, resolved);
     }
+  }
+}
+
+function resolveUrl(value: string, baseUrl: string): string | undefined {
+  try {
+    const resolved = new URL(value, baseUrl);
+    return SAFE_PROTOCOLS.has(resolved.protocol)
+      ? resolved.toString()
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 
