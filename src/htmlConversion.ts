@@ -20,10 +20,12 @@ export function convertHtml(url: string, html: string): string {
     new DOMParser().parseFromString(html, "text/html"),
   );
   const fragment = sanitizeHTMLToDom(html);
+  removeNonContentElements(fragment);
   resolveResourceUrls(fragment, url);
 
   const content =
     fragment.querySelector<HTMLElement>("article") ??
+    fragment.querySelector<HTMLElement>("main") ??
     fragment.querySelector<HTMLElement>("body") ??
     fragment;
   const frontmatter = title ? { title, source: url } : { source: url };
@@ -31,6 +33,12 @@ export function convertHtml(url: string, html: string): string {
   const markdown = htmlToMarkdown(content).trim();
 
   return `---\n${yaml}\n---\n\n${markdown}`;
+}
+
+function removeNonContentElements(fragment: DocumentFragment): void {
+  for (const element of fragment.querySelectorAll("nav, footer")) {
+    element.remove();
+  }
 }
 
 function resolveResourceUrls(
