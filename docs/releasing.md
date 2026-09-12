@@ -48,7 +48,7 @@ versionファイルは開発中に次期versionへ変更しません。リリー
 
 tagから実行された`Release Plugin`は、tagのソースを改めてcheckoutし、固定したツールチェーンでテストとbuildを再実行します。生成した`main.js`と`manifest.json`へGitHub artifact attestationを付与し、この2ファイルだけをGitHub Releaseへ添付します。
 
-Rustのversionは`rust-toolchain.toml`、Bunのversionは`.bun-version`、Nodeのversionは`.node-version`を参照します。wasm-bindgen CLIはworkflow内、Binaryenはpackage.jsonとbun.lockで固定します。これらのversionと依存関係はRenovateが週次で更新PRを作成するため、CIを確認してからマージしてください。GitHub Actionsは`@v7`のようなmajor tagを維持します。
+Rustのversionは`rust-toolchain.toml`、Bunのversionは`.bun-version`、Nodeのversionは`.node-version`を参照します。`wasm-pack`はworkflow内で固定します。これらのversionと依存関係はRenovateが週次で更新PRを作成するため、CIを確認してからマージしてください。GitHub Actionsは`@v7`のようなmajor tagを維持します。
 
 Renovateを動作させるには、repositoryへRenovate GitHub Appをインストールする必要があります。設定は`renovate.json`へ集約し、次を更新対象とします。
 
@@ -57,7 +57,7 @@ Renovateを動作させるには、repositoryへRenovate GitHub Appをインス�
 - Rust toolchain
 - Bun runtime
 - Node runtime
-- wasm-bindgen CLIとBinaryen
+- wasm-pack
 - GitHub Actions
 
 固定versionは、tagから同じ環境で再ビルドできるようにするために維持します。更新作業は手動編集せず、RenovateのPRとしてレビューします。
@@ -94,7 +94,7 @@ Rust/TypeScriptの役割と開発時の検証方法は[実装構成](rust-core.m
 
 `0.5.0`以降の最低対応版はObsidian 1.13.0です。設定画面は[Obsidian公式の移行ガイド](https://docs.obsidian.md/plugins/guides/migrate-declarative-settings)に従い、`getSettingDefinitions()`のみで描画します。公開済みリリースの`versions.json`エントリーは変更せず、最低対応版を変更する場合は新しいプラグインversionとして追加します。
 
-CIとリリースはUbuntu 24.04と固定したNode/Bun/Rust/wasm-bindgen CLI/Binaryenを使います。`bun install --frozen-lockfile`とCargoの`--locked`で依存関係の意図しない再解決を防ぎ、WASMに含まれるソース・Cargoレジストリの絶対パスを共通のパスへ置換します。Viteの出力ターゲットはES2022です。WASMは圧縮せずbase64として`main.js`に埋め込みます。production buildは`main.js`の実ファイルサイズが1,000,000 bytes以上の場合に失敗します。
+CIとリリースはUbuntu 24.04と固定したNode/Bun/Rust/wasm-packを使います。`bun install --frozen-lockfile`とCargoの`--locked`で依存関係の意図しない再解決を防ぎます。Viteの出力ターゲットはES2022です。WASMは圧縮せずbase64として`main.js`に埋め込みます。
 
 ```bash
 bun install --frozen-lockfile

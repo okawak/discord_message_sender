@@ -7,7 +7,6 @@ const temporaryRoot = await mkdtemp(join(tmpdir(), "discord-build-"));
 
 try {
   for (const name of [
-    ".cargo",
     "src",
     "crates",
     "scripts",

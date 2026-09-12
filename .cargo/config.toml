@@ -1,3 +1,0 @@
-[alias]
-# Build only the distribution library so Cargo can apply release-profile LTO.
-wasm-build = "rustc --package parse_message --lib --release --target wasm32-unknown-unknown --crate-type cdylib --locked"
