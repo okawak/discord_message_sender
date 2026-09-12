@@ -16,38 +16,31 @@ const TITLE_SELECTORS = [
 ] as const;
 
 export function convertHtml(url: string, html: string): string {
-  const title = extractTitle(
-    new DOMParser().parseFromString(html, "text/html"),
-  );
-  const fragment = sanitizeHTMLToDom(html);
-  removeNonContentElements(fragment);
-  resolveResourceUrls(fragment, url);
-
+  const document = new DOMParser().parseFromString(html, "text/html");
+  const title = extractTitle(document);
   const content =
-    fragment.querySelector<HTMLElement>("article") ??
-    fragment.querySelector<HTMLElement>("main") ??
-    fragment.querySelector<HTMLElement>("body") ??
-    fragment;
+    document.querySelector<HTMLElement>("article") ??
+    document.querySelector<HTMLElement>("main") ??
+    document.body;
+  removeNonContentElements(content);
+  resolveResourceUrls(content, url);
+
+  const fragment = sanitizeHTMLToDom(content.innerHTML);
   const frontmatter = title ? { title, source: url } : { source: url };
   const yaml = stringifyYaml(frontmatter).trimEnd();
-  const markdown = htmlToMarkdown(content).trim();
+  const markdown = htmlToMarkdown(fragment).trim();
 
   return `---\n${yaml}\n---\n\n${markdown}`;
 }
 
-function removeNonContentElements(fragment: DocumentFragment): void {
-  for (const element of fragment.querySelectorAll("nav, footer")) {
+function removeNonContentElements(root: ParentNode): void {
+  for (const element of root.querySelectorAll("nav, footer")) {
     element.remove();
   }
 }
 
-function resolveResourceUrls(
-  fragment: DocumentFragment,
-  baseUrl: string,
-): void {
-  for (const element of fragment.querySelectorAll<HTMLElement>(
-    "[href], [src]",
-  )) {
+function resolveResourceUrls(root: ParentNode, baseUrl: string): void {
+  for (const element of root.querySelectorAll<HTMLElement>("[href], [src]")) {
     for (const attribute of URL_ATTRIBUTES) {
       const value = element.getAttribute(attribute)?.trim();
       if (value === undefined) continue;
