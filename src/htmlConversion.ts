@@ -105,7 +105,8 @@ function replaceImagesWithTokens(
     const token = `${tokenPrefix}${replacements.length}END`;
     image.replaceWith(token);
     const escapedAlt = alt.replaceAll("\\", "\\\\").replace(/([[\]])/g, "\\$1");
-    replacements.push(`![${escapedAlt}](<${resolved}>)`);
+    const escapedUrl = resolved.replaceAll("\\", "%5C");
+    replacements.push(`![${escapedAlt}](<${escapedUrl}>)`);
   }
 
   if (replacements.length === 0) return (markdown) => markdown;

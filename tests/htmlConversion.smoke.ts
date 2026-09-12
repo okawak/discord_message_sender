@@ -69,7 +69,7 @@ const unsafeImage = createResource(
 );
 const backslashImage = createResource(
   "img",
-  { src: "//cdn.qiita.com/backslash.png" },
+  { src: "//cdn.qiita.com/backslash.png?q=\\" },
   String.raw`x\](https://attacker.invalid/p)![y`,
 );
 const fragmentImage = createResource("img", { src: "#icon" }, "Icon");
@@ -232,7 +232,7 @@ if (serializedFrontmatter.title !== "HTML <img src=x> guide") {
 if (
   !markdown.includes("![Article](<https://cdn.qiita.com/article.png>)") ||
   !markdown.includes(
-    String.raw`![x\\\](https://attacker.invalid/p)!\[y](<https://cdn.qiita.com/backslash.png>)`,
+    String.raw`![x\\\](https://attacker.invalid/p)!\[y](<https://cdn.qiita.com/backslash.png?q=%5C>)`,
   ) ||
   !markdown.includes("https://example.com/DMSIMAGETOKEN0X0END") ||
   markdown.includes("https://qiita.com/example#icon") ||
