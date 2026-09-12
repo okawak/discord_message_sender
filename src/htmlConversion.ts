@@ -3,16 +3,16 @@ import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
 const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
 const URL_ATTRIBUTES = ["href", "src"] as const;
 const TITLE_SELECTORS = [
-  "title",
-  'meta[name="title"]',
-  'meta[property="og:title"]',
-  'meta[name="twitter:title"]',
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
+  "head > title",
+  'head meta[name="title"]',
+  'head meta[property="og:title"]',
+  'head meta[name="twitter:title"]',
+  "body h1",
+  "body h2",
+  "body h3",
+  "body h4",
+  "body h5",
+  "body h6",
 ] as const;
 
 export function convertHtml(url: string, html: string): string {
