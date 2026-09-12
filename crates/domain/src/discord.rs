@@ -1,11 +1,23 @@
 use super::{channels::display_name, models::DiscordChannelSettings, trim};
 use regex_lite::{Captures, Regex};
+use serde::Serialize;
 use serde_json::Value;
 use std::{collections::BTreeMap, sync::LazyLock};
 
 pub const API_VERSION: u32 = 10;
 pub const PAGE_SIZE: usize = 100;
 pub const MAX_RETRIES: u32 = 3;
+
+#[derive(Serialize)]
+struct CreateMessageBody<'a> {
+    content: &'a str,
+}
+
+pub fn create_message_body(content: &str) -> String {
+    serde_json::to_string(&CreateMessageBody { content })
+        .expect("serializing a string-only Discord request cannot fail")
+}
+
 pub fn encode_component(value: &str) -> String {
     let mut out = String::new();
     for b in value.bytes() {
@@ -91,6 +103,12 @@ pub fn failure_notice(status: u32, method: &str) -> String {
         404 => "Discord channel was not found".into(),
         _ => format!("Discord API returned {status}"),
     }
+}
+pub fn network_error_message(method: &str, path: &str) -> String {
+    format!("Discord API {method} {path} request failed.")
+}
+pub fn rate_limit_notice(delay: f64) -> String {
+    format!("Rate-limited. Retry after {}s", (delay / 1000.0).ceil())
 }
 pub fn error_message(status: u32, method: &str, path: &str, text: &str) -> String {
     let hint = match status {
@@ -179,6 +197,14 @@ mod tests {
             name: name.into(),
             last_processed_message_id: None,
         }
+    }
+
+    #[test]
+    fn serializes_discord_request_bodies() {
+        assert_eq!(
+            create_message_body("line 1\n\"quoted\""),
+            r#"{"content":"line 1\n\"quoted\""}"#
+        );
     }
 
     #[test]

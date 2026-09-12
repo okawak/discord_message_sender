@@ -1,9 +1,14 @@
 import { Notice, type RequestUrlResponse, requestUrl } from "obsidian";
 import {
+  discord_create_message_body as createDiscordMessageBody,
   type DiscordMessage,
+  decode_discord_message as decodeDiscordMessage,
+  decode_discord_messages as decodeDiscordMessages,
   discord_retry_decision,
   discord_messages_path as getChannelMessagesPath,
   discord_api_version as getDiscordApiVersion,
+  discord_network_error_message as getNetworkErrorMessage,
+  discord_rate_limit_notice as getRateLimitNotice,
   discord_reset_delay as getRateLimitResetDelay,
 } from "../pkg/parse_message.js";
 import { DiscordApiError, type DiscordRequestMethod } from "./wasmCore";
@@ -20,12 +25,8 @@ export async function fetchMessages(
 ): Promise<DiscordMessagePage> {
   const path = getChannelMessagesPath(channelId, before);
   const res = await discordRequest(botToken, "GET", path);
-  const messages: unknown = JSON.parse(res.text);
-  if (!Array.isArray(messages)) {
-    throw new TypeError("Discord API returned an invalid message list.");
-  }
   return {
-    messages: messages as DiscordMessage[],
+    messages: decodeDiscordMessages(res.json),
     nextRequestDelayMs: getRateLimitResetDelay(res.headers),
   };
 }
@@ -41,9 +42,9 @@ export async function postNotification(
     botToken,
     "POST",
     path,
-    JSON.stringify({ content: text }),
+    createDiscordMessageBody(text),
   );
-  return JSON.parse(res.text);
+  return decodeDiscordMessage(res.json);
 }
 
 async function discordRequest(
@@ -69,7 +70,7 @@ async function discordRequest(
     } catch (error) {
       const decision = discord_retry_decision(undefined, attempt, {}, "");
       if (decision.kind !== "retry") {
-        throw new Error(`Discord API ${method} ${path} request failed.`, {
+        throw new Error(getNetworkErrorMessage(method, path), {
           cause: error,
         });
       }
@@ -86,10 +87,7 @@ async function discordRequest(
     if (decision.kind === "success") return res;
     if (decision.kind === "fail")
       throw new DiscordApiError(res.status, method, path, res.text);
-    if (decision.rateLimited)
-      new Notice(
-        `Rate-limited. Retry after ${Math.ceil(decision.delay / 1000)}s`,
-      );
+    if (decision.rateLimited) new Notice(getRateLimitNotice(decision.delay));
     await sleep(decision.delay);
   }
 }

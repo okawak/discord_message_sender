@@ -49,7 +49,7 @@ describe("Rust/TypeScript boundary", () => {
         "UTC",
       ),
     ).toThrow();
-    expect(message_instruction("hello", "!")).toEqual({
+    expect(message_instruction("hello", "!", false)).toEqual({
       kind: "message",
       markdown: "hello",
     });

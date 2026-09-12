@@ -126,6 +126,15 @@ pub fn failure_notice(channel: &super::models::DiscordChannelSettings, reason: &
         super::channels::display_name(channel)
     )
 }
+pub fn notification_failure_notice(
+    channel: &super::models::DiscordChannelSettings,
+    reason: &str,
+) -> String {
+    format!(
+        "Discord sync notification failed for \"{}\": {reason}. The channel sync completed; retrying is not required.",
+        super::channels::display_name(channel)
+    )
+}
 
 #[cfg(test)]
 mod tests {

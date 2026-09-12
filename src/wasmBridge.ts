@@ -8,7 +8,6 @@ import {
   message_instruction as parseMessage,
 } from "../pkg/parse_message.js";
 import { convertHtml } from "./htmlConversion";
-import { isSavedClippingInstruction } from "./messageParsing";
 import { initWasmCore } from "./wasmCore";
 
 export async function initWasmBridge(): Promise<InitOutput> {
@@ -30,7 +29,11 @@ export async function parseMessageWasm(
 
   let instruction: MessageInstruction;
   try {
-    instruction = parseMessage(message.content, prefix);
+    instruction = parseMessage(
+      message.content,
+      prefix,
+      existingClippingIds.has(message.id),
+    );
   } catch (error) {
     throw new Error("Failed to parse Discord message.", { cause: error });
   }
@@ -43,9 +46,7 @@ export async function parseMessageWasm(
       timeZone,
     );
   }
-
-  if (isSavedClippingInstruction(message.id, instruction, existingClippingIds))
-    return undefined;
+  if (instruction.kind === "skip") return undefined;
 
   const html = await fetchUrlContent(instruction.url);
   let markdown: string;

@@ -4,12 +4,12 @@ import initWasm, {
 
 await initWasm();
 
-const message = parseMessage("hello", "!");
+const message = parseMessage("hello", "!", false);
 if (message.kind !== "message" || message.markdown !== "hello") {
   throw new Error("WASM message processing smoke test failed.");
 }
 
-const url = parseMessage("!url https://example.com", "!");
+const url = parseMessage("!url https://example.com", "!", false);
 if (url.kind !== "url" || url.url !== "https://example.com") {
   throw new Error("WASM URL command smoke test failed.");
 }
@@ -17,7 +17,7 @@ if (url.kind !== "url" || url.url !== "https://example.com") {
 for (const input of ["!url", "!unknown"]) {
   let failed = false;
   try {
-    parseMessage(input, "!");
+    parseMessage(input, "!", false);
   } catch {
     failed = true;
   }

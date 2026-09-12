@@ -104,8 +104,12 @@ pub fn possible_local_dates(timestamp: &str) -> Result<Ts<LocalDateTimeList>, Js
     Ok(LocalDateTimeList(dates::possible_dates(timestamp).map_err(error)?).into_ts()?)
 }
 #[wasm_bindgen]
-pub fn message_instruction(input: &str, prefix: &str) -> Result<Ts<MessageInstruction>, JsError> {
-    Ok(messages::instruction(input, prefix)
+pub fn message_instruction(
+    input: &str,
+    prefix: &str,
+    clipping_already_saved: bool,
+) -> Result<Ts<MessageInstruction>, JsError> {
+    Ok(messages::instruction(input, prefix, clipping_already_saved)
         .map_err(error)?
         .into_ts()?)
 }
@@ -192,6 +196,22 @@ pub fn discord_messages_path(channel: &str, before: Option<String>) -> String {
     discord::messages_path(channel, before.as_deref())
 }
 #[wasm_bindgen]
+pub fn decode_discord_messages(value: JsValue) -> Result<Ts<MessageList>, JsError> {
+    let messages: MessageList = serde_wasm_bindgen::from_value(value)
+        .map_err(|_| error("Discord API returned an invalid message list."))?;
+    Ok(messages.into_ts()?)
+}
+#[wasm_bindgen]
+pub fn decode_discord_message(value: JsValue) -> Result<Ts<DiscordMessage>, JsError> {
+    let message: DiscordMessage = serde_wasm_bindgen::from_value(value)
+        .map_err(|_| error("Discord API returned an invalid message."))?;
+    Ok(message.into_ts()?)
+}
+#[wasm_bindgen]
+pub fn discord_create_message_body(content: &str) -> String {
+    discord::create_message_body(content)
+}
+#[wasm_bindgen]
 pub fn discord_api_version() -> u32 {
     discord::API_VERSION
 }
@@ -246,6 +266,14 @@ pub fn discord_failure_notice(status: u32, method: &str) -> String {
     discord::failure_notice(status, method)
 }
 #[wasm_bindgen]
+pub fn discord_network_error_message(method: &str, path: &str) -> String {
+    discord::network_error_message(method, path)
+}
+#[wasm_bindgen]
+pub fn discord_rate_limit_notice(delay: f64) -> String {
+    discord::rate_limit_notice(delay)
+}
+#[wasm_bindgen]
 pub fn discord_error_message(status: u32, method: &str, path: &str, text: &str) -> String {
     discord::error_message(status, method, path, text)
 }
@@ -298,4 +326,14 @@ pub fn sync_failure_notice(
     reason: &str,
 ) -> Result<String, JsError> {
     Ok(sync::failure_notice(&channel.to_rust()?, reason))
+}
+#[wasm_bindgen]
+pub fn sync_notification_failure_notice(
+    channel: Ts<DiscordChannelSettings>,
+    reason: &str,
+) -> Result<String, JsError> {
+    Ok(sync::notification_failure_notice(
+        &channel.to_rust()?,
+        reason,
+    ))
 }

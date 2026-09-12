@@ -108,6 +108,7 @@ pub struct ProcessedMessage {
 pub enum MessageInstruction {
     Message { markdown: String },
     Url { url: String },
+    Skip,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]

@@ -5,9 +5,14 @@ use super::{
     trim,
 };
 
-pub fn instruction(input: &str, prefix: &str) -> Result<MessageInstruction, String> {
+pub fn instruction(
+    input: &str,
+    prefix: &str,
+    clipping_already_saved: bool,
+) -> Result<MessageInstruction, String> {
     match parse_message(input, prefix).map_err(|e| e.to_string())? {
         MessageAction::Message(markdown) => Ok(MessageInstruction::Message { markdown }),
+        MessageAction::Url(_) if clipping_already_saved => Ok(MessageInstruction::Skip),
         MessageAction::Url(url) => Ok(MessageInstruction::Url { url }),
     }
 }
@@ -47,4 +52,25 @@ pub fn processed(
         markdown,
         is_clipping,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skips_only_saved_url_commands() {
+        assert!(matches!(
+            instruction("!url https://example.com", "!", true).unwrap(),
+            MessageInstruction::Skip
+        ));
+        assert!(matches!(
+            instruction("!url https://example.com", "?", true).unwrap(),
+            MessageInstruction::Message { .. }
+        ));
+        assert!(matches!(
+            instruction("regular message", "!", true).unwrap(),
+            MessageInstruction::Message { .. }
+        ));
+    }
 }

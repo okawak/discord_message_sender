@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  discord_create_message_body as createDiscordMessageBody,
+  decode_discord_message as decodeDiscordMessage,
+  decode_discord_messages as decodeDiscordMessages,
   discord_retry_decision,
   discord_messages_path as getChannelMessagesPath,
   discord_api_version as getDiscordApiVersion,
@@ -7,6 +10,34 @@ import {
   discord_rate_limit_delay as getRateLimitDelay,
   discord_reset_delay as getRateLimitResetDelay,
 } from "../pkg/parse_message.js";
+
+describe("Discord JSON boundary", () => {
+  const message = {
+    id: "1",
+    content: "hello",
+    timestamp: "2026-01-01T00:00:00Z",
+  };
+
+  test("decodes typed message responses in Rust", () => {
+    expect(decodeDiscordMessage(message)).toEqual(message);
+    expect(decodeDiscordMessages([message])).toEqual([message]);
+  });
+
+  test("rejects malformed Discord responses", () => {
+    expect(() => decodeDiscordMessage({ id: 1 })).toThrow(
+      "Discord API returned an invalid message.",
+    );
+    expect(() => decodeDiscordMessages({})).toThrow(
+      "Discord API returned an invalid message list.",
+    );
+  });
+
+  test("serializes notification request bodies in Rust", () => {
+    expect(createDiscordMessageBody('line 1\n"quoted"')).toBe(
+      '{"content":"line 1\\n\\"quoted\\""}',
+    );
+  });
+});
 
 describe("Discord message route", () => {
   test("uses API v10 and Discord's maximum page size", () => {

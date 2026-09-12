@@ -4,65 +4,43 @@ import {
   type DiscordMessage,
   message_instruction,
 } from "../pkg/parse_message.js";
-import { isSavedClippingInstruction } from "../src/messageParsing";
 
 describe("Rust message instructions", () => {
   test("returns a typed regular-message instruction", () => {
-    expect(message_instruction("# title", "!")).toEqual({
+    expect(message_instruction("# title", "!", false)).toEqual({
       kind: "message",
       markdown: "# title",
     });
   });
   test("returns a typed URL instruction", () => {
-    expect(message_instruction("!url https://example.com", "!")).toEqual({
-      kind: "url",
-      url: "https://example.com",
-    });
+    expect(message_instruction("!url https://example.com", "!", false)).toEqual(
+      {
+        kind: "url",
+        url: "https://example.com",
+      },
+    );
   });
   test("rejects a URL command without an argument", () => {
-    expect(() => message_instruction("!url", "!")).toThrow();
+    expect(() => message_instruction("!url", "!", false)).toThrow();
   });
   test("rejects unknown commands", () => {
-    expect(() => message_instruction("!unknown", "!")).toThrow();
+    expect(() => message_instruction("!unknown", "!", false)).toThrow();
   });
 });
 
-describe("isSavedClippingInstruction", () => {
-  const existingIds = new Set(["123"]);
-
-  test("skips only current URL commands with an existing clipping ID", () => {
-    expect(
-      isSavedClippingInstruction(
-        "123",
-        { kind: "url", url: "https://example.com" },
-        existingIds,
-      ),
-    ).toBe(true);
-    expect(
-      isSavedClippingInstruction(
-        "456",
-        { kind: "url", url: "https://example.com" },
-        existingIds,
-      ),
-    ).toBe(false);
-  });
-
-  test("does not skip regular content that previously used the same ID", () => {
-    expect(
-      isSavedClippingInstruction(
-        "123",
-        { kind: "message", markdown: "regular message" },
-        existingIds,
-      ),
-    ).toBe(false);
-  });
-
-  test("does not skip a former URL command after the prefix changes", () => {
-    const instruction = message_instruction("!url https://example.com", "?");
-
-    expect(isSavedClippingInstruction("123", instruction, existingIds)).toBe(
-      false,
-    );
+describe("saved clipping instructions", () => {
+  test("skips only current URL commands whose clipping already exists", () => {
+    expect(message_instruction("!url https://example.com", "!", true)).toEqual({
+      kind: "skip",
+    });
+    expect(message_instruction("regular message", "!", true)).toEqual({
+      kind: "message",
+      markdown: "regular message",
+    });
+    expect(message_instruction("!url https://example.com", "?", true)).toEqual({
+      kind: "message",
+      markdown: "!url https://example.com",
+    });
   });
 });
 
