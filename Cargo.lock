@@ -61,7 +61,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
-name = "discord_message_sender_core"
+name = "displaydoc"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.5",
+]
+
+[[package]]
+name = "domain"
 version = "0.5.1"
 dependencies = [
  "chrono",
@@ -74,17 +85,6 @@ dependencies = [
  "tsify",
  "unicode-normalization",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "displaydoc"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.5",
 ]
 
 [[package]]
@@ -405,7 +405,7 @@ dependencies = [
 name = "parse_message"
 version = "0.5.1"
 dependencies = [
- "discord_message_sender_core",
+ "domain",
  "html_to_markdown",
  "js-sys",
  "serde-wasm-bindgen",

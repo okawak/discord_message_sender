@@ -4,7 +4,7 @@
 
 ## wasm-packで単一crate typeを生成した結果
 
-0.5.1ではRustのintegration testからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。ドメインロジックとintegration testを`discord_message_sender_core`へ分離し、WASM境界を0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。
+0.5.1ではRustのintegration testからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。ドメインロジックとintegration testを`domain`へ分離し、WASM境界を0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。
 
 2026-09-12に同じ作業ツリーとツールチェーンで変更前後をproduction buildした結果です。圧縮、外部WASM、直接の`wasm-bindgen`呼び出しは使用していません。
 

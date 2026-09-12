@@ -1,5 +1,5 @@
 [package]
-name = "discord_message_sender_core"
+name = "domain"
 version.workspace = true
 authors.workspace = true
 description = "Domain logic for Discord Message Sender"
