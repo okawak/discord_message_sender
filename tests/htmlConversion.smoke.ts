@@ -25,6 +25,7 @@ function createResource(
 ) {
   const attributes = new Map(Object.entries(initialAttributes));
   let replacement: string | undefined;
+  let removed = false;
   return {
     alt,
     localName: tag,
@@ -40,7 +41,11 @@ function createResource(
     replaceWith(value: string) {
       replacement = value;
     },
+    remove() {
+      removed = true;
+    },
     serialize() {
+      if (removed) return "";
       if (replacement !== undefined) return replacement;
       const serializedAttributes = [...attributes]
         .map(([name, value]) => ` ${name}="${value}"`)
@@ -102,39 +107,10 @@ const root = {
   querySelectorAll(selector: string) {
     if (selector === "nav, footer") return footerAttached ? [footer] : [];
     if (selector.includes("iframe") && selector.includes("video")) {
-      return footerAttached
-        ? [
-            articleImage,
-            footerImage,
-            unsafeImage,
-            backslashImage,
-            fragmentImage,
-            reservedImage,
-            iframe,
-          ]
-        : [
-            articleImage,
-            unsafeImage,
-            backslashImage,
-            fragmentImage,
-            reservedImage,
-            iframe,
-          ];
+      return [iframe];
     }
-    if (selector === "[href], [src]") {
-      return [
-        articleImage,
-        unsafeImage,
-        backslashImage,
-        fragmentImage,
-        reservedImage,
-        iframe,
-        anchor,
-      ].filter(
-        (element) =>
-          element.getAttribute("href") !== null ||
-          element.getAttribute("src") !== null,
-      );
+    if (selector === "[href]") {
+      return [anchor];
     }
     if (selector === "img") {
       return [
@@ -152,7 +128,7 @@ const root = {
       return { innerHTML: "Related article", querySelectorAll: () => [] };
     }
     if (selector === "main") return root;
-    if (selector === "h1") return heading;
+    if (selector === "h1, h2, h3, h4, h5, h6") return heading;
     return null;
   },
 };
@@ -202,11 +178,7 @@ if (parsedInput !== rawHtml) {
     `HTML text was modified before inert parsing: ${parsedInput}`,
   );
 }
-if (
-  articleImage.getAttribute("src") !== null ||
-  iframe.getAttribute("src") !== null ||
-  sanitizedInput.includes(" src=")
-) {
+if (sanitizedInput.includes(" src=") || sanitizedInput.includes("<iframe")) {
   throw new Error(
     `Loadable attributes reached the sanitizer: ${sanitizedInput}`,
   );

@@ -1,19 +1,8 @@
 import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
 
 const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
-const URL_ATTRIBUTES = ["href", "src"] as const;
-const LOADABLE_ELEMENT_SELECTOR =
-  "audio, embed, feImage, iframe, image, img, input, link, object, source, track, use, video";
-const LOADABLE_ATTRIBUTES = [
-  "src",
-  "srcdoc",
-  "srcset",
-  "poster",
-  "data",
-  "href",
-  "xlink:href",
-] as const;
-const TITLE_SELECTORS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
+const EMBEDDED_RESOURCE_SELECTOR =
+  "audio, embed, feImage, iframe, image, input, link, object, source, track, use, video";
 
 export function convertHtml(url: string, html: string): string {
   const root = parseInertHtml(html);
@@ -23,9 +12,9 @@ export function convertHtml(url: string, html: string): string {
     root.querySelector<HTMLElement>("main") ??
     root;
   const title = extractTitle(content);
-  const imageSources = deactivateLoadableResources(content);
-  resolveResourceUrls(content, url);
-  const restoreImages = replaceImagesWithTokens(content, url, imageSources);
+  const restoreImages = replaceImagesWithTokens(content, url);
+  removeElements(content, EMBEDDED_RESOURCE_SELECTOR);
+  resolveLinks(content, url);
 
   const fragment = sanitizeHTMLToDom(content.innerHTML);
   const frontmatter = title ? { title, source: url } : { source: url };
@@ -43,35 +32,15 @@ function parseInertHtml(html: string): HTMLElement {
   return root;
 }
 
-function deactivateLoadableResources(
-  root: ParentNode,
-): WeakMap<HTMLImageElement, string> {
-  const imageSources = new WeakMap<HTMLImageElement, string>();
-  for (const element of root.querySelectorAll<HTMLElement>(
-    LOADABLE_ELEMENT_SELECTOR,
-  )) {
-    for (const attribute of LOADABLE_ATTRIBUTES) {
-      const value = element.getAttribute(attribute);
-      if (value === null) continue;
-      if (element.localName === "img" && attribute === "src") {
-        imageSources.set(element as HTMLImageElement, value);
-      }
-      element.removeAttribute(attribute);
-    }
-  }
-  return imageSources;
-}
-
 function replaceImagesWithTokens(
   root: HTMLElement,
   baseUrl: string,
-  imageSources: WeakMap<HTMLImageElement, string>,
 ): (markdown: string) => string {
   const replacements: string[] = [];
   const tokenPrefix = `DMSIMAGE${crypto.randomUUID().replaceAll("-", "")}TOKEN`;
 
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
-    const source = imageSources.get(image)?.trim();
+    const source = image.getAttribute("src")?.trim();
     const alt = image.alt.replace(/\s+/g, " ").trim();
     const resolved =
       source && !source.startsWith("#")
@@ -99,33 +68,26 @@ function replaceImagesWithTokens(
 }
 
 function removeNonContentElements(root: ParentNode): void {
-  for (const element of root.querySelectorAll("nav, footer")) {
+  removeElements(root, "nav, footer");
+}
+
+function removeElements(root: ParentNode, selector: string): void {
+  for (const element of root.querySelectorAll(selector)) {
     element.remove();
   }
 }
 
-function resolveResourceUrls(root: ParentNode, baseUrl: string): void {
-  for (const element of root.querySelectorAll<HTMLElement>("[href], [src]")) {
-    for (const attribute of URL_ATTRIBUTES) {
-      const value = element.getAttribute(attribute)?.trim();
-      if (value === undefined) continue;
-      if (!value) {
-        element.removeAttribute(attribute);
-        continue;
-      }
-
-      if (value.startsWith("#")) {
-        element.removeAttribute(attribute);
-        continue;
-      }
-
-      const resolved = resolveUrl(value, baseUrl);
-      if (!resolved) {
-        element.removeAttribute(attribute);
-        continue;
-      }
-      element.setAttribute(attribute, resolved);
+function resolveLinks(root: ParentNode, baseUrl: string): void {
+  for (const element of root.querySelectorAll<HTMLElement>("[href]")) {
+    const value = element.getAttribute("href")?.trim();
+    if (!value || value.startsWith("#")) {
+      element.removeAttribute("href");
+      continue;
     }
+
+    const resolved = resolveUrl(value, baseUrl);
+    if (resolved) element.setAttribute("href", resolved);
+    else element.removeAttribute("href");
   }
 }
 
@@ -141,19 +103,11 @@ function resolveUrl(value: string, baseUrl: string): string | undefined {
 }
 
 function extractTitle(root: ParentNode): string | undefined {
-  for (const selector of TITLE_SELECTORS) {
-    const element = root.querySelector<HTMLElement>(selector);
-    const value =
-      element?.getAttribute("content") ?? element?.textContent ?? undefined;
-    const normalized = normalizeTitle(value);
-    if (normalized) return normalized;
-  }
-  return undefined;
-}
-
-function normalizeTitle(value: string | undefined): string | undefined {
-  return value
-    ?.replace(/[\u200B\uFEFF]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    root
+      .querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6")
+      ?.textContent?.replace(/[\u200B\uFEFF]/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || undefined
+  );
 }
