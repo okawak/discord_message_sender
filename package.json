@@ -1,6 +1,6 @@
 {
   "name": "discord-message-sender",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "author": "okawak",
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
