@@ -1,5 +1,9 @@
-use super::{dates, models::*, trim};
-use crate::command::{MessageAction, parse_message};
+use super::{
+    command::{MessageAction, parse_message},
+    dates,
+    models::*,
+    trim,
+};
 
 pub fn instruction(input: &str, prefix: &str) -> Result<MessageInstruction, String> {
     match parse_message(input, prefix).map_err(|e| e.to_string())? {

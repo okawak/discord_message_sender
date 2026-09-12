@@ -1,6 +1,6 @@
 //! Typed JS boundary only. All decisions and transformations live in core/.
-use crate::core::{
-    self, channels, dates, discord, logs, messages, models::*, settings, storage, sync,
+use discord_message_sender_core::{
+    self as core, channels, dates, discord, logs, messages, models::*, settings, storage, sync,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;

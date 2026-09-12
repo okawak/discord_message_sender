@@ -130,7 +130,7 @@ pub fn failure_notice(channel: &super::models::DiscordChannelSettings, reason: &
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{models::DiscordPluginSettings, settings};
+    use crate::{models::DiscordPluginSettings, settings};
     use serde_json::json;
 
     fn message(id: &str) -> DiscordMessage {

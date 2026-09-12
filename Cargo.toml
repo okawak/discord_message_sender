@@ -1,5 +1,9 @@
 [workspace]
-members = ["./crates/parse_message", "crates/html_to_markdown"]
+members = [
+  "crates/discord_message_sender_core",
+  "crates/html_to_markdown",
+  "crates/parse_message",
+]
 resolver = "3"
 
 [workspace.package]

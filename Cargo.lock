@@ -61,6 +61,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
+name = "discord_message_sender_core"
+version = "0.5.1"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "js-sys",
+ "regex-lite",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tsify",
+ "unicode-normalization",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "displaydoc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -389,17 +405,12 @@ dependencies = [
 name = "parse_message"
 version = "0.5.1"
 dependencies = [
- "chrono",
- "chrono-tz",
+ "discord_message_sender_core",
  "html_to_markdown",
  "js-sys",
- "regex-lite",
- "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "thiserror",
  "tsify",
- "unicode-normalization",
  "wasm-bindgen",
 ]
 

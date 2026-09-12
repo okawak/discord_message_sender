@@ -4,14 +4,14 @@
 
 ## wasm-packで単一crate typeを生成した結果
 
-0.5.1ではRustの統合テストからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。4件の互換性テストをcrate内テストへ移し、0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。
+0.5.1ではRustのintegration testからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。ドメインロジックとintegration testを`discord_message_sender_core`へ分離し、WASM境界を0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。
 
 2026-09-12に同じ作業ツリーとツールチェーンで変更前後をproduction buildした結果です。圧縮、外部WASM、直接の`wasm-bindgen`呼び出しは使用していません。
 
 | 成果物 | 0.5.1構成 | `cdylib`単独 | 削減量 |
 | --- | ---: | ---: | ---: |
-| `pkg/parse_message_bg.wasm` | 749,309 bytes | **673,563 bytes** | 75,746 bytes（10.1%） |
-| `dist/main.js` | 1,026,488 bytes | **925,492 bytes** | 100,996 bytes（9.8%） |
+| `pkg/parse_message_bg.wasm` | 749,309 bytes | **674,608 bytes** | 74,701 bytes（10.0%） |
+| `dist/main.js` | 1,026,488 bytes | **926,888 bytes** | 99,600 bytes（9.7%） |
 
 ## 直接wasm-bindgenを使用していた時点の配布サイズ
 
