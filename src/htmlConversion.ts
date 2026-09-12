@@ -33,17 +33,14 @@ export function convertHtml(url: string, html: string): string {
     body.querySelector<HTMLElement>("main") ??
     body;
   resolveResourceUrls(content, url);
-  const imageReplacements = replaceImagesWithTokens(content, url);
+  const restoreImages = replaceImagesWithTokens(content, url);
 
   const fragment = sanitizeHTMLToDom(content.innerHTML);
   const frontmatter = title ? { title, source: url } : { source: url };
   const yaml = stringifyYaml(frontmatter).trimEnd();
-  let markdown = htmlToMarkdown(fragment);
-  for (const [token, image] of imageReplacements) {
-    markdown = markdown.replaceAll(token, image);
-  }
+  const markdown = restoreImages(htmlToMarkdown(fragment)).trim();
 
-  return `---\n${yaml}\n---\n\n${markdown.trim()}`;
+  return `---\n${yaml}\n---\n\n${markdown}`;
 }
 
 function maskLoadableAttributes(html: string): string {
@@ -59,9 +56,11 @@ function maskLoadableAttributes(html: string): string {
 function replaceImagesWithTokens(
   root: ParentNode,
   baseUrl: string,
-): Array<readonly [string, string]> {
-  const replacements: Array<readonly [string, string]> = [];
-  let index = 0;
+): (markdown: string) => string {
+  const replacements: string[] = [];
+  const existingText = root.textContent ?? "";
+  let tokenPrefix = "DMSIMAGETOKEN";
+  while (existingText.includes(tokenPrefix)) tokenPrefix += "X";
 
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
     const source = image.getAttribute(`${MASKED_ATTRIBUTE_PREFIX}src`)?.trim();
@@ -72,16 +71,18 @@ function replaceImagesWithTokens(
       continue;
     }
 
-    let token = `DMSIMAGETOKEN${index++}END`;
-    while (root.textContent?.includes(token)) token += "X";
+    const token = `${tokenPrefix}${replacements.length}END`;
     image.replaceWith(token);
-    replacements.push([
-      token,
-      `![${alt.replace(/([\\[\]])/g, "\\$1")}](<${resolved}>)`,
-    ]);
+    replacements.push(`![${alt.replace(/([\\[\]])/g, "\\$1")}](<${resolved}>)`);
   }
 
-  return replacements;
+  if (replacements.length === 0) return (markdown) => markdown;
+  const tokenPattern = new RegExp(`${tokenPrefix}(\\d+)END`, "g");
+  return (markdown) =>
+    markdown.replace(
+      tokenPattern,
+      (token, index: string) => replacements[Number(index)] ?? token,
+    );
 }
 
 function removeNonContentElements(root: ParentNode): void {
