@@ -8,8 +8,8 @@ repository.workspace = true
 license-file.workspace = true
 
 [lib]
-# This crate is distributed only as WebAssembly. Tests live inside the crate so
-# release builds can produce a single crate type and retain LTO.
+# This crate is distributed only as WebAssembly. Domain tests live in their own
+# crate so release builds can produce a single crate type and retain LTO.
 crate-type = ["cdylib"]
 
 [package.metadata.wasm-pack.profile.release]
@@ -17,7 +17,7 @@ wasm-opt = ["-Oz"]
 
 [dependencies]
 html_to_markdown = { path = "../html_to_markdown" }
-discord_message_sender_core = { path = "../discord_message_sender_core" }
+domain = { path = "../domain" }
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 serde_json.workspace = true

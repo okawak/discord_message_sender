@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  "crates/discord_message_sender_core",
+  "crates/domain",
   "crates/html_to_markdown",
   "crates/parse_message",
 ]
