@@ -1,6 +1,8 @@
 mod bindings;
 mod command;
 pub mod core;
+#[cfg(test)]
+mod compatibility_tests;
 
 use html_to_markdown::convert;
 use wasm_bindgen::prelude::*;

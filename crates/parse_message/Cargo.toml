@@ -8,8 +8,9 @@ repository.workspace = true
 license-file.workspace = true
 
 [lib]
-# WASM distribution and Rust integration tests, respectively.
-crate-type = ["cdylib", "rlib"]
+# This crate is distributed only as WebAssembly. Tests live inside the crate so
+# release builds can produce a single crate type and retain LTO.
+crate-type = ["cdylib"]
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Oz"]
