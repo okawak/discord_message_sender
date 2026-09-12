@@ -42,7 +42,11 @@ function resolveResourceUrls(
   )) {
     for (const attribute of URL_ATTRIBUTES) {
       const value = element.getAttribute(attribute)?.trim();
-      if (!value) continue;
+      if (value === undefined) continue;
+      if (!value) {
+        element.removeAttribute(attribute);
+        continue;
+      }
 
       if (value.startsWith("#")) {
         element.removeAttribute(attribute);
