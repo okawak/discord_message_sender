@@ -2,6 +2,7 @@ mod bindings;
 mod command;
 pub mod core;
 #[cfg(test)]
+#[path = "../tests/compatibility/mod.rs"]
 mod compatibility_tests;
 
 use html_to_markdown::convert;

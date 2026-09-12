@@ -96,7 +96,7 @@ Rustのロジックだけを確認する場合は`cargo test -p parse_message --
 
 通常の単体テストは対象の実装ファイル内の`#[cfg(test)] mod tests`に置きます。実装とテストを一緒に読めるようにするためで、配布サイズを削るための分離ではありません。別ファイルに置いた場合も、同じ`cfg(test)`でテストコードを本番ビルドから除外できます。[Rust公式のテスト配置](https://doc.rust-lang.org/book/ch11-03-test-organization.html)
 
-`src/compatibility_tests.rs`には、移行前のTypeScript出力を記録した`tests/fixtures/compatibility.json`と比較する4件のcrate内回帰テストをまとめます。配布crateを`cdylib`単独にするとrelease buildでLTOが適用されるため、テスト専用の`rlib`は生成しません。比較対象は設定、Unicodeパス、ログのバイト列、夏時間・うるう日・ISO週番号です。期待値は新しいRust実装から再生成せず、既存の保存形式を保護するデータとして扱います。
+`tests/compatibility/mod.rs`には、移行前のTypeScript出力を記録した`tests/fixtures/compatibility.json`と比較する4件の回帰テストをまとめます。テストコードは`tests/`に置いたまま、`src/lib.rs`から`cfg(test)`のcrate内テストとして読み込みます。配布crateを`cdylib`単独にするとrelease buildでLTOが適用されるため、テスト専用の`rlib`は生成しません。比較対象は設定、Unicodeパス、ログのバイト列、夏時間・うるう日・ISO週番号です。期待値は新しいRust実装から再生成せず、既存の保存形式を保護するデータとして扱います。
 
 WASMの生成には`wasm-pack`を使います。Cargo、wasm-bindgen、wasm-optを個別に呼び分けず、`package.json`の`wasm:build`を単一の入口にします。`Cargo.toml`ではwasm-packの標準設定で`wasm-opt -Oz`を指定します。`verify:build`は別ディレクトリで再ビルドして成果物を比較します。
 
