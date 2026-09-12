@@ -69,13 +69,6 @@ jobs:
           cache-workspaces: |
             .
 
-      - name: Install wasm-bindgen CLI
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-bindgen-cli@0.2.128
-          checksum: true
-          fallback: none
-
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
@@ -217,13 +210,6 @@ jobs:
           target: wasm32-unknown-unknown
           cache-workspaces: |
             .
-
-      - name: Install wasm-bindgen CLI
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-bindgen-cli@0.2.128
-          checksum: true
-          fallback: none
 
       - name: Setup Node
         uses: actions/setup-node@v7
