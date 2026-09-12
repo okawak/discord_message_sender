@@ -92,7 +92,7 @@ test("host date conversion and Unicode normalization match pre-migration fixture
     duplicates: { channels: DiscordChannelSettings[]; expected?: string }[];
   } = await Bun.file(
     new URL(
-      "../crates/parse_message/tests/fixtures/compatibility.json",
+      "../crates/discord_message_sender_core/tests/fixtures/compatibility.json",
       import.meta.url,
     ),
   ).json();

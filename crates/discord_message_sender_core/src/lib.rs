@@ -1,5 +1,7 @@
 //! Obsidian-independent domain logic. JavaScript owns host I/O and object identity.
+
 pub mod channels;
+mod command;
 pub mod dates;
 pub mod discord;
 pub mod logs;

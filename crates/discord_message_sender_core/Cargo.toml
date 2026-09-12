@@ -1,0 +1,25 @@
+[package]
+name = "discord_message_sender_core"
+version.workspace = true
+authors.workspace = true
+description = "Domain logic for Discord Message Sender"
+edition.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+regex-lite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tsify.workspace = true
+wasm-bindgen.workspace = true
+chrono.workspace = true
+
+# Native checks use IANA/Unicode data without requiring a JavaScript host.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono-tz.workspace = true
+unicode-normalization.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys.workspace = true

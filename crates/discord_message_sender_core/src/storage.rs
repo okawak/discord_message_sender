@@ -145,7 +145,7 @@ pub fn plan(input: StorageInput) -> Result<StoragePlan, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::messages;
+    use crate::messages;
 
     fn message(id: &str) -> DiscordMessage {
         DiscordMessage {

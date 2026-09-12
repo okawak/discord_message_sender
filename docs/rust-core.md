@@ -1,21 +1,21 @@
 # RustとTypeScriptの役割
 
-Rustで日常的にロジックを読んで変更できるよう、ObsidianのI/Oから独立した処理を`crates/parse_message/src/core/`へまとめています。目的は実装言語の統一と保守のしやすさです。
+Rustで日常的にロジックを読んで変更できるよう、ObsidianのI/Oから独立した処理を`crates/discord_message_sender_core`へまとめています。目的は実装言語の統一と保守のしやすさです。`crates/parse_message`は、このcoreをJavaScriptへ公開するWASM境界だけを担当します。
 
 ## コードの入口
 
 | ファイル | 担当 |
 | --- | --- |
-| `core/models.rs` | 設定・Discordメッセージ・処理結果のデータ型 |
-| `core/settings.rs` | 初期値、旧設定の移行、入力値の正規化、同期用スナップショット |
-| `core/channels.rs` | チャンネル名の検証、保存先の生成、Unicode正規化を含む重複判定 |
-| `core/dates.rs` | RFC 3339日時の解析、タイムゾーン変換、ISO週番号、既存ログの探索対象日 |
-| `core/messages.rs`、`command.rs` | メッセージとURLコマンドの解析、投稿者・ファイル名の生成 |
-| `core/logs.rs` | ログの識別、日次・週次・月次ログの結合、管理マーカー、重複排除 |
-| `core/storage.rs` | 既存ログの探索パス、個別ファイルと集約ログへの保存計画 |
-| `core/sync.rs` | 同期前の検証、新着ページの選別、古い順への並べ替え、通知文の選択 |
-| `core/discord.rs` | APIパス、レート制限、再試行判断、エラー文・通知文の生成 |
-| `bindings.rs` | 型付きWASM関数の公開、JS値との変換と例外への変換 |
+| `discord_message_sender_core/src/models.rs` | 設定・Discordメッセージ・処理結果のデータ型 |
+| `discord_message_sender_core/src/settings.rs` | 初期値、旧設定の移行、入力値の正規化、同期用スナップショット |
+| `discord_message_sender_core/src/channels.rs` | チャンネル名の検証、保存先の生成、Unicode正規化を含む重複判定 |
+| `discord_message_sender_core/src/dates.rs` | RFC 3339日時の解析、タイムゾーン変換、ISO週番号、既存ログの探索対象日 |
+| `discord_message_sender_core/src/messages.rs`、`command.rs` | メッセージとURLコマンドの解析、投稿者・ファイル名の生成 |
+| `discord_message_sender_core/src/logs.rs` | ログの識別、日次・週次・月次ログの結合、管理マーカー、重複排除 |
+| `discord_message_sender_core/src/storage.rs` | 既存ログの探索パス、個別ファイルと集約ログへの保存計画 |
+| `discord_message_sender_core/src/sync.rs` | 同期前の検証、新着ページの選別、古い順への並べ替え、通知文の選択 |
+| `discord_message_sender_core/src/discord.rs` | APIパス、レート制限、再試行判断、エラー文・通知文の生成 |
+| `parse_message/src/bindings.rs` | 型付きWASM関数の公開、JS値との変換と例外への変換 |
 
 HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当します。
 
@@ -37,7 +37,7 @@ HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当�
 ## 境界のルール
 
 1. Rustの型を`serde`と`tsify`で定義し、`wasm-bindgen`で`pkg/parse_message.d.ts`を生成します。TS側で同じデータ型を手書きしません。
-2. `bindings.rs`は`Ts<T>`を使い、`to_rust()`と`into_ts()`の失敗を通常の`Result`として処理します。ロジックは`core/`へ置きます。
+2. `bindings.rs`は`Ts<T>`を使い、`to_rust()`と`into_ts()`の失敗を通常の`Result`として処理します。ロジックは`discord_message_sender_core`へ置きます。
 3. WASM関数をモジュールの読み込み時やプラグインのコンストラクターから呼びません。`onload()`で初期化を待ってから設定を読み込みます。
 4. Rustから戻る値はコピーです。同期中のカーソル更新が既存設定へ届くよう、チャンネルはRustが返すインデックスで元のJSオブジェクトを参照します。設定画面で別項目を編集してもチャンネル配列を置き換えません。
 5. 保存計画はRustで作りますが、既存ログの結合は`Vault.process`のコールバック内で最新の本文に対して実行します。保存の完了後に同期カーソルを進めます。
@@ -46,7 +46,7 @@ HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当�
 
 ## 依存の管理と選定
 
-外部ライブラリのバージョンと基本featuresはルートの`Cargo.toml`の`[workspace.dependencies]`で管理します。各crateは必要なものだけを`dependency-name.workspace = true`で参照します。ルートに定義しただけでは各crateへの依存にはなりません。テスト用の外部依存もルートで定義し、利用側の`[dev-dependencies]`で参照します。方式は[Cargo公式のworkspace dependencies](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)に従います。workspace内のcrateへの依存は利用側に相対パスで記述し、`parse_message`では`html_to_markdown = { path = "../html_to_markdown" }`とします。
+外部ライブラリのバージョンと基本featuresはルートの`Cargo.toml`の`[workspace.dependencies]`で管理します。各crateは必要なものだけを`dependency-name.workspace = true`で参照します。ルートに定義しただけでは各crateへの依存にはなりません。テスト用の外部依存もルートで定義し、利用側の`[dev-dependencies]`で参照します。方式は[Cargo公式のworkspace dependencies](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)に従います。workspace内のcrateへの依存は利用側に相対パスで記述し、`parse_message`から`discord_message_sender_core`と`html_to_markdown`を参照します。
 
 ログマーカー・ファイル名・通知変数の照合には`regex-lite`を使います。エラー型には引き続き`thiserror`を使います。エラー文、CRLF/BOM、ASCII数字の判定、通知の置換値を再展開しない動作を維持します。
 
@@ -90,13 +90,13 @@ bun run test:wasm
 bun run verify:build
 ```
 
-Rustのロジックだけを確認する場合は`cargo test -p parse_message --locked`を実行します。Bunテストは`bunfig.toml`のpreloadで実際のWASMを初期化し、TSアダプターとRustの結合を検証します。古い`pkg`でテストしないよう、Rust変更後は先にビルドしてください。
+Rustのロジックだけを確認する場合は`cargo test -p discord_message_sender_core --locked`を実行します。Bunテストは`bunfig.toml`のpreloadで実際のWASMを初期化し、TSアダプターとRustの結合を検証します。古い`pkg`でテストしないよう、Rust変更後は先にビルドしてください。
 
-モジュールの入口は`src/core.rs`、子モジュールは`src/core/`に置きます。`mod.rs`も有効な形式ですが、[Rust公式が推奨する命名](https://doc.rust-lang.org/reference/items/modules.html#module-source-filenames)に合わせ、ファイル名から担当モジュールが分かる形に統一します。
+core crateの入口は`crates/discord_message_sender_core/src/lib.rs`、子モジュールは同じ`src/`に置きます。`mod.rs`も有効な形式ですが、[Rust公式が推奨する命名](https://doc.rust-lang.org/reference/items/modules.html#module-source-filenames)に合わせ、ファイル名から担当モジュールが分かる形に統一します。
 
 通常の単体テストは対象の実装ファイル内の`#[cfg(test)] mod tests`に置きます。実装とテストを一緒に読めるようにするためで、配布サイズを削るための分離ではありません。別ファイルに置いた場合も、同じ`cfg(test)`でテストコードを本番ビルドから除外できます。[Rust公式のテスト配置](https://doc.rust-lang.org/book/ch11-03-test-organization.html)
 
-crate直下の`tests/compatibility.rs`には、移行前のTypeScript出力を記録した`tests/fixtures/compatibility.json`と比較する4件の回帰テストをまとめます。Cargoの統合テストとして独立したcrateから`parse_message::core`の公開APIを呼び出します。このためライブラリの`crate-type`には、WASM配布用の`cdylib`に加えてRustからリンクするための`rlib`を指定します。`rlib`は配布物へ同梱しません。比較対象は設定、Unicodeパス、ログのバイト列、夏時間・うるう日・ISO週番号です。期待値は新しいRust実装から再生成せず、既存の保存形式を保護するデータとして扱います。
+core crateの`tests/compatibility.rs`には、移行前のTypeScript出力を記録した`tests/fixtures/compatibility.json`と比較する4件のintegration testをまとめます。WASM境界の`parse_message`は`cdylib`だけを生成し、通常のRustライブラリであるcore crateをリンクします。これによりrelease buildのLTOと独立したintegration testを両立します。比較対象は設定、Unicodeパス、ログのバイト列、夏時間・うるう日・ISO週番号です。期待値は新しいRust実装から再生成せず、既存の保存形式を保護するデータとして扱います。
 
 WASMの生成には`wasm-pack`を使います。Cargo、wasm-bindgen、wasm-optを個別に呼び分けず、`package.json`の`wasm:build`を単一の入口にします。`Cargo.toml`ではwasm-packの標準設定で`wasm-opt -Oz`を指定します。`verify:build`は別ディレクトリで再ビルドして成果物を比較します。
 

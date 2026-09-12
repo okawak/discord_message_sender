@@ -8,25 +8,18 @@ repository.workspace = true
 license-file.workspace = true
 
 [lib]
-# WASM distribution and Rust integration tests, respectively.
-crate-type = ["cdylib", "rlib"]
+# This crate is distributed only as WebAssembly. Tests live inside the crate so
+# release builds can produce a single crate type and retain LTO.
+crate-type = ["cdylib"]
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-Oz"]
 
 [dependencies]
-thiserror.workspace = true
-regex-lite.workspace = true
 html_to_markdown = { path = "../html_to_markdown" }
+discord_message_sender_core = { path = "../discord_message_sender_core" }
 js-sys.workspace = true
 wasm-bindgen.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 serde-wasm-bindgen.workspace = true
 tsify.workspace = true
-chrono.workspace = true
-
-# Native checks use IANA/Unicode data without requiring a JavaScript host.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-chrono-tz.workspace = true
-unicode-normalization.workspace = true
