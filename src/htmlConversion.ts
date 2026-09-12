@@ -84,7 +84,7 @@ function replaceImagesWithTokens(
     const source = image.getAttribute(`${MASKED_ATTRIBUTE_PREFIX}src`)?.trim();
     const alt = image.alt.replace(/\s+/g, " ").trim();
     const resolved = source ? resolveUrl(source, baseUrl) : undefined;
-    if (!resolved) {
+    if (!resolved?.startsWith("https:")) {
       image.replaceWith(alt);
       continue;
     }

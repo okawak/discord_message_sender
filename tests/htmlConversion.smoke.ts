@@ -61,6 +61,11 @@ const footerImage = createResource(
   { src: "//cdn.qiita.com/footer.png" },
   "Footer",
 );
+const unsafeImage = createResource(
+  "img",
+  { src: "tel:x>)![p](https://tracker.example)" },
+  "Unsafe",
+);
 const iframe = createResource("iframe", { src: "/embed" });
 const anchor = createResource("a", {
   href: "https://example.com/DMSIMAGETOKEN0END",
@@ -77,7 +82,7 @@ const root = {
     const footerHtml = footerAttached
       ? `<footer><article>${footerImage.serialize()}</article></footer>`
       : "";
-    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${iframe.serialize()}${footerHtml}`;
+    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${iframe.serialize()}${footerHtml}`;
   },
   get textContent() {
     return "HTML <img src=x> guide Article Guide";
@@ -86,17 +91,17 @@ const root = {
     if (selector === "nav, footer") return footerAttached ? [footer] : [];
     if (selector.includes("iframe") && selector.includes("video")) {
       return footerAttached
-        ? [articleImage, footerImage, iframe]
-        : [articleImage, iframe];
+        ? [articleImage, footerImage, unsafeImage, iframe]
+        : [articleImage, unsafeImage, iframe];
     }
     if (selector === "[href], [src]") {
-      return [articleImage, iframe, anchor].filter(
+      return [articleImage, unsafeImage, iframe, anchor].filter(
         (element) =>
           element.getAttribute("href") !== null ||
           element.getAttribute("src") !== null,
       );
     }
-    if (selector === "img") return [articleImage];
+    if (selector === "img") return [articleImage, unsafeImage];
     return [];
   },
   querySelector(selector: string) {
@@ -168,7 +173,8 @@ if (serializedFrontmatter.title !== "HTML <img src=x> guide") {
 }
 if (
   !markdown.includes("![Article](<https://cdn.qiita.com/article.png>)") ||
-  !markdown.includes("https://example.com/DMSIMAGETOKEN0END")
+  !markdown.includes("https://example.com/DMSIMAGETOKEN0END") ||
+  markdown.includes("tracker.example")
 ) {
   throw new Error(`Image restoration damaged Markdown: ${markdown}`);
 }
