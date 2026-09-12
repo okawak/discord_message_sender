@@ -17,12 +17,12 @@ const TITLE_SELECTORS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
 
 export function convertHtml(url: string, html: string): string {
   const root = parseInertHtml(html);
-  const title = extractTitle(root);
   removeNonContentElements(root);
   const content =
     root.querySelector<HTMLElement>("article") ??
     root.querySelector<HTMLElement>("main") ??
     root;
+  const title = extractTitle(content);
   const imageSources = deactivateLoadableResources(content);
   resolveResourceUrls(content, url);
   const restoreImages = replaceImagesWithTokens(content, url, imageSources);
@@ -141,14 +141,6 @@ function resolveUrl(value: string, baseUrl: string): string | undefined {
 }
 
 function extractTitle(root: ParentNode): string | undefined {
-  const titleElement = root.querySelector<HTMLElement>("title:not(svg *)");
-  if (titleElement) {
-    const decoder = titleElement.ownerDocument.createElement("textarea");
-    decoder.innerHTML = titleElement.innerHTML;
-    const title = normalizeTitle(decoder.textContent ?? undefined);
-    if (title) return title;
-  }
-
   for (const selector of TITLE_SELECTORS) {
     const element = root.querySelector<HTMLElement>(selector);
     const value =

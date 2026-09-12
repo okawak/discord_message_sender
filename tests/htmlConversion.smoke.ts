@@ -84,24 +84,9 @@ const anchor = createResource("a", {
 });
 let footerAttached = true;
 const footer = { remove: () => (footerAttached = false) };
-const titleDecoder = {
-  value: "",
-  set innerHTML(value: string) {
-    this.value = value;
-  },
-  get textContent() {
-    return this.value;
-  },
-};
-const title = {
+const heading = {
   getAttribute: () => null,
-  innerHTML: "HTML <img src=x> guide",
-  textContent: "HTML guide",
-  ownerDocument: {
-    createElement() {
-      return titleDecoder;
-    },
-  },
+  textContent: "Article heading",
 };
 const root = {
   append() {},
@@ -163,11 +148,11 @@ const root = {
     return [];
   },
   querySelector(selector: string) {
-    if (selector === "title:not(svg *)") return title;
     if (selector === "article" && footerAttached) {
       return { innerHTML: "Related article", querySelectorAll: () => [] };
     }
     if (selector === "main") return root;
+    if (selector === "h1") return heading;
     return null;
   },
 };
@@ -226,8 +211,10 @@ if (
     `Loadable attributes reached the sanitizer: ${sanitizedInput}`,
   );
 }
-if (serializedFrontmatter.title !== "HTML <img src=x> guide") {
-  throw new Error(`Raw title text was changed: ${serializedFrontmatter.title}`);
+if (serializedFrontmatter.title !== "Article heading") {
+  throw new Error(
+    `Content heading was not used as the title: ${serializedFrontmatter.title}`,
+  );
 }
 if (
   !markdown.includes("![Article](<https://cdn.qiita.com/article.png>)") ||
