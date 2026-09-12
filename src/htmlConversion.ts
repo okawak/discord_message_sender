@@ -3,35 +3,39 @@ import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
 const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
 const URL_ATTRIBUTES = ["href", "src"] as const;
 const MASKED_ATTRIBUTE_PREFIX = "data-dms-";
-const LOADABLE_ELEMENT_PATTERN =
-  /<(?:audio|embed|feimage|iframe|image|img|input|link|object|source|track|use|video)\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi;
-const LOADABLE_ATTRIBUTE_PATTERN =
-  /(\s)(src|srcdoc|srcset|poster|data|href|xlink:href)(\s*=)/gi;
+const LOADABLE_ELEMENT_SELECTOR =
+  "audio, embed, feImage, iframe, image, img, input, link, object, source, track, use, video";
+const LOADABLE_ATTRIBUTES = [
+  "src",
+  "srcdoc",
+  "srcset",
+  "poster",
+  "data",
+  "href",
+  "xlink:href",
+] as const;
 const TITLE_SELECTORS = [
-  "head > title",
-  'head meta[name="title"]',
-  'head meta[property="og:title"]',
-  'head meta[name="twitter:title"]',
-  "body h1",
-  "body h2",
-  "body h3",
-  "body h4",
-  "body h5",
-  "body h6",
+  "title:not(svg *)",
+  'meta[name="title"]',
+  'meta[property="og:title"]',
+  'meta[name="twitter:title"]',
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
 ] as const;
 
 export function convertHtml(url: string, html: string): string {
-  const document = new DOMParser().parseFromString(
-    maskLoadableAttributes(html),
-    "text/html",
-  );
-  const title = extractTitle(document);
-  const body = document.body;
-  removeNonContentElements(body);
+  const root = parseInertHtml(html);
+  const title = extractTitle(root);
+  removeNonContentElements(root);
   const content =
-    body.querySelector<HTMLElement>("article") ??
-    body.querySelector<HTMLElement>("main") ??
-    body;
+    root.querySelector<HTMLElement>("article") ??
+    root.querySelector<HTMLElement>("main") ??
+    root;
+  maskLoadableAttributes(content);
   resolveResourceUrls(content, url);
   const restoreImages = replaceImagesWithTokens(content, url);
 
@@ -43,24 +47,38 @@ export function convertHtml(url: string, html: string): string {
   return `---\n${yaml}\n---\n\n${markdown}`;
 }
 
-function maskLoadableAttributes(html: string): string {
-  return html.replace(LOADABLE_ELEMENT_PATTERN, (element) =>
-    element.replace(
-      LOADABLE_ATTRIBUTE_PATTERN,
-      (_, whitespace: string, name: string, equals: string) =>
-        `${whitespace}${MASKED_ATTRIBUTE_PREFIX}${name.toLowerCase()}${equals}`,
-    ),
-  );
+function parseInertHtml(html: string): HTMLElement {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const root = template.content.ownerDocument.createElement("div");
+  root.append(template.content);
+  return root;
+}
+
+function maskLoadableAttributes(root: ParentNode): void {
+  for (const element of root.querySelectorAll<HTMLElement>(
+    LOADABLE_ELEMENT_SELECTOR,
+  )) {
+    for (const attribute of LOADABLE_ATTRIBUTES) {
+      const value = element.getAttribute(attribute);
+      if (value === null) continue;
+      element.removeAttribute(attribute);
+      element.setAttribute(
+        `${MASKED_ATTRIBUTE_PREFIX}${attribute.replace(":", "-")}`,
+        value,
+      );
+    }
+  }
 }
 
 function replaceImagesWithTokens(
-  root: ParentNode,
+  root: HTMLElement,
   baseUrl: string,
 ): (markdown: string) => string {
   const replacements: string[] = [];
-  const existingText = root.textContent ?? "";
+  const existingContent = `${root.innerHTML}\n${root.textContent ?? ""}`;
   let tokenPrefix = "DMSIMAGETOKEN";
-  while (existingText.includes(tokenPrefix)) tokenPrefix += "X";
+  while (existingContent.includes(tokenPrefix)) tokenPrefix += "X";
 
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
     const source = image.getAttribute(`${MASKED_ATTRIBUTE_PREFIX}src`)?.trim();
