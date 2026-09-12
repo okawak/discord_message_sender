@@ -15,6 +15,17 @@
 
 削減の大半は、HTMLパーサー、文字参照データ、独自MarkdownレンダラーがWASMから不要になった効果です。生成済みWASMは従来どおりbase64として`main.js`へ直接埋め込み、`atob`で復号します。
 
+## TypeScript境界を薄くした後のサイズ
+
+公式`normalizePath`を追加し、Discord JSONの型検証、送信JSON、通知文、既存クリッピングの判断をRustへ移しました。純粋ロジックだけだったTypeScriptファイルを削除し、実行時TSを10ファイルから9ファイルへ減らしています。
+
+| 成果物 | HTML公式API移行直後 | 境界整理後 | 差分 |
+| --- | ---: | ---: | ---: |
+| `pkg/parse_message_bg.wasm` | 258,856 bytes | **261,637 bytes** | +2,781 bytes（1.1%） |
+| `dist/main.js` | 373,200 bytes | **377,582 bytes** | +4,382 bytes（1.2%） |
+
+JSON文字列パーサーをWASMへ追加せず、Obsidian `requestUrl`のJSON値を既存の`serde-wasm-bindgen`境界でRust型へ変換することで、増加を抑えています。移行前の`main.js` 926,208 bytesとの比較では548,626 bytes（59.2%）小さい状態を維持しています。
+
 ## wasm-packで単一crate typeを生成した結果
 
 0.5.1ではRustのintegration testからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。ドメインロジックとintegration testを`domain`へ分離し、WASM境界を0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。

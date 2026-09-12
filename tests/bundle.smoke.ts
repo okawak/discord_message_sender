@@ -44,6 +44,9 @@ const obsidian = {
       notices.push(message);
     }
   },
+  normalizePath(path: string) {
+    return path;
+  },
   requestUrl() {
     throw new Error("Network calls are forbidden in the bundle smoke test.");
   },

@@ -17,7 +17,7 @@ Rustで日常的にロジックを読んで変更できるよう、ObsidianのI/
 | `domain/src/discord.rs` | APIパス、レート制限、再試行判断、エラー文・通知文の生成 |
 | `parse_message/src/bindings.rs` | 型付きWASM関数の公開、JS値との変換と例外への変換 |
 
-HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts)の`sanitizeHTMLToDom`、`htmlToMarkdown`、`stringifyYaml`をTypeScriptから利用します。取得元を基準にした相対URLの絶対化だけを薄いアダプターとして保持し、HTMLパーサーとMarkdown変換器はプラグインに同梱しません。
+HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts)の`sanitizeHTMLToDom`、`htmlToMarkdown`、`stringifyYaml`をTypeScriptから利用します。取得元を基準にした相対URLの絶対化だけを薄いアダプターとして保持し、HTMLパーサーとMarkdown変換器はプラグインに同梱しません。Vaultへ渡す保存先は、Rustで生成した後に公式`normalizePath`で正規化します。
 
 ## TypeScriptに残す処理
 
@@ -26,11 +26,11 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 - `main.ts`: Obsidianプラグインの起動、コマンド登録、同期の排他、設定の保存、`Intl`からOSのタイムゾーン名を取得
 - `settingTab.ts`: Obsidian 1.13の設定画面、入力イベントと通知
 - `settings.ts`: 保存データのJS値への対応、設定変更時のJSオブジェクト参照の維持
-- `discordApi.ts`: Obsidian `requestUrl`によるDiscord通信、待機、通信例外の捕捉
+- `discordApi.ts`: Obsidian `requestUrl`によるDiscord通信、待機、通信例外の捕捉。公式APIが返すJSON値の検証と送信JSONの生成はRustへ渡す
 - `vault.ts`: Vaultのファイル探索・読み込み・作成・`Vault.process`による更新
 - `channelSync.ts`: ページ取得・メッセージ変換・保存・通知の非同期実行順序と失敗時の処理
 - `htmlConversion.ts`: Obsidian公式APIによるHTMLのサニタイズ・Markdown変換・frontmatter生成と相対URLの絶対化
-- `wasmCore.ts`: 非同期WASM初期化と再試行、Rustが生成する通信エラーのJS例外への対応
+- `wasmCore.ts`: Obsidianに依存しないWASM初期化と、Rustが生成する通信エラーのJS例外への対応
 - `wasmBridge.ts`: 初期化失敗のObsidian通知、クリッピング用のURL取得と公式HTML変換処理の接続
 
 ビルド・リリース用スクリプトもBun/Nodeのホスト処理としてTypeScriptに残します。
@@ -44,6 +44,7 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 5. 保存計画はRustで作りますが、既存ログの結合は`Vault.process`のコールバック内で最新の本文に対して実行します。保存の完了後に同期カーソルを進めます。
 6. WASM版のタイムゾーン変換はホストの`Intl.DateTimeFormat`、Unicode正規化は`String.normalize("NFC")`と`toLowerCase()`をRustから呼び出します。日付の解析・整形・ISO週の計算や保存先の判定はRustに残します。規則は実行環境のIANA/Unicodeデータに従い、プラグインのlockfileでは固定しません。ネイティブテストには`chrono-tz`と`unicode-normalization`を使います。
 7. Discord IDは文字列で保持し、新旧比較をRustで行います。JSの浮動小数点数には変換しません。
+8. Obsidian固有のAPIとDOM操作はTypeScriptに残し、JSON変換、通知文、既存クリッピングの判断などの純粋な処理はRustへ置きます。
 
 ## 依存の管理と選定
 

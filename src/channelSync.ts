@@ -1,7 +1,6 @@
 import {
   type DiscordChannelSettings,
   type DiscordMessage,
-  channel_display_name as getChannelDisplayName,
   type NotificationTemplates,
   type ProcessedMessage,
   select_message_page,
@@ -9,6 +8,7 @@ import {
   sync_batches,
   sync_completion_notice,
   sync_failure_notice,
+  sync_notification_failure_notice,
   sync_notification_text,
 } from "../pkg/parse_message.js";
 import type { DiscordMessagePage } from "./discordApi";
@@ -190,7 +190,10 @@ export function getChannelSyncFailureNotice(
 export function getChannelNotificationFailureNotice(
   failure: ChannelNotificationFailure,
 ): string {
-  return `Discord sync notification failed for "${getChannelDisplayName(failure.channel)}": ${getFailureReason(failure.error)}. The channel sync completed; retrying is not required.`;
+  return sync_notification_failure_notice(
+    failure.channel,
+    getFailureReason(failure.error),
+  );
 }
 
 export function getSyncCompletionNotice(summary: ChannelSyncSummary): string {

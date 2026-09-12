@@ -28,6 +28,7 @@ export class DiscordApiError extends Error {
     this.name = "DiscordApiError";
   }
 }
+
 export function getDiscordApiFailureNotice(error: DiscordApiError): string {
   return discord_failure_notice(error.status, error.method);
 }

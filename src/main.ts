@@ -1,4 +1,4 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, normalizePath, Plugin } from "obsidian";
 import {
   channel_directory as createChannelDirectory,
   type DiscordChannelSettings,
@@ -136,13 +136,11 @@ export default class DiscordMessageSenderPlugin extends Plugin {
     channel: DiscordChannelSettings,
     settings: MessageSyncSettingsSnapshot,
   ): Promise<number> {
-    const messageDirectory = createChannelDirectory(
-      settings.messageDirectoryName,
-      channel,
+    const messageDirectory = normalizePath(
+      createChannelDirectory(settings.messageDirectoryName, channel),
     );
-    const clippingDirectory = createChannelDirectory(
-      settings.clippingDirectoryName,
-      channel,
+    const clippingDirectory = normalizePath(
+      createChannelDirectory(settings.clippingDirectoryName, channel),
     );
     // Clippings are always individual files, so their IDs can prevent another
     // external fetch after the current message is confirmed to be a URL command.
