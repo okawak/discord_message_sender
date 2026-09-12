@@ -13,17 +13,7 @@ const LOADABLE_ATTRIBUTES = [
   "href",
   "xlink:href",
 ] as const;
-const TITLE_SELECTORS = [
-  'meta[name="title"]',
-  'meta[property="og:title"]',
-  'meta[name="twitter:title"]',
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-] as const;
+const TITLE_SELECTORS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
 
 export function convertHtml(url: string, html: string): string {
   const root = parseInertHtml(html);
