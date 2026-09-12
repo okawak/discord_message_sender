@@ -11,6 +11,9 @@ license-file.workspace = true
 # WASM distribution and Rust integration tests, respectively.
 crate-type = ["cdylib", "rlib"]
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz"]
+
 [dependencies]
 thiserror.workspace = true
 regex-lite.workspace = true

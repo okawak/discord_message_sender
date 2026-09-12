@@ -5,7 +5,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
     "@types/bun": "^1.4.2",
-    "binaryen": "117.0.0",
     "obsidian": "^1.13.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
@@ -18,7 +17,7 @@
   "packageManager": "bun@1.4.2",
   "private": true,
   "scripts": {
-    "wasm:build": "bun scripts/build-wasm.ts",
+    "wasm:build": "wasm-pack build crates/parse_message --release --target web -d ../../pkg -- --locked",
     "dev:build": "bun run wasm:build && bunx vite build --mode development",
     "copy:manifest": "bun -e \"await Bun.write('dist/manifest.json', Bun.file('manifest.json'))\"",
     "build": "bun run wasm:build && bunx vite build --mode production && bun run copy:manifest",

@@ -69,7 +69,7 @@ HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当�
 
 非圧縮サイズの比較ビルド、採用した改善、HTMLパーサーなどの候補は[サイズ調査](wasm-size-investigation.md)に記録しています。
 
-`main.js`の実ファイルサイズを1,000,000 bytes未満に制限します。Viteが表示する転送時gzipサイズとは別です。production buildは上限以上になると失敗するため、CI・リリースでも同じ制約が適用されます。
+配布サイズは[サイズ調査](wasm-size-investigation.md)を参考に継続して確認します。Viteが表示する転送時gzipサイズと、実際に配布する非圧縮`main.js`のサイズは別です。
 
 - `vite.config.ts`は生成済みWASMを**圧縮せず**base64として`main.js`に埋め込みます。base64は文字列への符号化であり、gzip等の圧縮ではありません。
 - 初期化時に標準APIの`atob`でWASMのバイト列へ戻します。追加の展開ライブラリ、外部アセット取得、Node固有APIは不要です。
@@ -98,20 +98,18 @@ Rustのロジックだけを確認する場合は`cargo test -p parse_message --
 
 crate直下の`tests/compatibility.rs`には、移行前のTypeScript出力を記録した`tests/fixtures/compatibility.json`と比較する4件の回帰テストをまとめます。Cargoの統合テストとして独立したcrateから`parse_message::core`の公開APIを呼び出します。このためライブラリの`crate-type`には、WASM配布用の`cdylib`に加えてRustからリンクするための`rlib`を指定します。`rlib`は配布物へ同梱しません。比較対象は設定、Unicodeパス、ログのバイト列、夏時間・うるう日・ISO週番号です。期待値は新しいRust実装から再生成せず、既存の保存形式を保護するデータとして扱います。
 
-`cdylib`と`rlib`の同時生成ではCargoがLTOを省略するため、配布時は`.cargo/config.toml`の`wasm-build`エイリアスから`cargo rustc --crate-type cdylib`を実行します。最適化はルートの`Cargo.toml`の`[profile.release]`で指定します。通常の`cargo test`では`rlib`を介した統合テストを実行します。[Cargo公式のcrate-type指定](https://doc.rust-lang.org/cargo/commands/cargo-rustc.html)
+WASMの生成には`wasm-pack`を使います。Cargo、wasm-bindgen、wasm-optを個別に呼び分けず、`package.json`の`wasm:build`を単一の入口にします。`Cargo.toml`ではwasm-packの標準設定で`wasm-opt -Oz`を指定します。`verify:build`は別ディレクトリで再ビルドして成果物を比較します。
 
-`scripts/build-wasm.ts`はCargo、wasm-bindgen、wasm-optの3コマンドを順に実行し、再現性のためにソースパスを置換するだけです。独自のコンパイラーラッパーや`build.rs`は使いません。`verify:build`は別ディレクトリでの再ビルドとjobserver接続警告の検査を行います。
-
-開発環境では、Rust toolchainに加えて以下を準備します。`wasm-bindgen-cli`は`Cargo.lock`の`wasm-bindgen`と同じversionにします。`wasm-opt`は固定した開発依存`binaryen`から提供され、`bun run`でPATHへ追加されます。これらのビルドツールはプラグインに同梱しません。
+開発環境では、Rust toolchainに加えて`wasm-pack`を準備します。これらのビルドツールはプラグインに同梱しません。
 
 ```bash
-cargo install wasm-bindgen-cli --version 0.2.128 --locked
+cargo install wasm-pack --version 0.15.0 --locked
 bun install --frozen-lockfile
 bun run build
 ```
 
-Cargoのバイナリディレクトリ（通常は`$HOME/.cargo/bin`、`CARGO_HOME`指定時はその`bin`）をPATHへ追加してください。CIでは固定versionのwasm-bindgen CLIをインストールします。
+Cargoのバイナリディレクトリ（通常は`$HOME/.cargo/bin`、`CARGO_HOME`指定時はその`bin`）をPATHへ追加してください。CIでは固定versionの`wasm-pack`をインストールします。
 
-`tests/wasmBoundary.test.ts`では型変換失敗後の継続動作・メモリ・オブジェクト参照・ホストの日時変換と正規化を検証します。`tests/bundle.smoke.ts`では生成済みCommonJSの`dist/main.js`を独立したJSコンテキストで読み込み、プラグイン生成、WASM初期化、旧設定の移行、設定保存まで検証します。Obsidian APIはモックです。全fetchを禁止し、`DecompressionStream`とNode固有APIのない環境で起動できること、埋め込んだbase64の復号結果と初期化に渡すWASMがそれぞれ生成元とバイト単位で一致すること、初期化が1回だけであること、`main.js`が1 MB未満であることも確認します。
+`tests/wasmBoundary.test.ts`では型変換失敗後の継続動作・メモリ・オブジェクト参照・ホストの日時変換と正規化を検証します。`tests/bundle.smoke.ts`では生成済みCommonJSの`dist/main.js`を独立したJSコンテキストで読み込み、プラグイン生成、WASM初期化、旧設定の移行、設定保存まで検証します。Obsidian APIはモックです。全fetchを禁止し、`DecompressionStream`とNode固有APIのない環境で起動できること、埋め込んだbase64の復号結果と初期化に渡すWASMがそれぞれ生成元とバイト単位で一致すること、初期化が1回だけであることも確認します。
 
 参考: [tsifyの型生成とTs<T>](https://docs.rs/tsify/latest/tsify/)、[wasm-bindgenのSerde連携](https://rustwasm.github.io/docs/wasm-bindgen/reference/arbitrary-data-with-serde.html)

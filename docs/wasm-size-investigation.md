@@ -2,9 +2,9 @@
 
 この文書は、Rust中心の構成、既存機能、標準ライブラリによる保守性を維持する前提で2026-09-10に行った比較実験の記録です。比較表以降の値は記録コミット`d774154ff1b550239a2f7a185c0f2e643088acf2`で追加された当時の測定値であり、現在値ではありません。
 
-## 現在の配布サイズ
+## 直接wasm-bindgenを使用していた時点の配布サイズ
 
-2026-09-11、`main`の`0224cc7f253cb01d25088d0dd0183de11c37b29a`をRust 1.98.1、Bun 1.4.0、wasm-bindgen 0.2.128、wasm-opt 117でproduction buildした結果です。配布時は`cdylib`のみを生成し、LTOと`wasm-opt -Oz`を適用します。
+2026-09-11、`main`の`0224cc7f253cb01d25088d0dd0183de11c37b29a`をRust 1.98.1、Bun 1.4.0、wasm-bindgen 0.2.128、wasm-opt 117でproduction buildした結果です。当時は配布時に`cdylib`のみを生成し、LTOと`wasm-opt -Oz`を適用していました。現在はビルド構成を単純にするため、wasm-packへ統一しています。
 
 | 成果物 | bytes | SHA-256 |
 | --- | ---: | --- |

@@ -24,10 +24,10 @@ jobs:
           cache-workspaces: |
             .
 
-      - name: Install wasm-bindgen CLI
+      - name: Install wasm-pack
         uses: taiki-e/install-action@v2
         with:
-          tool: wasm-bindgen-cli@0.2.128
+          tool: wasm-pack@0.15.0
           checksum: true
           fallback: none
 

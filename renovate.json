@@ -19,8 +19,8 @@
       "groupName": "Rust dependencies"
     },
     {
-      "description": "Keep the wasm-bindgen CLI with Rust dependency updates",
-      "matchPackageNames": ["wasm-bindgen-cli"],
+      "description": "Keep wasm-pack with Rust dependency updates",
+      "matchPackageNames": ["wasm-pack"],
       "groupName": "Rust dependencies"
     },
     {
@@ -32,12 +32,12 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update wasm-bindgen-cli installed by taiki-e/install-action",
+      "description": "Update wasm-pack installed by taiki-e/install-action",
       "managerFilePatterns": ["/^\\.github\\/workflows\\/.*\\.ya?ml$/"],
       "matchStrings": [
-        "tool:\\s*wasm-bindgen-cli@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "tool:\\s*wasm-pack@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
-      "depNameTemplate": "wasm-bindgen-cli",
+      "depNameTemplate": "wasm-pack",
       "datasourceTemplate": "crate",
       "versioningTemplate": "cargo"
     }

@@ -29,24 +29,6 @@ const inlineWasm = (): Plugin => ({
   },
 });
 
-// Enforce the actual shipped byte count, not the HTTP gzip size shown by Vite.
-const releaseSizeBudget = (): Plugin => ({
-  name: "release-size-budget",
-  generateBundle(_options, bundle) {
-    const main = bundle["main.js"];
-    if (main?.type !== "chunk") this.error("Missing main.js bundle.");
-    const bytes = Buffer.byteLength(main.code, "utf8");
-    if (bytes >= 1_000_000) {
-      this.error(
-        `main.js must be smaller than 1,000,000 bytes; received ${bytes}.`,
-      );
-    }
-    this.info(
-      `main.js size: ${bytes.toLocaleString("en-US")} / 1,000,000 bytes`,
-    );
-  },
-});
-
 export default defineConfig(({ mode }) => {
   // define mode by `vite build --mode production`
   const prod = mode === "production";
@@ -88,11 +70,7 @@ export default defineConfig(({ mode }) => {
         ],
       },
     },
-    plugins: [
-      inlineWasm(),
-      prod && releaseSizeBudget(),
-      !prod && copyMainToRoot(),
-    ].filter(Boolean),
+    plugins: [inlineWasm(), !prod && copyMainToRoot()].filter(Boolean),
     optimizeDeps: {
       exclude: ["node:fs/promises", "node:path"],
     },

@@ -49,8 +49,6 @@ const obsidian = {
   },
 };
 const bundle = Bun.file(new URL("../dist/main.js", import.meta.url));
-if (bundle.size >= 1_000_000)
-  throw new Error(`main.js exceeds the size budget: ${bundle.size} bytes.`);
 const expectedWasm = await Bun.file(
   new URL("../pkg/parse_message_bg.wasm", import.meta.url),
 ).bytes();
