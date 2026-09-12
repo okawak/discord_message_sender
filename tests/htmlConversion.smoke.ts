@@ -6,11 +6,11 @@ let serializedFrontmatter: Record<string, string> = {};
 
 mock.module("obsidian", () => ({
   sanitizeHTMLToDom(html: string) {
-    sanitizedInput = html;
+    sanitizedInput = html.replace("<script>ignored</script>", "");
     return {};
   },
   htmlToMarkdown() {
-    return sanitizedInput;
+    return sanitizedInput.replaceAll("<span>", "").replaceAll("</span>", "");
   },
   stringifyYaml(frontmatter: Record<string, string>) {
     serializedFrontmatter = frontmatter;
@@ -109,7 +109,7 @@ const root = {
     const footerHtml = footerAttached
       ? `<footer><article>${footerImage.serialize()}</article></footer>`
       : "";
-    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${backslashImage.serialize()}${fragmentImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
+    return `<p>Article</p><span>DMSIMAGE</span><script>ignored</script><span>TOKEN0X0END</span>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${backslashImage.serialize()}${fragmentImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
   },
   get textContent() {
     return "HTML <img src=x> guide Article Guide";
@@ -235,6 +235,7 @@ if (
     String.raw`![x\\\](https://attacker.invalid/p)!\[y](<https://cdn.qiita.com/backslash.png?q=%5C>)`,
   ) ||
   !markdown.includes("https://example.com/DMSIMAGETOKEN0X0END") ||
+  markdown.match(/DMSIMAGETOKEN0X0END/g)?.length !== 2 ||
   markdown.includes("https://qiita.com/example#icon") ||
   markdown.includes("tracker.example")
 ) {

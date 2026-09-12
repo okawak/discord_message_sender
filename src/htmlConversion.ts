@@ -13,7 +13,6 @@ const LOADABLE_ATTRIBUTES = [
   "href",
   "xlink:href",
 ] as const;
-const IMAGE_TOKEN_PATTERN = /DMSIMAGETOKEN(\d+)X\d+END/g;
 const TITLE_SELECTORS = [
   'meta[name="title"]',
   'meta[property="og:title"]',
@@ -79,16 +78,7 @@ function replaceImagesWithTokens(
   imageSources: WeakMap<HTMLImageElement, string>,
 ): (markdown: string) => string {
   const replacements: string[] = [];
-  const existingContent = `${root.innerHTML}\n${root.textContent ?? ""}`;
-  const usedNamespaces = new Set(
-    Array.from(
-      existingContent.matchAll(IMAGE_TOKEN_PATTERN),
-      (match) => match[1],
-    ),
-  );
-  let namespace = 0;
-  while (usedNamespaces.has(String(namespace))) namespace += 1;
-  const tokenPrefix = `DMSIMAGETOKEN${namespace}X`;
+  const tokenPrefix = `DMSIMAGE${crypto.randomUUID().replaceAll("-", "")}TOKEN`;
 
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
     const source = imageSources.get(image)?.trim();
