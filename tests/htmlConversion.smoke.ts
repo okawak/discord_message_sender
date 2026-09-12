@@ -27,6 +27,7 @@ function createResource(
   let replacement: string | undefined;
   return {
     alt,
+    localName: tag,
     getAttribute(name: string) {
       return attributes.get(name) ?? null;
     },
@@ -66,15 +67,35 @@ const unsafeImage = createResource(
   { src: "tel:x>)![p](https://tracker.example)" },
   "Unsafe",
 );
+const reservedImage = createResource(
+  "img",
+  { "data-dms-src": "https://tracker.example/pixel" },
+  "Reserved",
+);
 const iframe = createResource("iframe", { src: "/embed" });
 const anchor = createResource("a", {
   href: "https://example.com/DMSIMAGETOKEN0END",
 });
 let footerAttached = true;
 const footer = { remove: () => (footerAttached = false) };
+const titleDecoder = {
+  value: "",
+  set innerHTML(value: string) {
+    this.value = value;
+  },
+  get textContent() {
+    return this.value;
+  },
+};
 const title = {
   getAttribute: () => null,
-  textContent: "HTML <img src=x> guide",
+  innerHTML: "HTML <img src=x> guide",
+  textContent: "HTML guide",
+  ownerDocument: {
+    createElement() {
+      return titleDecoder;
+    },
+  },
 };
 const root = {
   append() {},
@@ -82,7 +103,7 @@ const root = {
     const footerHtml = footerAttached
       ? `<footer><article>${footerImage.serialize()}</article></footer>`
       : "";
-    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${iframe.serialize()}${footerHtml}`;
+    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
   },
   get textContent() {
     return "HTML <img src=x> guide Article Guide";
@@ -91,17 +112,19 @@ const root = {
     if (selector === "nav, footer") return footerAttached ? [footer] : [];
     if (selector.includes("iframe") && selector.includes("video")) {
       return footerAttached
-        ? [articleImage, footerImage, unsafeImage, iframe]
-        : [articleImage, unsafeImage, iframe];
+        ? [articleImage, footerImage, unsafeImage, reservedImage, iframe]
+        : [articleImage, unsafeImage, reservedImage, iframe];
     }
     if (selector === "[href], [src]") {
-      return [articleImage, unsafeImage, iframe, anchor].filter(
+      return [articleImage, unsafeImage, reservedImage, iframe, anchor].filter(
         (element) =>
           element.getAttribute("href") !== null ||
           element.getAttribute("src") !== null,
       );
     }
-    if (selector === "img") return [articleImage, unsafeImage];
+    if (selector === "img") {
+      return [articleImage, unsafeImage, reservedImage];
+    }
     return [];
   },
   querySelector(selector: string) {
@@ -162,7 +185,7 @@ if (parsedInput !== rawHtml) {
 if (
   articleImage.getAttribute("src") !== null ||
   iframe.getAttribute("src") !== null ||
-  !sanitizedInput.includes('data-dms-src="/embed"')
+  sanitizedInput.includes(" src=")
 ) {
   throw new Error(
     `Loadable attributes reached the sanitizer: ${sanitizedInput}`,

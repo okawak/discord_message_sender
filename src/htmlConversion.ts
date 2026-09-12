@@ -2,7 +2,6 @@ import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
 
 const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
 const URL_ATTRIBUTES = ["href", "src"] as const;
-const MASKED_ATTRIBUTE_PREFIX = "data-dms-";
 const LOADABLE_ELEMENT_SELECTOR =
   "audio, embed, feImage, iframe, image, img, input, link, object, source, track, use, video";
 const LOADABLE_ATTRIBUTES = [
@@ -15,7 +14,6 @@ const LOADABLE_ATTRIBUTES = [
   "xlink:href",
 ] as const;
 const TITLE_SELECTORS = [
-  "title:not(svg *)",
   'meta[name="title"]',
   'meta[property="og:title"]',
   'meta[name="twitter:title"]',
@@ -35,9 +33,9 @@ export function convertHtml(url: string, html: string): string {
     root.querySelector<HTMLElement>("article") ??
     root.querySelector<HTMLElement>("main") ??
     root;
-  maskLoadableAttributes(content);
+  const imageSources = deactivateLoadableResources(content);
   resolveResourceUrls(content, url);
-  const restoreImages = replaceImagesWithTokens(content, url);
+  const restoreImages = replaceImagesWithTokens(content, url, imageSources);
 
   const fragment = sanitizeHTMLToDom(content.innerHTML);
   const frontmatter = title ? { title, source: url } : { source: url };
@@ -55,25 +53,29 @@ function parseInertHtml(html: string): HTMLElement {
   return root;
 }
 
-function maskLoadableAttributes(root: ParentNode): void {
+function deactivateLoadableResources(
+  root: ParentNode,
+): WeakMap<HTMLImageElement, string> {
+  const imageSources = new WeakMap<HTMLImageElement, string>();
   for (const element of root.querySelectorAll<HTMLElement>(
     LOADABLE_ELEMENT_SELECTOR,
   )) {
     for (const attribute of LOADABLE_ATTRIBUTES) {
       const value = element.getAttribute(attribute);
       if (value === null) continue;
+      if (element.localName === "img" && attribute === "src") {
+        imageSources.set(element as HTMLImageElement, value);
+      }
       element.removeAttribute(attribute);
-      element.setAttribute(
-        `${MASKED_ATTRIBUTE_PREFIX}${attribute.replace(":", "-")}`,
-        value,
-      );
     }
   }
+  return imageSources;
 }
 
 function replaceImagesWithTokens(
   root: HTMLElement,
   baseUrl: string,
+  imageSources: WeakMap<HTMLImageElement, string>,
 ): (markdown: string) => string {
   const replacements: string[] = [];
   const existingContent = `${root.innerHTML}\n${root.textContent ?? ""}`;
@@ -81,7 +83,7 @@ function replaceImagesWithTokens(
   while (existingContent.includes(tokenPrefix)) tokenPrefix += "X";
 
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
-    const source = image.getAttribute(`${MASKED_ATTRIBUTE_PREFIX}src`)?.trim();
+    const source = imageSources.get(image)?.trim();
     const alt = image.alt.replace(/\s+/g, " ").trim();
     const resolved = source ? resolveUrl(source, baseUrl) : undefined;
     if (!resolved?.startsWith("https:")) {
@@ -146,15 +148,27 @@ function resolveUrl(value: string, baseUrl: string): string | undefined {
 }
 
 function extractTitle(root: ParentNode): string | undefined {
+  const titleElement = root.querySelector<HTMLElement>("title:not(svg *)");
+  if (titleElement) {
+    const decoder = titleElement.ownerDocument.createElement("textarea");
+    decoder.innerHTML = titleElement.innerHTML;
+    const title = normalizeTitle(decoder.textContent ?? undefined);
+    if (title) return title;
+  }
+
   for (const selector of TITLE_SELECTORS) {
     const element = root.querySelector<HTMLElement>(selector);
     const value =
       element?.getAttribute("content") ?? element?.textContent ?? undefined;
-    const normalized = value
-      ?.replace(/[\u200B\uFEFF]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    const normalized = normalizeTitle(value);
     if (normalized) return normalized;
   }
   return undefined;
+}
+
+function normalizeTitle(value: string | undefined): string | undefined {
+  return value
+    ?.replace(/[\u200B\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
