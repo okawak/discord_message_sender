@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "crates/domain",
-  "crates/html_to_markdown",
   "crates/parse_message",
 ]
 resolver = "3"
@@ -15,9 +14,7 @@ repository = "https://github.com/okawak/discord_message_sender"
 license-file = "LICENSE"
 
 [workspace.dependencies]
-html5ever = "0.39"
 thiserror = "2"
-url = "2.5.8"
 regex-lite = "0.1"
 js-sys = "0.3"
 wasm-bindgen = "0.2"
@@ -28,11 +25,6 @@ tsify = { version = "0.5.8", default-features = false, features = ["js"] }
 unicode-normalization = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 chrono-tz = "0.10"
-
-# Test-only dependencies are inherited under each crate's dev-dependencies.
-pretty_assertions = "1"
-rstest = "0.27"
-indoc = "2"
 
 [profile.release]
 opt-level = 'z'

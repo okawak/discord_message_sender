@@ -17,11 +17,11 @@ Rustで日常的にロジックを読んで変更できるよう、ObsidianのI/
 | `domain/src/discord.rs` | APIパス、レート制限、再試行判断、エラー文・通知文の生成 |
 | `parse_message/src/bindings.rs` | 型付きWASM関数の公開、JS値との変換と例外への変換 |
 
-HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当します。
+HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts)の`sanitizeHTMLToDom`、`htmlToMarkdown`、`stringifyYaml`をTypeScriptから利用します。取得元を基準にした相対URLの絶対化だけを薄いアダプターとして保持し、HTMLパーサーとMarkdown変換器はプラグインに同梱しません。
 
 ## TypeScriptに残す処理
 
-実行時のTSは次の8ファイルです。単にRustの関数や型を再公開するファイルは置かず、呼び出し元から生成済みの`pkg/parse_message.js`を直接インポートします。
+実行時のTSは次の9ファイルです。単にRustの関数や型を再公開するファイルは置かず、呼び出し元から生成済みの`pkg/parse_message.js`を直接インポートします。
 
 - `main.ts`: Obsidianプラグインの起動、コマンド登録、同期の排他、設定の保存、`Intl`からOSのタイムゾーン名を取得
 - `settingTab.ts`: Obsidian 1.13の設定画面、入力イベントと通知
@@ -29,8 +29,9 @@ HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当�
 - `discordApi.ts`: Obsidian `requestUrl`によるDiscord通信、待機、通信例外の捕捉
 - `vault.ts`: Vaultのファイル探索・読み込み・作成・`Vault.process`による更新
 - `channelSync.ts`: ページ取得・メッセージ変換・保存・通知の非同期実行順序と失敗時の処理
+- `htmlConversion.ts`: Obsidian公式APIによるHTMLのサニタイズ・Markdown変換・frontmatter生成と相対URLの絶対化
 - `wasmCore.ts`: 非同期WASM初期化と再試行、Rustが生成する通信エラーのJS例外への対応
-- `wasmBridge.ts`: 初期化失敗のObsidian通知、クリッピング用のURL取得とRust変換処理の接続
+- `wasmBridge.ts`: 初期化失敗のObsidian通知、クリッピング用のURL取得と公式HTML変換処理の接続
 
 ビルド・リリース用スクリプトもBun/Nodeのホスト処理としてTypeScriptに残します。
 
@@ -46,22 +47,19 @@ HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当�
 
 ## 依存の管理と選定
 
-外部ライブラリのバージョンと基本featuresはルートの`Cargo.toml`の`[workspace.dependencies]`で管理します。各crateは必要なものだけを`dependency-name.workspace = true`で参照します。ルートに定義しただけでは各crateへの依存にはなりません。テスト用の外部依存もルートで定義し、利用側の`[dev-dependencies]`で参照します。方式は[Cargo公式のworkspace dependencies](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)に従います。workspace内のcrateへの依存は利用側に相対パスで記述し、`parse_message`から`domain`と`html_to_markdown`を参照します。
+外部ライブラリのバージョンと基本featuresはルートの`Cargo.toml`の`[workspace.dependencies]`で管理します。各crateは必要なものだけを`dependency-name.workspace = true`で参照します。ルートに定義しただけでは各crateへの依存にはなりません。方式は[Cargo公式のworkspace dependencies](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)に従います。workspace内のcrateへの依存は利用側に相対パスで記述し、`parse_message`から`domain`を参照します。
 
 ログマーカー・ファイル名・通知変数の照合には`regex-lite`を使います。エラー型には引き続き`thiserror`を使います。エラー文、CRLF/BOM、ASCII数字の判定、通知の置換値を再展開しない動作を維持します。
 
 | 維持する依存 | 用途・理由 |
 | --- | --- |
 | `thiserror` | `Display`／`Error`の実装をコンパイル時に生成し、エラー型の見通しを保つ |
-| `html5ever` | HTMLの構文解析、壊れたHTMLの回復、文字参照など。HTML仕様全体の独自実装を避ける |
 | `regex-lite` | 固定形式のログ・ID・テンプレートの照合。専用パーサーの保守を避ける |
 | `chrono` | RFC 3339、暦・ISO週、日付の整形。default featuresを無効化して`std`だけを指定 |
 | `chrono-tz` | ネイティブビルド専用のタイムゾーン変換。WASM版はホストの`Intl`を使い、データを同梱しない |
 | `unicode-normalization` | ネイティブビルド専用のNFC正規化。WASM版ではホストのUnicode実装を使う |
 | `serde`、`serde_json` | 設定の移行・検証、DiscordレスポンスのJSON処理 |
 | `wasm-bindgen`、`js-sys`、`serde-wasm-bindgen`、`tsify` | JS/WASM間の呼び出し・型変換・TypeScript型の生成。`tsify`は`js` featureだけを有効化 |
-| `html_to_markdown` | workspace内のHTML変換crate |
-| `pretty_assertions`、`rstest`、`indoc` | HTML変換のテスト専用。releaseのWASMには組み込まれない |
 
 依存の宣言数と配布サイズは同じではありません。機能・テーブルを含むライブラリと、コンパイル時にコードを生成するマクロ、テスト専用の依存を分けて判断します。`thiserror`は[公式ドキュメント](https://docs.rs/thiserror/latest/thiserror/)でも手書きの`Error`実装に相当すると説明されており、配布サイズ削減のために外す対象とはしません。
 
@@ -74,6 +72,7 @@ HTMLからMarkdownへの変換は引き続き`crates/html_to_markdown`が担当�
 - `vite.config.ts`は生成済みWASMを**圧縮せず**base64として`main.js`に埋め込みます。base64は文字列への符号化であり、gzip等の圧縮ではありません。
 - 初期化時に標準APIの`atob`でWASMのバイト列へ戻します。追加の展開ライブラリ、外部アセット取得、Node固有APIは不要です。
 - 大きなIANA/Unicodeテーブルはホストの標準APIを利用して同梱を省きます。Rustの処理を独自の簡易パーサーへ置き換えてサイズを削る方針は採りません。
+- HTMLの構文解析・サニタイズ・Markdown変換・YAML生成もObsidian公式APIへ任せ、プラグイン独自の変換器を持ちません。
 - ホスト側のIANA/Unicode更新とネイティブテスト用ライブラリの更新時期は異なる場合があります。実WASMでも互換性fixture、夏時間・分単位の時差・Unicodeの重複判定を検証します。
 
 利用する標準API: [Intl.DateTimeFormat.formatToParts](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/formatToParts)、[String.normalize](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)。
