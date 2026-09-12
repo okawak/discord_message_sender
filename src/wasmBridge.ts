@@ -1,6 +1,5 @@
 import { Notice, requestUrl } from "obsidian";
 import {
-  convert_html as convertHtml,
   processed_message as createProcessedMessage,
   type DiscordMessage,
   type InitOutput,
@@ -8,6 +7,7 @@ import {
   type ProcessedMessage,
   message_instruction as parseMessage,
 } from "../pkg/parse_message.js";
+import { convertHtml } from "./htmlConversion";
 import { isSavedClippingInstruction } from "./messageParsing";
 import { initWasmCore } from "./wasmCore";
 

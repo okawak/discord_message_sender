@@ -1,0 +1,76 @@
+import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
+
+const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
+const URL_ATTRIBUTES = ["href", "src"] as const;
+const TITLE_SELECTORS = [
+  "title",
+  'meta[name="title"]',
+  'meta[property="og:title"]',
+  'meta[name="twitter:title"]',
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+] as const;
+
+export function convertHtml(url: string, html: string): string {
+  const fragment = sanitizeHTMLToDom(html);
+  resolveResourceUrls(fragment, url);
+
+  const content =
+    fragment.querySelector<HTMLElement>("article") ??
+    fragment.querySelector<HTMLElement>("body") ??
+    fragment;
+  const title = extractTitle(fragment);
+  const frontmatter = title ? { title, source: url } : { source: url };
+  const yaml = stringifyYaml(frontmatter).trimEnd();
+  const markdown = htmlToMarkdown(content).trim();
+
+  return `---\n${yaml}\n---\n\n${markdown}`;
+}
+
+function resolveResourceUrls(
+  fragment: DocumentFragment,
+  baseUrl: string,
+): void {
+  for (const element of fragment.querySelectorAll<HTMLElement>(
+    "[href], [src]",
+  )) {
+    for (const attribute of URL_ATTRIBUTES) {
+      const value = element.getAttribute(attribute)?.trim();
+      if (!value) continue;
+
+      if (value.startsWith("#")) {
+        element.removeAttribute(attribute);
+        continue;
+      }
+
+      try {
+        const resolved = new URL(value, baseUrl);
+        if (!SAFE_PROTOCOLS.has(resolved.protocol)) {
+          element.removeAttribute(attribute);
+          continue;
+        }
+        element.setAttribute(attribute, resolved.toString());
+      } catch {
+        element.removeAttribute(attribute);
+      }
+    }
+  }
+}
+
+function extractTitle(fragment: DocumentFragment): string | undefined {
+  for (const selector of TITLE_SELECTORS) {
+    const element = fragment.querySelector<HTMLElement>(selector);
+    const value =
+      element?.getAttribute("content") ?? element?.textContent ?? undefined;
+    const normalized = value
+      ?.replace(/[\u200B\uFEFF]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (normalized) return normalized;
+  }
+  return undefined;
+}

@@ -133,7 +133,7 @@ async function main(): Promise<void> {
   ]);
 
   const cargo = Bun.spawn(
-    ["cargo", "update", "-p", "html_to_markdown", "-p", "parse_message"],
+    ["cargo", "update", "-p", "domain", "-p", "parse_message"],
     { cwd: root, stdout: "inherit", stderr: "inherit" },
   );
   const exitCode = await cargo.exited;

@@ -47,6 +47,15 @@ const obsidian = {
   requestUrl() {
     throw new Error("Network calls are forbidden in the bundle smoke test.");
   },
+  htmlToMarkdown() {
+    throw new Error("HTML conversion is not expected during initialization.");
+  },
+  sanitizeHTMLToDom() {
+    throw new Error("HTML conversion is not expected during initialization.");
+  },
+  stringifyYaml() {
+    throw new Error("HTML conversion is not expected during initialization.");
+  },
 };
 const bundle = Bun.file(new URL("../dist/main.js", import.meta.url));
 const expectedWasm = await Bun.file(
