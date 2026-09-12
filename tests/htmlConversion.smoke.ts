@@ -51,13 +51,15 @@ const body = {
     }
     return [];
   },
-};
-const parsedDocument = {
-  body,
-  querySelector() {
+  querySelector(selector: string) {
+    if (selector === "article" && footerAttached) {
+      return { innerHTML: "Related article", querySelectorAll: () => [] };
+    }
+    if (selector === "main") return body;
     return null;
   },
 };
+const parsedDocument = { body, querySelector: () => null };
 
 const originalDOMParser = globalThis.DOMParser;
 try {

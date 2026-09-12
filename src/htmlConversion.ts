@@ -18,11 +18,12 @@ const TITLE_SELECTORS = [
 export function convertHtml(url: string, html: string): string {
   const document = new DOMParser().parseFromString(html, "text/html");
   const title = extractTitle(document);
+  const body = document.body;
+  removeNonContentElements(body);
   const content =
-    document.querySelector<HTMLElement>("article") ??
-    document.querySelector<HTMLElement>("main") ??
-    document.body;
-  removeNonContentElements(content);
+    body.querySelector<HTMLElement>("article") ??
+    body.querySelector<HTMLElement>("main") ??
+    body;
   resolveResourceUrls(content, url);
 
   const fragment = sanitizeHTMLToDom(content.innerHTML);
