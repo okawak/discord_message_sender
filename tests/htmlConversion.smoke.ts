@@ -67,6 +67,11 @@ const unsafeImage = createResource(
   { src: "tel:x>)![p](https://tracker.example)" },
   "Unsafe",
 );
+const backslashImage = createResource(
+  "img",
+  { src: "//cdn.qiita.com/backslash.png" },
+  String.raw`x\](https://attacker.invalid/p)![y`,
+);
 const reservedImage = createResource(
   "img",
   { "data-dms-src": "https://tracker.example/pixel" },
@@ -103,7 +108,7 @@ const root = {
     const footerHtml = footerAttached
       ? `<footer><article>${footerImage.serialize()}</article></footer>`
       : "";
-    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
+    return `<p>Article</p>${anchor.serialize()}${articleImage.serialize()}${unsafeImage.serialize()}${backslashImage.serialize()}${reservedImage.serialize()}${iframe.serialize()}${footerHtml}`;
   },
   get textContent() {
     return "HTML <img src=x> guide Article Guide";
@@ -112,18 +117,32 @@ const root = {
     if (selector === "nav, footer") return footerAttached ? [footer] : [];
     if (selector.includes("iframe") && selector.includes("video")) {
       return footerAttached
-        ? [articleImage, footerImage, unsafeImage, reservedImage, iframe]
-        : [articleImage, unsafeImage, reservedImage, iframe];
+        ? [
+            articleImage,
+            footerImage,
+            unsafeImage,
+            backslashImage,
+            reservedImage,
+            iframe,
+          ]
+        : [articleImage, unsafeImage, backslashImage, reservedImage, iframe];
     }
     if (selector === "[href], [src]") {
-      return [articleImage, unsafeImage, reservedImage, iframe, anchor].filter(
+      return [
+        articleImage,
+        unsafeImage,
+        backslashImage,
+        reservedImage,
+        iframe,
+        anchor,
+      ].filter(
         (element) =>
           element.getAttribute("href") !== null ||
           element.getAttribute("src") !== null,
       );
     }
     if (selector === "img") {
-      return [articleImage, unsafeImage, reservedImage];
+      return [articleImage, unsafeImage, backslashImage, reservedImage];
     }
     return [];
   },
@@ -196,6 +215,9 @@ if (serializedFrontmatter.title !== "HTML <img src=x> guide") {
 }
 if (
   !markdown.includes("![Article](<https://cdn.qiita.com/article.png>)") ||
+  !markdown.includes(
+    String.raw`![x\\\](https://attacker.invalid/p)!\[y](<https://cdn.qiita.com/backslash.png>)`,
+  ) ||
   !markdown.includes("https://example.com/DMSIMAGETOKEN0X0END") ||
   markdown.includes("tracker.example")
 ) {
