@@ -1,20 +1,19 @@
 import { Notice, requestUrl } from "obsidian";
 import {
-  processed_message as createProcessedMessage,
+  complete_message_instruction,
   type DiscordMessage,
-  type InitOutput,
   type MessageInstruction,
-  type ProcessedMessage,
+  type ProcessedMessageList,
   message_instruction as parseMessage,
 } from "../pkg/parse_message.js";
 import { convertHtml } from "./htmlConversion";
 import { initWasmCore } from "./wasmCore";
 
-export async function initWasmBridge(): Promise<InitOutput> {
+export async function initWasmBridge(): Promise<void> {
   try {
-    return await initWasmCore();
+    await initWasmCore();
   } catch (error) {
-    new Notice("WASM initialization failed.");
+    new Notice("Plugin initialization failed.");
     throw error;
   }
 }
@@ -24,7 +23,7 @@ export async function parseMessageWasm(
   prefix: string,
   timeZone: string,
   existingClippingIds: ReadonlySet<string> = new Set(),
-): Promise<ProcessedMessage | undefined> {
+): Promise<ProcessedMessageList> {
   await initWasmBridge();
 
   let instruction: MessageInstruction;
@@ -38,27 +37,24 @@ export async function parseMessageWasm(
     throw new Error("Failed to parse Discord message.", { cause: error });
   }
 
-  if (instruction.kind === "message") {
-    return createProcessedMessage(
-      instruction.markdown,
-      false,
-      message,
-      timeZone,
-    );
-  }
-  if (instruction.kind === "skip") return undefined;
-
-  const html = await fetchUrlContent(instruction.url);
-  let markdown: string;
-  try {
-    markdown = convertHtml(instruction.url, html);
-  } catch (error) {
-    throw new Error("Failed to convert URL content to Markdown.", {
-      cause: error,
-    });
+  let clippingMarkdown: string | undefined;
+  if (instruction.kind === "url") {
+    const html = await fetchUrlContent(instruction.url);
+    try {
+      clippingMarkdown = convertHtml(instruction.url, html);
+    } catch (error) {
+      throw new Error("Failed to convert URL content to Markdown.", {
+        cause: error,
+      });
+    }
   }
 
-  return createProcessedMessage(markdown, true, message, timeZone);
+  return complete_message_instruction(
+    instruction,
+    message,
+    clippingMarkdown,
+    timeZone,
+  );
 }
 
 async function fetchUrlContent(value: string): Promise<string> {

@@ -1,17 +1,19 @@
 import initWasm, {
   discord_error_message,
   discord_failure_notice,
-  type InitOutput,
 } from "../pkg/parse_message.js";
 
-let ready: Promise<InitOutput> | undefined;
+let ready: Promise<void> | undefined;
 
 /** Initialize before calling any domain function; a failed initialization can be retried. */
-export function initWasmCore(): Promise<InitOutput> {
-  ready ??= initWasm().catch((error: unknown) => {
-    ready = undefined;
-    throw new Error("WASM initialization failed.", { cause: error });
-  });
+export function initWasmCore(): Promise<void> {
+  ready ??= initWasm().then(
+    () => {},
+    (error: unknown) => {
+      ready = undefined;
+      throw new Error("WASM initialization failed.", { cause: error });
+    },
+  );
   return ready;
 }
 

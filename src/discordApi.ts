@@ -26,7 +26,7 @@ export async function fetchMessages(
   const path = getChannelMessagesPath(channelId, before);
   const res = await discordRequest(botToken, "GET", path);
   return {
-    messages: decodeDiscordMessages(res.json),
+    messages: decodeDiscordMessages(res.text),
     nextRequestDelayMs: getRateLimitResetDelay(res.headers),
   };
 }
@@ -44,7 +44,7 @@ export async function postNotification(
     path,
     createDiscordMessageBody(text),
   );
-  return decodeDiscordMessage(res.json);
+  return decodeDiscordMessage(res.text);
 }
 
 async function discordRequest(

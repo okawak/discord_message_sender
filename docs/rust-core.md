@@ -10,14 +10,14 @@ Rustで日常的にロジックを読んで変更できるよう、ObsidianのI/
 | `domain/src/settings.rs` | 初期値、旧設定の移行、入力値の正規化、同期用スナップショット |
 | `domain/src/channels.rs` | チャンネル名の検証、保存先の生成、Unicode正規化を含む重複判定 |
 | `domain/src/dates.rs` | RFC 3339日時の解析、タイムゾーン変換、ISO週番号、既存ログの探索対象日 |
-| `domain/src/messages.rs`、`command.rs` | メッセージとURLコマンドの解析、投稿者・ファイル名の生成 |
+| `domain/src/messages.rs`、`command.rs` | メッセージとURLコマンドの解析、処理結果の確定・空本文の除外、投稿者・ファイル名の生成 |
 | `domain/src/logs.rs` | ログの識別、日次・週次・月次ログの結合、管理マーカー、重複排除 |
 | `domain/src/storage.rs` | 既存ログの探索パス、個別ファイルと集約ログへの保存計画 |
 | `domain/src/sync.rs` | 同期前の検証、新着ページの選別、古い順への並べ替え、通知文の選択 |
 | `domain/src/discord.rs` | APIパス、レート制限、再試行判断、エラー文・通知文の生成 |
 | `parse_message/src/bindings.rs` | 型付きWASM関数の公開、JS値との変換と例外への変換 |
 
-HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts)の`sanitizeHTMLToDom`、`htmlToMarkdown`、`stringifyYaml`をTypeScriptから利用します。取得元を基準にした相対URLの絶対化だけを薄いアダプターとして保持し、HTMLパーサーとMarkdown変換器はプラグインに同梱しません。Vaultへ渡す保存先は、Rustで生成した後に公式`normalizePath`で正規化します。
+HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts)の`sanitizeHTMLToDom`、`htmlToMarkdown`、`stringifyYaml`をTypeScriptから利用します。その前処理に[parse5](https://parse5.js.org/)を同梱し、DOMを作らずにHTMLを解析します。`prepareContent`の1回の巡回で本文候補を選び、不要な要素・通信を起こす属性の除去、画像の一時トークン化、相対URLの絶対化を行います。公式APIには変換時のリソース読み込みを禁止する指定がないため、この前処理を残しています。`innerHTML`への代入や、サニタイズ前の画像・iframeなどの読み込みは行いません。Markdown変換器は同梱しません。Vaultへ渡す保存先は、Rustで生成した後に公式`normalizePath`で正規化します。
 
 ## TypeScriptに残す処理
 
@@ -26,7 +26,7 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 - `main.ts`: Obsidianプラグインの起動、コマンド登録、同期の排他、設定の保存、`Intl`からOSのタイムゾーン名を取得
 - `settingTab.ts`: Obsidian 1.13の設定画面、入力イベントと通知
 - `settings.ts`: 保存データのJS値への対応、設定変更時のJSオブジェクト参照の維持
-- `discordApi.ts`: Obsidian `requestUrl`によるDiscord通信、待機、通信例外の捕捉。公式APIが返すJSON値の検証と送信JSONの生成はRustへ渡す
+- `discordApi.ts`: Obsidian `requestUrl`によるDiscord通信、待機、通信例外の捕捉。応答のJSON文字列をRustへ渡し、解析・型検証・送信JSONの生成を任せる
 - `vault.ts`: Vaultのファイル探索・読み込み・作成・`Vault.process`による更新
 - `channelSync.ts`: ページ取得・メッセージ変換・保存・通知の非同期実行順序と失敗時の処理
 - `htmlConversion.ts`: Obsidian公式APIによるHTMLのサニタイズ・Markdown変換・frontmatter生成と相対URLの絶対化
@@ -45,6 +45,8 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 6. WASM版のタイムゾーン変換はホストの`Intl.DateTimeFormat`、Unicode正規化は`String.normalize("NFC")`と`toLowerCase()`をRustから呼び出します。日付の解析・整形・ISO週の計算や保存先の判定はRustに残します。規則は実行環境のIANA/Unicodeデータに従い、プラグインのlockfileでは固定しません。ネイティブテストには`chrono-tz`と`unicode-normalization`を使います。
 7. Discord IDは文字列で保持し、新旧比較をRustで行います。JSの浮動小数点数には変換しません。
 8. Obsidian固有のAPIとDOM操作はTypeScriptに残し、JSON変換、通知文、既存クリッピングの判断などの純粋な処理はRustへ置きます。
+9. 未検証の設定入力や応答ヘッダーなど、ホストから渡される`JsValue`だけを`unknown`として受け、Rustで検証します。Discordの応答は`string`で受けてRustでJSON解析し、設定コントロールの戻り値はRustの`SettingControlValue`から`string | boolean | null`を生成します。同期で捕捉した例外は`Error`へ正規化してから結果へ格納します。`tests/wasmTypes.test.ts`と型チェックで、検証後の値に`any`や`unknown`が広がらないことを確認します。
+10. `wasm-bindgen`が生成する低水準の`InitOutput`には`any`が含まれますが、プラグインの初期化APIは`Promise<void>`を返し、低水準の関数を公開しません。
 
 ## 依存の管理と選定
 
@@ -73,7 +75,7 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 - `vite.config.ts`は生成済みWASMを**圧縮せず**base64として`main.js`に埋め込みます。base64は文字列への符号化であり、gzip等の圧縮ではありません。
 - 初期化時に標準APIの`atob`でWASMのバイト列へ戻します。追加の展開ライブラリ、外部アセット取得、Node固有APIは不要です。
 - 大きなIANA/Unicodeテーブルはホストの標準APIを利用して同梱を省きます。Rustの処理を独自の簡易パーサーへ置き換えてサイズを削る方針は採りません。
-- HTMLの構文解析・サニタイズ・Markdown変換・YAML生成もObsidian公式APIへ任せ、プラグイン独自の変換器を持ちません。
+- HTMLの初期解析は通信機能を持たないparse5で行い、サニタイズ・Markdown変換・YAML生成はObsidian公式APIへ任せます。画像以外の埋め込み、SVG/MathML、inline CSSはクリッピングから除去します。
 - ホスト側のIANA/Unicode更新とネイティブテスト用ライブラリの更新時期は異なる場合があります。実WASMでも互換性fixture、夏時間・分単位の時差・Unicodeの重複判定を検証します。
 
 利用する標準API: [Intl.DateTimeFormat.formatToParts](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/formatToParts)、[String.normalize](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/normalize)。
@@ -98,7 +100,11 @@ domain crateの入口は`crates/domain/src/lib.rs`、子モジュールは同じ
 
 domain crateの`tests/compatibility.rs`には、移行前のTypeScript出力を記録した`tests/fixtures/compatibility.json`と比較する4件のintegration testをまとめます。WASM境界の`parse_message`は`cdylib`だけを生成し、通常のRustライブラリであるdomain crateをリンクします。これによりrelease buildのLTOと独立したintegration testを両立します。比較対象は設定、Unicodeパス、ログのバイト列、夏時間・うるう日・ISO週番号です。期待値は新しいRust実装から再生成せず、既存の保存形式を保護するデータとして扱います。
 
-WASMの生成には`wasm-pack`を使います。Cargo、wasm-bindgen、wasm-optを個別に呼び分けず、`package.json`の`wasm:build`を単一の入口にします。`Cargo.toml`ではwasm-packの標準設定で`wasm-opt -Oz`を指定します。`verify:build`は別ディレクトリで再ビルドして成果物を比較します。
+WASMの生成には`wasm-pack`を使います。`package.json`の`wasm:build`を単一の入口とし、`scripts/build-wasm.ts`はホスト固有のパスを正規化してwasm-packを呼び出します。Binaryenは`bun.lock`で固定し、実行ファイルの選択は`bun run`に任せます。`Cargo.toml`ではwasm-packの標準設定で`wasm-opt -Oz`を指定します。`verify:build`はcheckoutとCargo homeの場所を変えて再ビルドし、成果物を比較します。
+
+型の定義元はRustの`tsify`だけにします。TypeScriptはビルド時に生成される`pkg/parse_message.d.ts`を直接参照し、そのコピーや手書きの同等型をソースへ追加しません。`pkg`はGit管理外です。`bun run type-check`は先にWASMと型宣言を生成してからTypeScriptを検証するため、初回checkoutやRustの型変更後にも使えます。
+
+メッセージの処理結果は、既存のRust型`ProcessedMessageList`へ統一します。`complete_message_instruction`が通常メッセージ・URL・スキップを判断し、保存対象があるときは1件、保存済みや空本文なら0件の配列を返します。TypeScriptはURLの取得・HTML変換と、返された配列の蓄積・保存を担当します。これにより`ProcessedMessage | undefined`をTS側で組み立てる必要がなくなり、`pkg`のないソース検査でも今回の`no-redundant-type-constituents`警告2件は発生しません。ただし、生成前にRustの型情報まで利用できるわけではなく、完全な型チェックは生成後に行います。
 
 開発環境では、Rust toolchainに加えて`wasm-pack`を準備します。これらのビルドツールはプラグインに同梱しません。
 

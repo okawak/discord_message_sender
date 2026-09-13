@@ -1,113 +1,141 @@
 import { htmlToMarkdown, sanitizeHTMLToDom, stringifyYaml } from "obsidian";
+import {
+  type DefaultTreeAdapterTypes,
+  html as htmlNames,
+  parse,
+  serialize,
+  defaultTreeAdapter as tree,
+} from "parse5";
+
+type HtmlElement = DefaultTreeAdapterTypes.Element;
 
 const SAFE_PROTOCOLS = new Set(["https:", "mailto:", "tel:", "ftp:"]);
-const EMBEDDED_RESOURCE_SELECTOR =
-  "audio, embed, feImage, iframe, image, input, link, object, source, track, use, video";
+const NON_CONTENT_TAGS = new Set([
+  "audio",
+  "embed",
+  "footer",
+  "head",
+  "iframe",
+  "input",
+  "link",
+  "nav",
+  "noembed",
+  "noframes",
+  "noscript",
+  "object",
+  "plaintext",
+  "script",
+  "source",
+  "style",
+  "template",
+  "track",
+  "video",
+  "xmp",
+]);
+// Keep only attributes used by the Markdown converter. Resource attributes,
+// inline CSS, event handlers, and foreign namespaces never reach a browser DOM.
+const MARKDOWN_ATTRIBUTES = new Set([
+  "title",
+  "class",
+  "start",
+  "colspan",
+  "rowspan",
+]);
 
 export function convertHtml(url: string, html: string): string {
-  const root = parseInertHtml(html);
-  removeNonContentElements(root);
-  const content =
-    root.querySelector<HTMLElement>("article") ??
-    root.querySelector<HTMLElement>("main") ??
-    root;
-  const title = extractTitle(content);
-  const restoreImages = replaceImagesWithTokens(content, url);
-  removeElements(content, EMBEDDED_RESOURCE_SELECTOR);
-  resolveLinks(content, url);
-
-  const fragment = sanitizeHTMLToDom(content.innerHTML);
+  const { content, images, tokenPrefix } = prepareContent(url, html);
+  const fragment = sanitizeHTMLToDom(content);
+  const title = fragment
+    .querySelector("h1, h2, h3, h4, h5, h6")
+    ?.textContent?.replace(/[\u200B\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   const frontmatter = title ? { title, source: url } : { source: url };
   const yaml = stringifyYaml(frontmatter).trimEnd();
-  const markdown = restoreImages(htmlToMarkdown(fragment)).trim();
+  const markdown = htmlToMarkdown(fragment)
+    .replace(
+      new RegExp(`${tokenPrefix}\\d+END`, "g"),
+      (token) => images.get(token) ?? token,
+    )
+    .trim();
 
   return `---\n${yaml}\n---\n\n${markdown}`;
 }
 
-function parseInertHtml(html: string): HTMLElement {
-  const template = document.createElement("template");
-  template.innerHTML = html;
-  const root = template.content.ownerDocument.createElement("div");
-  root.append(template.content);
-  return root;
-}
-
-function replaceImagesWithTokens(
-  root: HTMLElement,
-  baseUrl: string,
-): (markdown: string) => string {
-  const replacements: string[] = [];
+function prepareContent(baseUrl: string, html: string) {
+  // parse5 creates plain objects. Remove resources before creating a browser DOM.
+  const root = parse(html);
+  const sections = new Map<string, HtmlElement>();
+  const images = new Map<string, string>();
   const tokenPrefix = `DMSIMAGE${crypto.randomUUID().replaceAll("-", "")}TOKEN`;
-
-  for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
-    const source = image.getAttribute("src")?.trim();
-    const alt = image.alt.replace(/\s+/g, " ").trim();
-    const resolved =
-      source && !source.startsWith("#")
-        ? resolveUrl(source, baseUrl)
+  const pending = [...root.childNodes].reverse();
+  while (pending.length > 0) {
+    const node = pending.pop();
+    if (!node || !tree.isElementNode(node)) continue;
+    if (
+      node.namespaceURI !== htmlNames.NS.HTML ||
+      NON_CONTENT_TAGS.has(node.tagName)
+    ) {
+      tree.detachNode(node);
+      continue;
+    }
+    if (
+      ["article", "main", "body"].includes(node.tagName) &&
+      !sections.has(node.tagName)
+    ) {
+      sections.set(node.tagName, node);
+    }
+    if (node.tagName === "img") {
+      const alt = (getAttribute(node, "alt") ?? "").replace(/\s+/g, " ").trim();
+      const source = resolveUrl(getAttribute(node, "src"), baseUrl);
+      let text = alt;
+      if (source?.startsWith("https:")) {
+        text = `${tokenPrefix}${images.size}END`;
+        const escapedAlt = alt.replace(/([\\[\]<>])/g, "\\$1");
+        const escapedUrl = source.replaceAll("\\", "%5C");
+        images.set(text, `![${escapedAlt}](<${escapedUrl}>)`);
+      }
+      if (node.parentNode) tree.insertTextBefore(node.parentNode, text, node);
+      tree.detachNode(node);
+      continue;
+    }
+    const href =
+      node.tagName === "a"
+        ? resolveUrl(getAttribute(node, "href"), baseUrl)
         : undefined;
-    if (!resolved?.startsWith("https:")) {
-      image.replaceWith(alt);
-      continue;
-    }
-
-    const token = `${tokenPrefix}${replacements.length}END`;
-    image.replaceWith(token);
-    const escapedAlt = alt.replaceAll("\\", "\\\\").replace(/([[\]])/g, "\\$1");
-    const escapedUrl = resolved.replaceAll("\\", "%5C");
-    replacements.push(`![${escapedAlt}](<${escapedUrl}>)`);
-  }
-
-  if (replacements.length === 0) return (markdown) => markdown;
-  const tokenPattern = new RegExp(`${tokenPrefix}(\\d+)END`, "g");
-  return (markdown) =>
-    markdown.replace(
-      tokenPattern,
-      (token, index: string) => replacements[Number(index)] ?? token,
+    node.attrs = node.attrs.filter(
+      (attr) => !attr.namespace && MARKDOWN_ATTRIBUTES.has(attr.name),
     );
-}
-
-function removeNonContentElements(root: ParentNode): void {
-  removeElements(root, "nav, footer");
-}
-
-function removeElements(root: ParentNode, selector: string): void {
-  for (const element of root.querySelectorAll(selector)) {
-    element.remove();
+    if (href) node.attrs.push({ name: "href", value: href });
+    for (const child of [...node.childNodes].reverse()) pending.push(child);
   }
+  const content = serialize(
+    sections.get("article") ??
+      sections.get("main") ??
+      sections.get("body") ??
+      root,
+  );
+  return { content, images, tokenPrefix };
 }
 
-function resolveLinks(root: ParentNode, baseUrl: string): void {
-  for (const element of root.querySelectorAll<HTMLElement>("[href]")) {
-    const value = element.getAttribute("href")?.trim();
-    if (!value || value.startsWith("#")) {
-      element.removeAttribute("href");
-      continue;
-    }
-
-    const resolved = resolveUrl(value, baseUrl);
-    if (resolved) element.setAttribute("href", resolved);
-    else element.removeAttribute("href");
-  }
+function getAttribute(element: HtmlElement, name: string): string | undefined {
+  return element.attrs.find(
+    (attribute) => !attribute.namespace && attribute.name === name,
+  )?.value;
 }
 
-function resolveUrl(value: string, baseUrl: string): string | undefined {
+function resolveUrl(
+  value: string | undefined,
+  baseUrl: string,
+): string | undefined {
+  const source = value?.trim();
+  if (!source || source.startsWith("#")) return undefined;
   try {
-    const resolved = new URL(value, baseUrl);
+    const resolved = new URL(source, baseUrl);
     return SAFE_PROTOCOLS.has(resolved.protocol)
       ? resolved.toString()
       : undefined;
   } catch {
     return undefined;
   }
-}
-
-function extractTitle(root: ParentNode): string | undefined {
-  return (
-    root
-      .querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6")
-      ?.textContent?.replace(/[\u200B\uFEFF]/g, "")
-      .replace(/\s+/g, " ")
-      .trim() || undefined
-  );
 }

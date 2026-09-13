@@ -8,6 +8,7 @@ import {
   getChannelNotificationFailureNotice,
   getChannelSyncFailureNotice,
   getSyncCompletionNotice,
+  type SingleChannelSyncDependencies,
   syncChannelMessages,
   syncChannelsSequentially,
 } from "../src/channelSync";
@@ -54,6 +55,23 @@ function getHistoryPage(
 }
 
 describe("syncChannelsSequentially", () => {
+  test("wraps non-Error rejections while preserving their cause and continuing", async () => {
+    const thrown = { details: "private failure details" };
+    const summary = await syncChannelsSequentially(
+      channels,
+      async (channel) => {
+        if (channel.id === firstChannel.id) throw thrown;
+        return { kind: "success", processedMessageCount: 1 };
+      },
+    );
+    const failure = summary.failures[0];
+    if (!failure) throw new Error("Expected a channel failure");
+    expect(failure.error).toBeInstanceOf(Error);
+    expect(failure.error.cause).toBe(thrown);
+    expect(summary.processedMessageCount).toBe(2);
+    expect(getChannelSyncFailureNotice(failure)).not.toContain(thrown.details);
+  });
+
   test("continues syncing after a channel-specific API failure", async () => {
     const synced: string[] = [];
     const forbidden = new DiscordApiError(
@@ -221,6 +239,37 @@ describe("syncChannelsSequentially", () => {
     expect(synced).toEqual(["111"]);
   });
 });
+
+test.each(["fetchMessages", "postNotification"] as const)(
+  "normalizes non-Error failures from %s at the sync boundary",
+  async (stage) => {
+    const dependencies: SingleChannelSyncDependencies = {
+      fetchMessages: async () => messagePage([]),
+      postNotification: async () => createMessage(1),
+      processMessages: async () => 0,
+      persistCursor: async () => {},
+      sleep: async () => {},
+    };
+    dependencies[stage] = async () => {
+      throw "private failure details";
+    };
+    const result = await syncChannelMessages(
+      {
+        botToken: "token",
+        channel: firstChannel,
+        sendSyncNotifications: true,
+        notificationTemplates: { saved: "saved", noNew: "none" },
+      },
+      dependencies,
+    );
+    expect(result.kind).toBe(
+      stage === "fetchMessages" ? "syncFailure" : "notificationFailure",
+    );
+    if (result.kind === "success") throw new Error("Expected a sync failure");
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error.cause).toBe("private failure details");
+  },
+);
 
 describe("syncChannelMessages", () => {
   test("processes messages oldest first without checkpointing the notification", async () => {

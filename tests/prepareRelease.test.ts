@@ -69,7 +69,8 @@ describe("prepareReleaseFileContents", () => {
       versionsJson: JSON.stringify(previousVersions),
     };
     const updated = prepareReleaseFileContents(files, "0.5.0");
-    expect(JSON.parse(updated.packageJson).version).toBe("0.5.0");
+    const updatedPackage: unknown = JSON.parse(updated.packageJson);
+    expect(updatedPackage).toMatchObject({ version: "0.5.0" });
     expect(JSON.parse(updated.manifestJson)).toMatchObject({
       version: "0.5.0",
       minAppVersion: "1.13.0",

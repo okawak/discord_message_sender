@@ -19,17 +19,39 @@ describe("Discord JSON boundary", () => {
   };
 
   test("decodes typed message responses in Rust", () => {
-    expect(decodeDiscordMessage(message)).toEqual(message);
-    expect(decodeDiscordMessages([message])).toEqual([message]);
+    expect(decodeDiscordMessage(JSON.stringify(message))).toEqual(message);
+    expect(decodeDiscordMessages(JSON.stringify([message]))).toEqual([message]);
   });
 
   test("rejects malformed Discord responses", () => {
-    expect(() => decodeDiscordMessage({ id: 1 })).toThrow(
+    expect(() => decodeDiscordMessage('{"id":1}')).toThrow(
       "Discord API returned an invalid message.",
     );
-    expect(() => decodeDiscordMessages({})).toThrow(
+    expect(() => decodeDiscordMessages("{}")).toThrow(
       "Discord API returned an invalid message list.",
     );
+  });
+
+  test("rejects invalid JSON and preserves message strings without JS coercion", () => {
+    for (const invalid of ["", "<html>error</html>", "null", '{"id":']) {
+      expect(() => decodeDiscordMessage(invalid)).toThrow(
+        "Discord API returned an invalid message.",
+      );
+      expect(() => decodeDiscordMessages(invalid)).toThrow(
+        "Discord API returned an invalid message list.",
+      );
+    }
+    const original = {
+      ...message,
+      id: "900719925474099312345",
+      content: '日本語\n"quoted" \\ emoji 🎉',
+      author: { id: "123", global_name: null },
+    };
+    // Optional null fields are omitted by the existing Rust serialization.
+    expect(decodeDiscordMessage(JSON.stringify(original))).toEqual({
+      ...original,
+      author: { id: "123" },
+    });
   });
 
   test("serializes notification request bodies in Rust", () => {

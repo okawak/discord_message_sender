@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { DiscordMessage, ProcessedMessage } from "../pkg/parse_message.js";
+import {
+  complete_message_instruction,
+  type DiscordMessage,
+  message_instruction,
+  type ProcessedMessageList,
+} from "../pkg/parse_message.js";
 import { processDiscordMessageBatch } from "../src/channelSync";
 
 function message(id: string, bot = false): DiscordMessage {
@@ -11,16 +16,16 @@ function message(id: string, bot = false): DiscordMessage {
   };
 }
 
-function processed(source: DiscordMessage): ProcessedMessage {
-  return {
-    messageId: source.id,
-    timestamp: source.timestamp,
-    authorId: source.author?.id ?? "",
-    authorName: source.author?.id ?? "Unknown",
-    markdown: source.content,
-    isClipping: false,
-    fileName: `20260701_090000_${source.id}`,
-  };
+function processed(
+  source: DiscordMessage,
+  clippingAlreadySaved = false,
+): ProcessedMessageList {
+  return complete_message_instruction(
+    message_instruction(source.content, "!", clippingAlreadySaved),
+    source,
+    undefined,
+    "Asia/Tokyo",
+  );
 }
 
 describe("processDiscordMessageBatch", () => {
@@ -75,8 +80,7 @@ describe("processDiscordMessageBatch", () => {
       [existingClipping, message("new")],
       async (source) => {
         parsed.push(source.id);
-        if (existingClippingIds.has(source.id)) return undefined;
-        return processed(source);
+        return processed(source, existingClippingIds.has(source.id));
       },
       async (messages) => {
         saved.push(messages.map(({ messageId }) => messageId));
@@ -86,6 +90,20 @@ describe("processDiscordMessageBatch", () => {
 
     expect(count).toBe(1);
     expect(parsed).toEqual(["existing", "new"]);
+    expect(saved).toEqual([["new"]]);
+  });
+
+  test("omits empty content selected out by Rust", async () => {
+    const saved: string[][] = [];
+    const count = await processDiscordMessageBatch(
+      [{ ...message("empty"), content: "" }, message("new")],
+      async (source) => processed(source),
+      async (messages) => {
+        saved.push(messages.map(({ messageId }) => messageId));
+        return messages.length;
+      },
+    );
+    expect(count).toBe(1);
     expect(saved).toEqual([["new"]]);
   });
 });
