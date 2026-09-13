@@ -1,5 +1,5 @@
 import { cp, mkdtemp, rm, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
@@ -30,9 +30,21 @@ try {
     join(temporaryRoot, "node_modules"),
     "dir",
   );
+  // Exercise a different Cargo home as well as a different checkout path.
+  // Reuse downloaded dependencies; only target/pkg compilation caches are absent.
+  const cargoHome = join(temporaryRoot, "cargo-home");
+  await symlink(
+    process.env.CARGO_HOME ?? join(homedir(), ".cargo"),
+    cargoHome,
+    "dir",
+  );
   const build = Bun.spawn(["bun", "run", "build"], {
     cwd: temporaryRoot,
-    env: { ...process.env, CARGO_TARGET_DIR: join(temporaryRoot, "target") },
+    env: {
+      ...process.env,
+      CARGO_HOME: cargoHome,
+      CARGO_TARGET_DIR: join(temporaryRoot, "target"),
+    },
     stdout: "inherit",
     stderr: "pipe",
   });

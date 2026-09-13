@@ -102,7 +102,11 @@ bun run build
 bun run verify:build
 ```
 
-`verify:build`は別の一時ディレクトリでRust/WASMをキャッシュなしでビルドし、`dist/main.js`と`dist/manifest.json`をバイト単位で比較します。JavaScript依存は同じ固定済みインストールを使います。不一致がある場合はCIとリリースを停止します。この検証は同じOS・ツールチェーン内の比較であり、任意の別環境や過去のリリースとの一致を保証するものではありません。公開済みの添付ファイルは上書きせず、修正を含む新しいversionをリリースしてください。
+`scripts/build-wasm.ts`はcheckout、Cargo home、Rust標準ライブラリのソースパスを`--remap-path-prefix`で共通表記へ変換します。これらのパスはpanic位置などとしてWASMに残るため、ツールのversion固定だけでは異なる環境で同じ成果物になりません。スクリプトはパスの正規化とwasm-packの呼び出しだけを担当します。wasm-packが実行するBinaryenは`bun.lock`に固定し、`bun run wasm:build`が設定するPATHから選択します。
+
+`verify:build`はcheckoutとCargo homeを別の一時パスへ移し、Rust/WASMをコンパイルキャッシュなしでビルドして、`dist/main.js`と`dist/manifest.json`をバイト単位で比較します。ダウンロード済みCargo依存と固定済みJavaScript依存は再利用します。不一致がある場合はCIとリリースを停止します。この検証は同じOS・ツールチェーン内の比較であり、任意の別環境や過去のリリースとの一致を保証するものではありません。公開済みの添付ファイルは上書きせず、修正を含む新しいversionをリリースしてください。
+
+0.5.2のレビューで示されたネットワーク呼び出し、base64復号、WASMメモリexportは、同期やWASMの実行に必要な機能の開示です。スキャンやbuild verificationの「not available」は審査側の実行状況も関係し、コード変更だけで解消するとは限りません。新しいリリースで再審査した結果を確認してください。
 
 リリース前にObsidian 1.13以降で設定検索、チャンネルの追加・削除、設定の再読み込み、Bot tokenの表示切替を確認してください。
 

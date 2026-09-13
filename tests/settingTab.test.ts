@@ -117,4 +117,18 @@ describe("Obsidian 1.13 settings", () => {
     ).rejects.toThrow(TypeError);
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
+
+  test("returns concrete control values and preserves live channel references", async () => {
+    const { tab, plugin } = createTab();
+    const channel = plugin.settings.channels[0];
+    expect(tab.getControlValue("messageDirectoryName")).toBe("DiscordLogs");
+    expect(tab.getControlValue("showAuthorNames")).toBe(false);
+    expect(tab.getControlValue("missing")).toBeNull();
+    for (const mode of ["individual", "daily", "weekly", "monthly"]) {
+      await tab.setControlValue("messageStorageMode", mode);
+      expect(tab.getControlValue("messageStorageMode")).toBe(mode);
+    }
+    expect(plugin.settings.channels[0]).toBe(channel);
+    expect(channel?.lastProcessedMessageId).toBe("456");
+  });
 });

@@ -14,6 +14,7 @@ import {
   normalize_setting_control,
   read_setting_control,
   rename_channel,
+  type SettingControlValue,
   trim_setting,
 } from "../pkg/parse_message.js";
 import type DiscordMessageSenderPlugin from "./main";
@@ -180,12 +181,12 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
     ];
   }
 
-  override getControlValue(key: string): unknown {
+  override getControlValue(key: string): SettingControlValue {
     return read_setting_control(this.plugin.settings, key);
   }
 
   override async setControlValue(key: string, value: unknown): Promise<void> {
-    const normalized: unknown = normalize_setting_control(key, value);
+    const normalized = normalize_setting_control(key, value);
     // Apply the single changed field without replacing channels used by active syncs.
     if (
       key === "savedNotificationTemplate" ||
@@ -276,7 +277,7 @@ export class DiscordMessageSenderSettingTab extends PluginSettingTab {
         textComponent = text;
         text.inputEl.type = "password";
         text
-          .setPlaceholder("xxxxx.yyyyy.zzzzz")
+          .setPlaceholder("Paste your bot token")
           .setValue(this.plugin.settings.botToken)
           .onChange(async (value) => {
             this.plugin.settings.botToken = trim_setting(value);

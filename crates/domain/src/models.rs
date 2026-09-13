@@ -26,6 +26,16 @@ pub enum MessageStorageMode {
     Monthly,
 }
 
+/// Values exposed by the declarative text, dropdown, and toggle controls.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[serde(untagged)]
+#[tsify(missing_as_null)]
+pub enum SettingControlValue {
+    Text(String),
+    Toggle(bool),
+    Unset,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscordPluginSettings {

@@ -12,16 +12,23 @@ fn raw(value: JsValue) -> Result<Value, JsError> {
     serde_wasm_bindgen::from_value(value).map_err(error)
 }
 
+// JsValue is unvalidated host data. Its generated TS type is unknown; runtime
+// validation still happens below, before values enter the typed domain.
+
 #[wasm_bindgen]
 pub fn default_settings() -> Result<Ts<DiscordPluginSettings>, JsError> {
     Ok(DiscordPluginSettings::default().into_ts()?)
 }
 #[wasm_bindgen]
-pub fn normalize_settings(value: JsValue) -> Result<Ts<DiscordPluginSettings>, JsError> {
+pub fn normalize_settings(
+    #[wasm_bindgen(unchecked_param_type = "unknown")] value: JsValue,
+) -> Result<Ts<DiscordPluginSettings>, JsError> {
     Ok(settings::normalize(&raw(value)?).into_ts()?)
 }
 #[wasm_bindgen]
-pub fn migrate_settings(value: JsValue) -> Result<Ts<SettingsMigrationResult>, JsError> {
+pub fn migrate_settings(
+    #[wasm_bindgen(unchecked_param_type = "unknown")] value: JsValue,
+) -> Result<Ts<SettingsMigrationResult>, JsError> {
     Ok(settings::migrate(&raw(value)?).into_ts()?)
 }
 #[wasm_bindgen]
@@ -46,15 +53,18 @@ pub fn change_channel_id(
 pub fn read_setting_control(
     value: Ts<DiscordPluginSettings>,
     key: &str,
-) -> Result<JsValue, JsError> {
-    serde_wasm_bindgen::to_value(&settings::get_control(&value.to_rust()?, key)).map_err(error)
+) -> Result<Ts<SettingControlValue>, JsError> {
+    Ok(settings::get_control(&value.to_rust()?, key).into_ts()?)
 }
 #[wasm_bindgen]
-pub fn normalize_setting_control(key: &str, value: JsValue) -> Result<JsValue, JsValue> {
+pub fn normalize_setting_control(
+    key: &str,
+    #[wasm_bindgen(unchecked_param_type = "unknown")] value: JsValue,
+) -> Result<Ts<SettingControlValue>, JsValue> {
     let value = serde_wasm_bindgen::from_value(value)
         .map_err(|e| js_sys::TypeError::new(&e.to_string()))?;
     let result = settings::control_patch(key, &value).map_err(|e| js_sys::TypeError::new(&e))?;
-    serde_wasm_bindgen::to_value(&result).map_err(|e| js_sys::TypeError::new(&e.to_string()).into())
+    result.into_ts().map_err(|e| js_sys::TypeError::new(&e.to_string()).into())
 }
 #[wasm_bindgen]
 pub fn trim_setting(value: &str) -> String {
@@ -112,6 +122,22 @@ pub fn message_instruction(
     Ok(messages::instruction(input, prefix, clipping_already_saved)
         .map_err(error)?
         .into_ts()?)
+}
+#[wasm_bindgen]
+pub fn complete_message_instruction(
+    instruction: Ts<MessageInstruction>,
+    message: Ts<DiscordMessage>,
+    clipping_markdown: Option<String>,
+    zone: &str,
+) -> Result<Ts<ProcessedMessageList>, JsError> {
+    Ok(messages::complete_instruction(
+        instruction.to_rust()?,
+        message.to_rust()?,
+        clipping_markdown,
+        zone,
+    )
+    .map_err(error)?
+    .into_ts()?)
 }
 #[wasm_bindgen]
 pub fn processed_message(
@@ -196,14 +222,14 @@ pub fn discord_messages_path(channel: &str, before: Option<String>) -> String {
     discord::messages_path(channel, before.as_deref())
 }
 #[wasm_bindgen]
-pub fn decode_discord_messages(value: JsValue) -> Result<Ts<MessageList>, JsError> {
-    let messages: MessageList = serde_wasm_bindgen::from_value(value)
+pub fn decode_discord_messages(json: &str) -> Result<Ts<MessageList>, JsError> {
+    let messages: MessageList = serde_json::from_str(json)
         .map_err(|_| error("Discord API returned an invalid message list."))?;
     Ok(messages.into_ts()?)
 }
 #[wasm_bindgen]
-pub fn decode_discord_message(value: JsValue) -> Result<Ts<DiscordMessage>, JsError> {
-    let message: DiscordMessage = serde_wasm_bindgen::from_value(value)
+pub fn decode_discord_message(json: &str) -> Result<Ts<DiscordMessage>, JsError> {
+    let message: DiscordMessage = serde_json::from_str(json)
         .map_err(|_| error("Discord API returned an invalid message."))?;
     Ok(message.into_ts()?)
 }
@@ -251,14 +277,19 @@ fn rate_limit_headers(value: &JsValue) -> BTreeMap<String, String> {
 }
 
 #[wasm_bindgen]
-pub fn discord_rate_limit_delay(headers: JsValue, text: &str) -> Result<f64, JsError> {
+pub fn discord_rate_limit_delay(
+    #[wasm_bindgen(unchecked_param_type = "unknown")] headers: JsValue,
+    text: &str,
+) -> Result<f64, JsError> {
     Ok(discord::rate_limit_delay(
         &rate_limit_headers(&headers),
         text,
     ))
 }
 #[wasm_bindgen]
-pub fn discord_reset_delay(headers: JsValue) -> Result<f64, JsError> {
+pub fn discord_reset_delay(
+    #[wasm_bindgen(unchecked_param_type = "unknown")] headers: JsValue,
+) -> Result<f64, JsError> {
     Ok(discord::reset_delay(&rate_limit_headers(&headers)))
 }
 #[wasm_bindgen]
@@ -293,7 +324,7 @@ pub fn sync_completion_notice(count: usize, failures: usize) -> String {
 pub fn discord_retry_decision(
     status: Option<u32>,
     attempt: u32,
-    headers: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "unknown")] headers: JsValue,
     text: &str,
 ) -> Result<Ts<discord::RetryDecision>, JsError> {
     Ok(discord::retry(status, attempt, &rate_limit_headers(&headers), text).into_ts()?)

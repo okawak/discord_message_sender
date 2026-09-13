@@ -65,19 +65,18 @@ const expectedWasm = await Bun.file(
   new URL("../pkg/parse_message_bg.wasm", import.meta.url),
 ).bytes();
 let instantiations = 0;
-const checkedWebAssembly = Object.create(WebAssembly) as typeof WebAssembly;
-checkedWebAssembly.instantiate = (async (
-  bytes: BufferSource,
-  imports: WebAssembly.Imports,
-) => {
-  const actual = ArrayBuffer.isView(bytes)
-    ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-    : new Uint8Array(bytes);
-  if (!Buffer.from(actual).equals(Buffer.from(expectedWasm)))
-    throw new Error("Embedded WASM does not decode to the original binary.");
-  instantiations++;
-  return WebAssembly.instantiate(bytes, imports);
-}) as typeof WebAssembly.instantiate;
+const checkedWebAssembly = {
+  async instantiate(bytes: BufferSource, imports: WebAssembly.Imports) {
+    const actual = ArrayBuffer.isView(bytes)
+      ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      : new Uint8Array(bytes);
+    if (!Buffer.from(actual).equals(Buffer.from(expectedWasm)))
+      throw new Error("Embedded WASM does not decode to the original binary.");
+    instantiations++;
+    return WebAssembly.instantiate(bytes, imports);
+  },
+};
+Object.setPrototypeOf(checkedWebAssembly, WebAssembly);
 runInNewContext(await bundle.text(), {
   module,
   exports: module.exports,

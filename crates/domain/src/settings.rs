@@ -143,17 +143,18 @@ pub fn change_channel_id(
     }
     channel
 }
-pub fn get_control(settings: &DiscordPluginSettings, key: &str) -> Value {
-    match key {
+pub fn get_control(settings: &DiscordPluginSettings, key: &str) -> SettingControlValue {
+    let value = match key {
         "savedNotificationTemplate" => Value::String(settings.notification_templates.saved.clone()),
         "noNewNotificationTemplate" => {
             Value::String(settings.notification_templates.no_new.clone())
         }
         _ => serde_json::to_value(settings).expect("settings serialize")[key].clone(),
-    }
+    };
+    serde_json::from_value(value).unwrap_or(SettingControlValue::Unset)
 }
 /// Returns only the changed field, so the host can preserve channel object identity.
-pub fn control_patch(key: &str, value: &Value) -> Result<Value, String> {
+pub fn control_patch(key: &str, value: &Value) -> Result<SettingControlValue, String> {
     let defaults = DiscordPluginSettings::default();
     let fallback = match key {
         "messageDirectoryName" => Some(defaults.message_directory_name),
@@ -166,7 +167,7 @@ pub fn control_patch(key: &str, value: &Value) -> Result<Value, String> {
     };
     if let Some(fallback) = fallback {
         let text = trim(value.as_str().unwrap_or(""));
-        return Ok(Value::String(if text.is_empty() {
+        return Ok(SettingControlValue::Text(if text.is_empty() {
             fallback
         } else {
             text.into()
@@ -174,18 +175,21 @@ pub fn control_patch(key: &str, value: &Value) -> Result<Value, String> {
     }
     match key {
         "messageStorageMode" => {
+            let Value::String(mode) = value else {
+                return Err("Invalid message storage mode.".into());
+            };
             serde_json::from_value::<MessageStorageMode>(value.clone())
                 .map_err(|_| "Invalid message storage mode.".to_string())?;
-            Ok(value.clone())
+            Ok(SettingControlValue::Text(mode.clone()))
         }
         "showAuthorNames"
         | "showMessageTime"
         | "enableAutoSyncOnStartup"
         | "sendSyncNotifications" => {
-            if !value.is_boolean() {
-                return Err(format!("Setting \"{key}\" requires a boolean value."));
-            }
-            Ok(value.clone())
+            value
+                .as_bool()
+                .map(SettingControlValue::Toggle)
+                .ok_or_else(|| format!("Setting \"{key}\" requires a boolean value."))
         }
         _ => Err(format!("Unknown setting key \"{key}\".")),
     }
@@ -220,14 +224,34 @@ mod tests {
     fn controls_validate_without_resetting_other_settings() {
         assert_eq!(
             control_patch("messageDirectoryName", &json!(" \u{feff} ")).unwrap(),
-            "DiscordLogs"
+            SettingControlValue::Text("DiscordLogs".into())
         );
         assert_eq!(
             control_patch("sendSyncNotifications", &json!(false)).unwrap(),
-            false
+            SettingControlValue::Toggle(false)
         );
         assert!(control_patch("sendSyncNotifications", &json!("false")).is_err());
         assert!(control_patch("messageStorageMode", &json!("yearly")).is_err());
         assert!(control_patch("channels", &json!([])).is_err());
+    }
+
+    #[test]
+    fn control_values_match_their_declared_primitive_types() {
+        let settings = DiscordPluginSettings::default();
+        assert_eq!(
+            get_control(&settings, "messageDirectoryName"),
+            SettingControlValue::Text("DiscordLogs".into()),
+        );
+        assert_eq!(
+            get_control(&settings, "showAuthorNames"),
+            SettingControlValue::Toggle(false),
+        );
+        assert_eq!(get_control(&settings, "missing"), SettingControlValue::Unset);
+        for mode in ["individual", "daily", "weekly", "monthly"] {
+            assert_eq!(
+                control_patch("messageStorageMode", &json!(mode)).unwrap(),
+                SettingControlValue::Text(mode.into()),
+            );
+        }
     }
 }

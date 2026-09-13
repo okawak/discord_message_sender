@@ -1,13 +1,5 @@
 import { describe, expect, test } from "bun:test";
-
-interface Manifest {
-  description: string;
-  minAppVersion: string;
-}
-
-const manifest = (await Bun.file(
-  new URL("../manifest.json", import.meta.url),
-).json()) as Manifest;
+import manifest from "../manifest.json";
 
 describe("manifest", () => {
   test("uses punctuation required by the Obsidian plugin review", () => {

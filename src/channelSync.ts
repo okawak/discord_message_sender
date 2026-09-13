@@ -3,6 +3,7 @@ import {
   type DiscordMessage,
   type NotificationTemplates,
   type ProcessedMessage,
+  type ProcessedMessageList,
   select_message_page,
   should_process_message,
   sync_batches,
@@ -46,16 +47,16 @@ export interface SingleChannelSyncDependencies {
 
 export interface ChannelSyncFailure {
   channel: DiscordChannelSettings;
-  error: unknown;
+  error: Error;
 }
 
 export type SingleChannelSyncResult =
   | { kind: "success"; processedMessageCount: number }
-  | { kind: "syncFailure"; processedMessageCount: number; error: unknown }
+  | { kind: "syncFailure"; processedMessageCount: number; error: Error }
   | {
       kind: "notificationFailure";
       processedMessageCount: number;
-      error: unknown;
+      error: Error;
     };
 
 export interface ChannelNotificationFailure extends ChannelSyncFailure {
@@ -104,7 +105,11 @@ export async function syncChannelMessages(
       await dependencies.persistCursor(channel, batch.cursor);
     }
   } catch (syncError) {
-    return { kind: "syncFailure", processedMessageCount, error: syncError };
+    return {
+      kind: "syncFailure",
+      processedMessageCount,
+      error: normalizeSyncError(syncError),
+    };
   }
 
   if (sendSyncNotifications) {
@@ -122,7 +127,7 @@ export async function syncChannelMessages(
       return {
         kind: "notificationFailure",
         processedMessageCount,
-        error: notificationError,
+        error: normalizeSyncError(notificationError),
       };
     }
   }
@@ -166,14 +171,20 @@ export async function syncChannelsSequentially(
       if (error instanceof DiscordApiError && error.status === 401) {
         throw error;
       }
-      failures.push({ channel, error });
+      failures.push({ channel, error: normalizeSyncError(error) });
     }
   }
 
   return { processedMessageCount, failures, notificationFailures };
 }
 
-function getFailureReason(error: unknown): string {
+function normalizeSyncError(error: unknown): Error {
+  return error instanceof Error
+    ? error
+    : new Error("Unexpected sync failure.", { cause: error });
+}
+
+function getFailureReason(error: Error): string {
   return error instanceof DiscordApiError
     ? getDiscordApiFailureNotice(error)
     : error instanceof MessageStorageError
@@ -205,9 +216,7 @@ export function getSyncCompletionNotice(summary: ChannelSyncSummary): string {
 
 export async function processDiscordMessageBatch(
   messages: readonly DiscordMessage[],
-  parseMessage: (
-    message: DiscordMessage,
-  ) => Promise<ProcessedMessage | undefined>,
+  parseMessage: (message: DiscordMessage) => Promise<ProcessedMessageList>,
   saveMessages: (messages: readonly ProcessedMessage[]) => Promise<number>,
 ): Promise<number> {
   const processedMessages: ProcessedMessage[] = [];
@@ -218,10 +227,7 @@ export async function processDiscordMessageBatch(
         continue;
       }
 
-      const processedMessage = await parseMessage(message);
-      if (processedMessage?.markdown) {
-        processedMessages.push(processedMessage);
-      }
+      processedMessages.push(...(await parseMessage(message)));
     }
   } catch (error) {
     if (processedMessages.length > 0) {

@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import {
+import fixtures from "../crates/domain/tests/fixtures/compatibility.json";
+import initWasm, {
   change_channel_id,
-  type DiscordChannelSettings,
   type DiscordMessage,
   duplicate_channel_path,
-  type LocalDateTime,
   local_date_time,
   message_instruction,
   normalize_settings,
@@ -55,7 +54,7 @@ describe("Rust/TypeScript boundary", () => {
     });
   });
   test("repeated conversion errors release temporary WASM allocations", async () => {
-    const wasm = await initWasmCore();
+    const wasm = await initWasm();
     const invalid = {
       id: "x".repeat(10_000),
       content: "a".repeat(10_000),
@@ -86,16 +85,7 @@ describe("Rust/TypeScript boundary", () => {
   });
 });
 
-test("host date conversion and Unicode normalization match pre-migration fixtures", async () => {
-  const fixtures: {
-    dates: { timestamp: string; zone: string; expected: LocalDateTime }[];
-    duplicates: { channels: DiscordChannelSettings[]; expected?: string }[];
-  } = await Bun.file(
-    new URL(
-      "../crates/domain/tests/fixtures/compatibility.json",
-      import.meta.url,
-    ),
-  ).json();
+test("host date conversion and Unicode normalization match pre-migration fixtures", () => {
   for (const entry of fixtures.dates)
     expect(local_date_time(entry.timestamp, entry.zone)).toEqual(
       entry.expected,
@@ -124,7 +114,7 @@ test("host date conversion handles midnight, fractional offsets, and year zero",
 
 test("invalid zones throw without poisoning the host formatter cache or leaking memory", async () => {
   const timestamp = "2026-01-01T00:00:00Z";
-  const wasm = await initWasmCore();
+  const wasm = await initWasm();
   const invalid = () =>
     expect(() => local_date_time(timestamp, "Invalid/Zone")).toThrow(
       "Invalid time zone: Invalid/Zone",
