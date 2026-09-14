@@ -102,9 +102,11 @@ bun run build
 bun run verify:build
 ```
 
-`scripts/build-wasm.ts`はcheckout、Cargo home、Rust標準ライブラリのソースパスを`--remap-path-prefix`で共通表記へ変換します。これらのパスはpanic位置などとしてWASMに残るため、ツールのversion固定だけでは異なる環境で同じ成果物になりません。スクリプトはパスの正規化とwasm-packの呼び出しだけを担当します。wasm-packが実行するBinaryenは`bun.lock`に固定し、`bun run wasm:build`が設定するPATHから選択します。
+`scripts/build-wasm.ts`はcheckout、Cargo home、Rust標準ライブラリのソースパスを`--remap-path-prefix`で共通表記へ変換します。これらのパスはpanic位置などとしてWASMに残るため、ツールのversion固定だけでは異なる環境で同じ成果物になりません。スクリプトはパスの正規化とwasm-packの呼び出しだけを担当します。コマンド実行・出力の取得・失敗時の停止は既存のBunに含まれる[Bun Shell](https://bun.sh/docs/runtime/shell)へ任せています。wasm-packが実行するBinaryenは`bun.lock`に固定し、`bun run wasm:build`が設定するPATHから選択します。
 
 `verify:build`はcheckoutとCargo homeを別の一時パスへ移し、Rust/WASMをコンパイルキャッシュなしでビルドして、`dist/main.js`と`dist/manifest.json`をバイト単位で比較します。ダウンロード済みCargo依存と固定済みJavaScript依存は再利用します。不一致がある場合はCIとリリースを停止します。この検証は同じOS・ツールチェーン内の比較であり、任意の別環境や過去のリリースとの一致を保証するものではありません。公開済みの添付ファイルは上書きせず、修正を含む新しいversionをリリースしてください。
+
+初回の`rustc`呼び出しでは、rustupが`rust-toolchain.toml`に指定されたツールチェーンを自動インストールする場合があります。`build-wasm.ts`はRust環境の問い合わせを直列に実行し、複数のrustupプロセスによるダウンロードの競合を避けます。0.5.3の外部ビルド検証で発生した`clippy`の`.partial`ファイル消失は、この競合によるものです（[rustupの既知の問題](https://github.com/rust-lang/rustup/issues/988)）。CIでは通常の事前インストール済み環境に加え、空の`RUSTUP_HOME`と別のコンパイル先で`bun run build`を実行し、両方の成果物が一致することも検証します。既存のCargo依存とJavaScript依存は再利用します。
 
 0.5.2のレビューで示されたネットワーク呼び出し、base64復号、WASMメモリexportは、同期やWASMの実行に必要な機能の開示です。スキャンやbuild verificationの「not available」は審査側の実行状況も関係し、コード変更だけで解消するとは限りません。新しいリリースで再審査した結果を確認してください。
 
