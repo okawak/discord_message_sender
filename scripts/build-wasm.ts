@@ -1,28 +1,19 @@
 import { realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { $ } from "bun";
 
 const root = resolve(import.meta.dir, "..");
 const cargoHome = process.env.CARGO_HOME ?? join(homedir(), ".cargo");
 
-async function output(command: string[]): Promise<string> {
-  const child = Bun.spawn(command, {
-    cwd: root,
-    stdout: "pipe",
-    stderr: "inherit",
-  });
-  const [status, stdout] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-  ]);
-  if (status !== 0) throw new Error(`${command.join(" ")} failed (${status}).`);
-  return stdout.trim();
-}
-
 // The first rustc invocation may install the pinned toolchain through rustup.
 // Concurrent invocations can race over the same component downloads.
-const sysroot = await output(["rustc", "--print", "sysroot"]);
-const rustVersion = await output(["rustc", "--version", "--verbose"]);
+const sysroot = (
+  await $`rustc --print sysroot 2>${Bun.stderr}`.cwd(root).text()
+).trim();
+const rustVersion = await $`rustc --version --verbose 2>${Bun.stderr}`
+  .cwd(root)
+  .text();
 const commit = /^commit-hash: (\w+)$/m.exec(rustVersion)?.[1];
 if (!commit) throw new Error("Cannot determine the Rust compiler commit.");
 
@@ -46,27 +37,6 @@ for (const [source, destination] of mappings) {
   }
 }
 
-const build = Bun.spawn(
-  [
-    "wasm-pack",
-    "build",
-    "crates/parse_message",
-    "--release",
-    "--target",
-    "web",
-    "-d",
-    "../../pkg",
-    "--",
-    "--locked",
-  ],
-  {
-    cwd: root,
-    env: {
-      ...process.env,
-      CARGO_ENCODED_RUSTFLAGS: flags.join("\x1f"),
-    },
-    stdout: "inherit",
-    stderr: "inherit",
-  },
-);
-if ((await build.exited) !== 0) throw new Error("WASM build failed.");
+await $`wasm-pack build crates/parse_message --release --target web -d ../../pkg -- --locked`
+  .cwd(root)
+  .env({ ...process.env, CARGO_ENCODED_RUSTFLAGS: flags.join("\x1f") });

@@ -102,7 +102,7 @@ bun run build
 bun run verify:build
 ```
 
-`scripts/build-wasm.ts`はcheckout、Cargo home、Rust標準ライブラリのソースパスを`--remap-path-prefix`で共通表記へ変換します。これらのパスはpanic位置などとしてWASMに残るため、ツールのversion固定だけでは異なる環境で同じ成果物になりません。スクリプトはパスの正規化とwasm-packの呼び出しだけを担当します。wasm-packが実行するBinaryenは`bun.lock`に固定し、`bun run wasm:build`が設定するPATHから選択します。
+`scripts/build-wasm.ts`はcheckout、Cargo home、Rust標準ライブラリのソースパスを`--remap-path-prefix`で共通表記へ変換します。これらのパスはpanic位置などとしてWASMに残るため、ツールのversion固定だけでは異なる環境で同じ成果物になりません。スクリプトはパスの正規化とwasm-packの呼び出しだけを担当します。コマンド実行・出力の取得・失敗時の停止は既存のBunに含まれる[Bun Shell](https://bun.sh/docs/runtime/shell)へ任せています。wasm-packが実行するBinaryenは`bun.lock`に固定し、`bun run wasm:build`が設定するPATHから選択します。
 
 `verify:build`はcheckoutとCargo homeを別の一時パスへ移し、Rust/WASMをコンパイルキャッシュなしでビルドして、`dist/main.js`と`dist/manifest.json`をバイト単位で比較します。ダウンロード済みCargo依存と固定済みJavaScript依存は再利用します。不一致がある場合はCIとリリースを停止します。この検証は同じOS・ツールチェーン内の比較であり、任意の別環境や過去のリリースとの一致を保証するものではありません。公開済みの添付ファイルは上書きせず、修正を含む新しいversionをリリースしてください。
 
