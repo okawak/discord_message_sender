@@ -19,10 +19,10 @@ async function output(command: string[]): Promise<string> {
   return stdout.trim();
 }
 
-const [sysroot, rustVersion] = await Promise.all([
-  output(["rustc", "--print", "sysroot"]),
-  output(["rustc", "--version", "--verbose"]),
-]);
+// The first rustc invocation may install the pinned toolchain through rustup.
+// Concurrent invocations can race over the same component downloads.
+const sysroot = await output(["rustc", "--print", "sysroot"]);
+const rustVersion = await output(["rustc", "--version", "--verbose"]);
 const commit = /^commit-hash: (\w+)$/m.exec(rustVersion)?.[1];
 if (!commit) throw new Error("Cannot determine the Rust compiler commit.");
 

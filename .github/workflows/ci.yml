@@ -53,6 +53,17 @@ jobs:
       - name: Verify reproducible release assets
         run: bun run verify:build
 
+      - name: Verify build with a fresh Rust installation
+        env:
+          RUSTUP_HOME: ${{ runner.temp }}/discord-cold-rustup
+          CARGO_TARGET_DIR: ${{ runner.temp }}/discord-cold-target
+        run: |
+          unset RUSTUP_TOOLCHAIN
+          export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+          sha256sum dist/main.js dist/manifest.json > "$RUNNER_TEMP/discord-cold-build.sha256"
+          bun run build
+          sha256sum --check "$RUNNER_TEMP/discord-cold-build.sha256"
+
       - name: Verify lockfiles are unchanged
         run: git diff --exit-code -- bun.lock Cargo.lock
 

@@ -106,6 +106,8 @@ bun run verify:build
 
 `verify:build`はcheckoutとCargo homeを別の一時パスへ移し、Rust/WASMをコンパイルキャッシュなしでビルドして、`dist/main.js`と`dist/manifest.json`をバイト単位で比較します。ダウンロード済みCargo依存と固定済みJavaScript依存は再利用します。不一致がある場合はCIとリリースを停止します。この検証は同じOS・ツールチェーン内の比較であり、任意の別環境や過去のリリースとの一致を保証するものではありません。公開済みの添付ファイルは上書きせず、修正を含む新しいversionをリリースしてください。
 
+初回の`rustc`呼び出しでは、rustupが`rust-toolchain.toml`に指定されたツールチェーンを自動インストールする場合があります。`build-wasm.ts`はRust環境の問い合わせを直列に実行し、複数のrustupプロセスによるダウンロードの競合を避けます。0.5.3の外部ビルド検証で発生した`clippy`の`.partial`ファイル消失は、この競合によるものです（[rustupの既知の問題](https://github.com/rust-lang/rustup/issues/988)）。CIでは通常の事前インストール済み環境に加え、空の`RUSTUP_HOME`と別のコンパイル先で`bun run build`を実行し、両方の成果物が一致することも検証します。既存のCargo依存とJavaScript依存は再利用します。
+
 0.5.2のレビューで示されたネットワーク呼び出し、base64復号、WASMメモリexportは、同期やWASMの実行に必要な機能の開示です。スキャンやbuild verificationの「not available」は審査側の実行状況も関係し、コード変更だけで解消するとは限りません。新しいリリースで再審査した結果を確認してください。
 
 リリース前にObsidian 1.13以降で設定検索、チャンネルの追加・削除、設定の再読み込み、Bot tokenの表示切替を確認してください。
