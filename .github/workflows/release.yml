@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     env:
       VERSION: ${{ inputs.version }}
@@ -34,7 +34,7 @@ jobs:
   prepare-release:
     needs: validate
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       actions: write
@@ -178,7 +178,7 @@ jobs:
   publish-release:
     needs: validate
     if: github.ref == format('refs/tags/{0}', inputs.version)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       attestations: write
