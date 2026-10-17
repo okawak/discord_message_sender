@@ -1,5 +1,5 @@
 [package]
-name = "domain"
+name = "dmscore"
 version.workspace = true
 authors.workspace = true
 description = "Domain logic for Discord Message Sender"

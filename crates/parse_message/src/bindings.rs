@@ -1,5 +1,5 @@
-//! Typed JS boundary only. All decisions and transformations live in the domain crate.
-use domain::{channels, dates, discord, logs, messages, models::*, settings, storage, sync};
+//! Typed JS boundary only. All decisions and transformations live in the dmscore crate.
+use dmscore::{channels, dates, discord, logs, messages, models::*, settings, storage, sync};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tsify::{Ts, Tsify};
@@ -64,11 +64,13 @@ pub fn normalize_setting_control(
     let value = serde_wasm_bindgen::from_value(value)
         .map_err(|e| js_sys::TypeError::new(&e.to_string()))?;
     let result = settings::control_patch(key, &value).map_err(|e| js_sys::TypeError::new(&e))?;
-    result.into_ts().map_err(|e| js_sys::TypeError::new(&e.to_string()).into())
+    result
+        .into_ts()
+        .map_err(|e| js_sys::TypeError::new(&e.to_string()).into())
 }
 #[wasm_bindgen]
 pub fn trim_setting(value: &str) -> String {
-    domain::trim(value).into()
+    dmscore::trim(value).into()
 }
 #[wasm_bindgen]
 pub fn channel_display_name(value: Ts<DiscordChannelSettings>) -> Result<String, JsError> {

@@ -8,7 +8,7 @@ repository.workspace = true
 license-file.workspace = true
 
 [lib]
-# This crate is distributed only as WebAssembly. Domain tests live in their own
+# This crate is distributed only as WebAssembly. dmscore tests live in their own
 # crate so release builds can produce a single crate type and retain LTO.
 crate-type = ["cdylib"]
 
@@ -16,7 +16,7 @@ crate-type = ["cdylib"]
 wasm-opt = ["-Oz"]
 
 [dependencies]
-domain = { path = "../domain" }
+dmscore = { path = "../dmscore" }
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 serde_json.workspace = true

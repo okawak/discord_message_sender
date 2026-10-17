@@ -1,6 +1,6 @@
 //! Regression fixtures captured from the previous TypeScript implementation.
 //! Keep cross-module compatibility checks together; unit tests live beside their implementation.
-use domain::{channels, dates, logs, settings};
+use dmscore::{channels, dates, logs, settings};
 use serde_json::Value;
 
 fn fixtures() -> Value {

@@ -185,12 +185,10 @@ pub fn control_patch(key: &str, value: &Value) -> Result<SettingControlValue, St
         "showAuthorNames"
         | "showMessageTime"
         | "enableAutoSyncOnStartup"
-        | "sendSyncNotifications" => {
-            value
-                .as_bool()
-                .map(SettingControlValue::Toggle)
-                .ok_or_else(|| format!("Setting \"{key}\" requires a boolean value."))
-        }
+        | "sendSyncNotifications" => value
+            .as_bool()
+            .map(SettingControlValue::Toggle)
+            .ok_or_else(|| format!("Setting \"{key}\" requires a boolean value.")),
         _ => Err(format!("Unknown setting key \"{key}\".")),
     }
 }
@@ -246,7 +244,10 @@ mod tests {
             get_control(&settings, "showAuthorNames"),
             SettingControlValue::Toggle(false),
         );
-        assert_eq!(get_control(&settings, "missing"), SettingControlValue::Unset);
+        assert_eq!(
+            get_control(&settings, "missing"),
+            SettingControlValue::Unset
+        );
         for mode in ["individual", "daily", "weekly", "monthly"] {
             assert_eq!(
                 control_patch("messageStorageMode", &json!(mode)).unwrap(),
