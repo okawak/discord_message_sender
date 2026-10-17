@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import fixtures from "../crates/domain/tests/fixtures/compatibility.json";
+import fixtures from "../crates/dmscore/tests/fixtures/compatibility.json";
 import initWasm, {
   change_channel_id,
   type DiscordMessage,
