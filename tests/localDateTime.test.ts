@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   possible_local_dates as getPossibleLocalDateTimes,
   local_date_time as toLocalDateTime,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 describe("toLocalDateTime", () => {
   test("uses the requested time zone at a UTC month boundary", () => {

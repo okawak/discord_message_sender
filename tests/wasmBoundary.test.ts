@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import fixtures from "../crates/dmscore/tests/fixtures/compatibility.json";
+import fixtures from "../crates/dms-domain/tests/fixtures/compatibility.json";
 import initWasm, {
   change_channel_id,
   type DiscordMessage,
@@ -8,7 +8,7 @@ import initWasm, {
   message_instruction,
   normalize_settings,
   processed_message,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import { getConfiguredChannels, normalizeSettings } from "../src/settings";
 import { initWasmCore } from "../src/wasmCore";
 

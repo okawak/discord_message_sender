@@ -10,7 +10,7 @@ import {
   channel_path_segment as getChannelPathSegment,
   invalid_channel_name_message,
   render_notification as renderNotificationTemplate,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import {
   getConfiguredChannels,
   migrateSettings,

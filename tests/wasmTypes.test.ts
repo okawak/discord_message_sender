@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from "bun:test";
-import type * as wasm from "../pkg/parse_message.js";
+import type * as wasm from "../pkg/dms_wasm.js";
 import type { initWasmCore } from "../src/wasmCore";
 
 // These assertions are checked by tsc against the declarations generated from

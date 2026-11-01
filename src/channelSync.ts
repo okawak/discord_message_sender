@@ -11,7 +11,7 @@ import {
   sync_failure_notice,
   sync_notification_failure_notice,
   sync_notification_text,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import type { DiscordMessagePage } from "./discordApi";
 import { MessageStorageError } from "./vault";
 import { DiscordApiError, getDiscordApiFailureNotice } from "./wasmCore";

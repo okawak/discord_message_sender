@@ -2,6 +2,8 @@
 
 この文書は、Rust中心の構成と公式APIによる保守性を維持する前提で行った比較実験の記録です。「直接wasm-bindgenを使用していた時点の配布サイズ」以降の値は記録コミット`d774154ff1b550239a2f7a185c0f2e643088acf2`で追加された当時の測定値であり、現在値ではありません。
 
+現在のクレート名は`dms-domain`と`dms-wasm`です。過去の測定表では当時の成果物名`pkg/parse_message_bg.wasm`を保持していますが、現在の対応する成果物は`pkg/dms_wasm_bg.wasm`です。数値とハッシュは改名前の測定記録です。
+
 ## Obsidian公式HTML変換APIへの移行
 
 未完成だった独自の`html_to_markdown` crateを削除し、Obsidian公式の`sanitizeHTMLToDom`、`htmlToMarkdown`、`stringifyYaml`へ移行しました。TypeScriptには取得元URLを基準に`href`と`src`を絶対化する薄いアダプターだけを残しています。圧縮、外部WASM、実行時のバイナリ取得は使用していません。
@@ -28,7 +30,7 @@ JSON文字列パーサーをWASMへ追加せず、Obsidian `requestUrl`のJSON�
 
 ## wasm-packで単一crate typeを生成した結果
 
-0.5.1ではRustのintegration testからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。ドメインロジックとintegration testを`dmscore`へ分離し、WASM境界を0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。
+0.5.1ではRustのintegration testからcrateへリンクするため、`cdylib`と`rlib`を同時に生成していました。この構成ではrelease buildのLTOが適用されません。ドメインロジックとintegration testを`dms-domain`（旧名`dmscore`）へ分離し、WASM境界を0.4.0と同じ`cdylib`単独へ戻すことで、ビルド手順を増やさずにLTOを有効化しました。
 
 2026-09-12に同じ作業ツリーとツールチェーンで変更前後をproduction buildした結果です。圧縮、外部WASM、直接の`wasm-bindgen`呼び出しは使用していません。
 
@@ -143,7 +145,7 @@ HTML文字参照用の生成データには、名前の途中の接頭辞を含�
 
 ```sh
 bun run build
-wc -c dist/main.js pkg/parse_message_bg.wasm
+wc -c dist/main.js pkg/dms_wasm_bg.wasm
 bun run type-check
 bun run check
 bun run test

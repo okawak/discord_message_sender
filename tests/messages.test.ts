@@ -3,7 +3,7 @@ import {
   processed_message as createProcessedMessage,
   type DiscordMessage,
   message_instruction,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 describe("Rust message instructions", () => {
   test("returns a typed regular-message instruction", () => {

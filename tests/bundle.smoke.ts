@@ -1,5 +1,5 @@
 import { runInNewContext } from "node:vm";
-import type { DiscordPluginSettings } from "../pkg/parse_message.js";
+import type { DiscordPluginSettings } from "../pkg/dms_wasm.js";
 
 interface TestSettingTab {
   getSettingDefinitions(): unknown[];
@@ -62,7 +62,7 @@ const obsidian = {
 };
 const bundle = Bun.file(new URL("../dist/main.js", import.meta.url));
 const expectedWasm = await Bun.file(
-  new URL("../pkg/parse_message_bg.wasm", import.meta.url),
+  new URL("../pkg/dms_wasm_bg.wasm", import.meta.url),
 ).bytes();
 let instantiations = 0;
 const checkedWebAssembly = {

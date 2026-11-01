@@ -1,7 +1,7 @@
 import initWasm, {
   discord_error_message,
   discord_failure_notice,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 let ready: Promise<void> | undefined;
 

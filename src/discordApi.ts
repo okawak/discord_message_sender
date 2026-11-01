@@ -10,7 +10,7 @@ import {
   discord_network_error_message as getNetworkErrorMessage,
   discord_rate_limit_notice as getRateLimitNotice,
   discord_reset_delay as getRateLimitResetDelay,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import { DiscordApiError, type DiscordRequestMethod } from "./wasmCore";
 
 export interface DiscordMessagePage {

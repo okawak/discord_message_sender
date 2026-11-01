@@ -5,7 +5,7 @@ import {
   type DiscordPluginSettings,
   migrate_settings,
   normalize_settings,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 export function normalizeSettings(data: unknown): DiscordPluginSettings {
   return normalize_settings(data ?? null);

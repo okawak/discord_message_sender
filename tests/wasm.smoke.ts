@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import initWasm, {
   type DiscordMessage,
   message_instruction as parseMessage,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 await initWasm();
 
