@@ -16,7 +16,7 @@ import {
   rename_channel,
   type SettingControlValue,
   trim_setting,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import type DiscordMessageSenderPlugin from "./main";
 import { updateChannelId } from "./settings";
 

@@ -5,7 +5,7 @@ import {
   has_aggregated_log_marker as hasAggregatedLogMarker,
   is_managed_log as isManagedAggregatedLog,
   merge_aggregated_log as mergeAggregatedLog,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 const entry = {
   messageId: "123",

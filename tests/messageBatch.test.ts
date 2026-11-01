@@ -4,7 +4,7 @@ import {
   type DiscordMessage,
   message_instruction,
   type ProcessedMessageList,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import { processDiscordMessageBatch } from "../src/channelSync";
 
 function message(id: string, bot = false): DiscordMessage {

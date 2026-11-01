@@ -1,5 +1,5 @@
-//! Typed JS boundary only. All decisions and transformations live in the dmscore crate.
-use dmscore::{channels, dates, discord, logs, messages, models::*, settings, storage, sync};
+//! Typed JS boundary only. All decisions and transformations live in the dms-domain crate.
+use dms_domain::{channels, dates, discord, logs, messages, models::*, settings, storage, sync};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tsify::{Ts, Tsify};
@@ -70,7 +70,7 @@ pub fn normalize_setting_control(
 }
 #[wasm_bindgen]
 pub fn trim_setting(value: &str) -> String {
-    dmscore::trim(value).into()
+    dms_domain::trim(value).into()
 }
 #[wasm_bindgen]
 pub fn channel_display_name(value: Ts<DiscordChannelSettings>) -> Result<String, JsError> {

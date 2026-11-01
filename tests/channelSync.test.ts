@@ -3,7 +3,7 @@ import {
   type DiscordChannelSettings,
   type DiscordMessage,
   discord_page_size as getDiscordMessagePageSize,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import {
   getChannelNotificationFailureNotice,
   getChannelSyncFailureNotice,

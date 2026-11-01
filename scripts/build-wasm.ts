@@ -37,6 +37,6 @@ for (const [source, destination] of mappings) {
   }
 }
 
-await $`wasm-pack build crates/parse_message --release --target web -d ../../pkg -- --locked`
+await $`wasm-pack build crates/dms-wasm --release --target web -d ../../pkg -- --locked`
   .cwd(root)
   .env({ ...process.env, CARGO_ENCODED_RUSTFLAGS: flags.join("\x1f") });

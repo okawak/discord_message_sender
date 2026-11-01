@@ -5,7 +5,7 @@ import {
   type MessageInstruction,
   type ProcessedMessageList,
   message_instruction as parseMessage,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import { convertHtml } from "./htmlConversion";
 import { initWasmCore } from "./wasmCore";
 

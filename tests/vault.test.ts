@@ -4,7 +4,7 @@ import {
   processed_message as createProcessedMessage,
   type MessageStorageOptions,
   type ProcessedMessage,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import { saveProcessedMessages } from "../src/vault";
 
 function createVaultMock() {

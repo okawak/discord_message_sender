@@ -9,7 +9,7 @@ import {
   discord_page_size as getDiscordMessagePageSize,
   discord_rate_limit_delay as getRateLimitDelay,
   discord_reset_delay as getRateLimitResetDelay,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 describe("Discord JSON boundary", () => {
   const message = {

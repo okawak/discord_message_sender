@@ -8,7 +8,7 @@ import {
   type MessageSyncSettingsSnapshot,
   prepare_sync,
   type SyncPreparation,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 import {
   getChannelNotificationFailureNotice,
   getChannelSyncFailureNotice,

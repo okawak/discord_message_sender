@@ -37,12 +37,5 @@
     "scripts/**/*.ts",
     "tests/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "parse_message",
-    "pkg",
-    "**/*.js",
-    "**/*.mjs"
-  ]
+  "exclude": ["node_modules", "dist", "crates", "pkg", "**/*.js", "**/*.mjs"]
 }

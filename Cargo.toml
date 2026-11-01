@@ -1,7 +1,7 @@
 [workspace]
 members = [
-  "crates/dmscore",
-  "crates/parse_message",
+  "crates/dms-domain",
+  "crates/dms-wasm",
 ]
 resolver = "3"
 

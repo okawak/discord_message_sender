@@ -12,7 +12,7 @@ import {
   plan_message_storage,
   type StorageInput,
   storage_candidate_paths,
-} from "../pkg/parse_message.js";
+} from "../pkg/dms_wasm.js";
 
 export class MessageStorageError extends Error {
   override name = "MessageStorageError";

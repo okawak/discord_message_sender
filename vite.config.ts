@@ -8,14 +8,13 @@ const inlineWasm = (): Plugin => ({
   name: "inline-wasm",
   enforce: "pre",
   async transform(code, id) {
-    if (!id.endsWith("/pkg/parse_message.js")) return null;
+    if (!id.endsWith("/pkg/dms_wasm.js")) return null;
 
-    const wasmUrl =
-      /new URL\(['"]parse_message_bg\.wasm['"], import\.meta\.url\)/g;
+    const wasmUrl = /new URL\(['"]dms_wasm_bg\.wasm['"], import\.meta\.url\)/g;
     if (Array.from(code.matchAll(wasmUrl)).length !== 1) {
       throw new Error("Expected one wasm-bindgen default WASM URL.");
     }
-    const wasmPath = resolve("pkg/parse_message_bg.wasm");
+    const wasmPath = resolve("pkg/dms_wasm_bg.wasm");
     this.addWatchFile(wasmPath);
     const binary = await fs.readFile(wasmPath);
     const base64 = binary.toString("base64");

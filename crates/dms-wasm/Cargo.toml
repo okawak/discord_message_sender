@@ -1,14 +1,15 @@
 [package]
-name = "parse_message"
+name = "dms-wasm"
+publish = false
 version.workspace = true
 authors.workspace = true
-description = "Parse Discord messages"
+description = "WebAssembly bindings for Discord Message Sender"
 edition.workspace = true
 repository.workspace = true
 license-file.workspace = true
 
 [lib]
-# This crate is distributed only as WebAssembly. dmscore tests live in their own
+# This crate is distributed only as WebAssembly. dms-domain tests live in their own
 # crate so release builds can produce a single crate type and retain LTO.
 crate-type = ["cdylib"]
 
@@ -16,7 +17,7 @@ crate-type = ["cdylib"]
 wasm-opt = ["-Oz"]
 
 [dependencies]
-dmscore = { path = "../dmscore" }
+dms-domain = { path = "../dms-domain" }
 js-sys.workspace = true
 wasm-bindgen.workspace = true
 serde_json.workspace = true
