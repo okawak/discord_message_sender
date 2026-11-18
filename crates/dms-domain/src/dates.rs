@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 // Temporal grammar. Fractions are validated here and omitted from the file timestamps.
 static DISCORD_TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^([0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2})(?:\.[0-9]+)?([Zz]|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
+        r"^([0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2})(?:\.[0-9]+)?([Zz]|[+−-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
     )
     .unwrap()
 });
@@ -16,8 +16,11 @@ fn parse(timestamp: &str) -> Result<(Timestamp, bool), String> {
     let invalid = || format!("Invalid Discord message timestamp: \"{timestamp}\".");
     let parts = DISCORD_TIMESTAMP.captures(timestamp).ok_or_else(invalid)?;
     let [datetime, offset] = parts.extract().1;
+    let (minus, offset) = offset
+        .strip_prefix('−')
+        .map_or(("", offset), |digits| ("-", digits));
     // Jiff maps :60 to :59. Keep the original second for existing file names.
-    let instant = format!("{datetime}{offset}")
+    let instant = format!("{datetime}{minus}{offset}")
         .parse()
         .map_err(|_| invalid())?;
     Ok((instant, datetime.ends_with(":60")))
@@ -97,6 +100,7 @@ mod tests {
         for (timestamp, expected) in [
             ("1969-12-31t23:59:59.999999999123z", "19691231_235959"),
             ("2020-01-01 00:00:01+00:02", "20191231_235801"),
+            ("2019-12-31T23:59:00−00:02", "20200101_000100"),
             ("0000-01-01T00:00:00+00:01", "-00011231_235900"),
             ("2017-01-01T08:59:60.25+09:00", "20161231_235960"),
         ] {
