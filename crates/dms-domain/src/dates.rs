@@ -1,13 +1,34 @@
 use super::models::LocalDateTime;
-use chrono::{DateTime, Datelike, Duration, NaiveDateTime, Timelike};
+use jiff::{Timestamp, civil::DateTime, tz::offset};
+use regex_lite::Regex;
+use std::sync::LazyLock;
 
-fn parse(timestamp: &str) -> Result<DateTime<chrono::FixedOffset>, String> {
-    DateTime::parse_from_rfc3339(timestamp)
-        .map_err(|_| format!("Invalid Discord message timestamp: \"{timestamp}\"."))
+// Keep accepting the RFC 3339 form used by Discord, rather than Jiff's broader
+// Temporal grammar. Fractions are validated here and omitted from the file timestamps.
+static DISCORD_TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^([0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2})(?:\.[0-9]+)?([Zz]|[+−-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
+    )
+    .unwrap()
+});
+
+fn parse(timestamp: &str) -> Result<(Timestamp, bool), String> {
+    let invalid = || format!("Invalid Discord message timestamp: \"{timestamp}\".");
+    let parts = DISCORD_TIMESTAMP.captures(timestamp).ok_or_else(invalid)?;
+    let [datetime, offset] = parts.extract().1;
+    let (minus, offset) = offset
+        .strip_prefix('−')
+        .map_or(("", offset), |digits| ("-", digits));
+    // Jiff maps :60 to :59. Keep the original second for existing file names.
+    let instant = format!("{datetime}{minus}{offset}")
+        .parse()
+        .map_err(|_| invalid())?;
+    Ok((instant, datetime.ends_with(":60")))
 }
-fn format(date: NaiveDateTime) -> LocalDateTime {
+
+fn format(date: DateTime, leap_second: bool) -> LocalDateTime {
     let year = date.year();
-    // Match Chrono's ISO year representation, including BCE and expanded years.
+    // Preserve the signed ISO year format used in existing paths.
     let year = if (0..10_000).contains(&year) {
         format!("{year:04}")
     } else {
@@ -17,93 +38,77 @@ fn format(date: NaiveDateTime) -> LocalDateTime {
     let day = date.day();
     let hour = date.hour();
     let minute = date.minute();
-    let second = date.second() + date.nanosecond() / 1_000_000_000;
+    let second = date.second() + i8::from(leap_second);
+    let week = date.date().iso_week_date();
     LocalDateTime {
         date: format!("{year}-{month:02}-{day:02}"),
         month: format!("{year}-{month:02}"),
-        week: format!("{}-W{:02}", date.iso_week().year(), date.iso_week().week()),
+        week: format!("{}-W{:02}", week.year(), week.week()),
         time: format!("{hour:02}:{minute:02}"),
         file_timestamp: format!("{year}{month:02}{day:02}_{hour:02}{minute:02}{second:02}"),
     }
 }
 
 pub fn local(timestamp: &str, zone: &str) -> Result<LocalDateTime, String> {
-    let date = parse(timestamp)?;
-    Ok(format(local_datetime(date, zone)?))
+    let (instant, leap_second) = parse(timestamp)?;
+    Ok(format(local_datetime(instant, zone)?, leap_second))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn local_datetime(
-    date: DateTime<chrono::FixedOffset>,
-    zone: &str,
-) -> Result<NaiveDateTime, String> {
-    let zone: chrono_tz::Tz = zone
-        .parse()
-        .map_err(|_| format!("Invalid time zone: {zone}"))?;
-    Ok(date.with_timezone(&zone).naive_local())
+fn local_datetime(instant: Timestamp, zone: &str) -> Result<DateTime, String> {
+    let zone = jiff::tz::TimeZone::get(zone).map_err(|_| format!("Invalid time zone: {zone}"))?;
+    Ok(zone.to_offset(instant).to_datetime(instant))
 }
 
 #[cfg(target_arch = "wasm32")]
 use host::local_datetime;
 
 pub fn possible_dates(timestamp: &str) -> Result<Vec<LocalDateTime>, String> {
-    let date = parse(timestamp)?.naive_utc();
-    [-12, 0, 14]
+    let (instant, leap_second) = parse(timestamp)?;
+    Ok([-12, 0, 14]
         .into_iter()
-        .map(|hours| {
-            date.checked_add_signed(Duration::hours(hours))
-                .map(format)
-                .ok_or_else(|| "Timestamp is out of range.".into())
-        })
-        .collect()
+        .map(|hours| format(offset(hours).to_datetime(instant), leap_second))
+        .collect())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
 
     #[test]
     fn invalid_dates_and_time_zones_return_errors() {
-        assert!(local("invalid", "UTC").is_err());
-        assert!(local("2026-06-30T00:00:00Z", "invalid").is_err());
-        assert!(possible_dates("invalid").is_err());
+        for timestamp in [
+            "invalid",
+            "2026-02-29T00:00:00Z",
+            "2026-06-30T00:00Z",
+            "2026-06-30T00:00:00+00",
+            "2026-06-30T00:00:00+24:00",
+            "2026-06-30T00:00:00Z[UTC]",
+        ] {
+            let error = format!("Invalid Discord message timestamp: \"{timestamp}\".");
+            assert_eq!(local(timestamp, "UTC"), Err(error.clone()));
+            assert_eq!(possible_dates(timestamp), Err(error));
+        }
+        assert_eq!(
+            local("2026-06-30T00:00:00Z", "invalid"),
+            Err("Invalid time zone: invalid".into()),
+        );
     }
 
     #[test]
-    fn fixed_formats_match_chrono_across_calendar_boundaries() {
-        for year in [
-            -262_000, -10_000, -1, 0, 1, 999, 1900, 2000, 2026, 9999, 10_000, 262_000,
+    fn rfc3339_dates_keep_existing_file_names() {
+        for (timestamp, expected) in [
+            ("1969-12-31t23:59:59.999999999123z", "19691231_235959"),
+            ("2020-01-01 00:00:01+00:02", "20191231_235801"),
+            ("2019-12-31T23:59:00−00:02", "20200101_000100"),
+            ("0000-01-01T00:00:00+00:01", "-00011231_235900"),
+            ("2017-01-01T08:59:60.25+09:00", "20161231_235960"),
         ] {
-            for month in 1..=12 {
-                for day in [1, 28, 29, 30, 31] {
-                    let Some(date) = NaiveDate::from_ymd_opt(year, month, day) else {
-                        continue;
-                    };
-                    for (hour, minute, second, nanos) in [
-                        (0, 0, 0, 0),
-                        (9, 5, 7, 999_999_999),
-                        (23, 59, 59, 1_999_999_999),
-                    ] {
-                        let date = date.and_hms_nano_opt(hour, minute, second, nanos).unwrap();
-                        assert_eq!(
-                            format(date),
-                            LocalDateTime {
-                                date: date.format("%Y-%m-%d").to_string(),
-                                month: date.format("%Y-%m").to_string(),
-                                week: format!(
-                                    "{}-W{:02}",
-                                    date.iso_week().year(),
-                                    date.iso_week().week()
-                                ),
-                                time: date.format("%H:%M").to_string(),
-                                file_timestamp: date.format("%Y%m%d_%H%M%S").to_string(),
-                            },
-                            "{date}"
-                        );
-                    }
-                }
-            }
+            assert_eq!(local(timestamp, "UTC").unwrap().file_timestamp, expected);
+            assert_eq!(
+                possible_dates(timestamp).unwrap()[1].file_timestamp,
+                expected
+            );
         }
     }
 }
@@ -113,7 +118,6 @@ mod tests {
 #[cfg(target_arch = "wasm32")]
 mod host {
     use super::*;
-    use chrono::NaiveDate;
     use js_sys::Intl::{
         DateTimeFormatOptions, DateTimeFormatPart, DateTimeFormatPartType, DayFormat, EraFormat,
         HourCycle, MonthFormat, NumericFormat, YearFormat,
@@ -164,13 +168,9 @@ mod host {
         })
     }
 
-    pub(super) fn local_datetime(
-        date: DateTime<chrono::FixedOffset>,
-        zone: &str,
-    ) -> Result<NaiveDateTime, String> {
+    pub(super) fn local_datetime(instant: Timestamp, zone: &str) -> Result<DateTime, String> {
         let formatter = formatter(zone)?;
-        // Whole seconds keep subsecond rounding and Chrono's leap-second representation intact.
-        let instant = js_sys::Date::new(&JsValue::from_f64(date.timestamp() as f64 * 1000.0));
+        let instant = js_sys::Date::new(&JsValue::from_f64(instant.as_millisecond() as f64));
         let error = || format!("Failed to convert timestamp in time zone: {zone}");
         let parts = formatter.parts(&instant).map_err(|_| error())?;
         let mut fields = [None; 6];
@@ -191,7 +191,7 @@ mod host {
                 }
                 _ => continue,
             };
-            fields[index] = value.parse::<u32>().ok();
+            fields[index] = value.parse::<i16>().ok();
         }
         let [
             Some(year),
@@ -204,15 +204,16 @@ mod host {
         else {
             return Err(error());
         };
-        let year = if before_common_era {
-            1 - year as i32
-        } else {
-            year as i32
-        };
-        NaiveDate::from_ymd_opt(year, month, day)
-            .and_then(|day| {
-                day.and_hms_nano_opt(hour, minute, second, date.timestamp_subsec_nanos())
-            })
-            .ok_or_else(error)
+        let year = if before_common_era { 1 - year } else { year };
+        DateTime::new(
+            year,
+            month as i8,
+            day as i8,
+            hour as i8,
+            minute as i8,
+            second as i8,
+            0,
+        )
+        .map_err(|_| error())
     }
 }

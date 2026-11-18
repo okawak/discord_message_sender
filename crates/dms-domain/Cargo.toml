@@ -15,12 +15,17 @@ serde.workspace = true
 serde_json.workspace = true
 tsify.workspace = true
 wasm-bindgen.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 
 # Native checks use IANA/Unicode data without requiring a JavaScript host.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-chrono-tz.workspace = true
 unicode-normalization.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+jiff = { workspace = true, features = ["tzdb-zoneinfo"] }
+
+[target.'cfg(windows)'.dependencies]
+jiff = { workspace = true, features = ["tzdb-bundle-platform"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys.workspace = true

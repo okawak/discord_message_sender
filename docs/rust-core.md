@@ -49,7 +49,7 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 3. WASM関数をモジュールの読み込み時やプラグインのコンストラクターから呼びません。`onload()`で初期化を待ってから設定を読み込みます。
 4. Rustから戻る値はコピーです。同期中のカーソル更新が既存設定へ届くよう、チャンネルはRustが返すインデックスで元のJSオブジェクトを参照します。設定画面で別項目を編集してもチャンネル配列を置き換えません。
 5. 保存計画はRustで作りますが、既存ログの結合は`Vault.process`のコールバック内で最新の本文に対して実行します。保存の完了後に同期カーソルを進めます。
-6. WASM版のタイムゾーン変換はホストの`Intl.DateTimeFormat`、Unicode正規化は`String.normalize("NFC")`と`toLowerCase()`をRustから呼び出します。日付の解析・整形・ISO週の計算や保存先の判定はRustに残します。規則は実行環境のIANA/Unicodeデータに従い、プラグインのlockfileでは固定しません。ネイティブテストには`chrono-tz`と`unicode-normalization`を使います。
+6. WASM版のタイムゾーン変換はホストの`Intl.DateTimeFormat`、Unicode正規化は`String.normalize("NFC")`と`toLowerCase()`をRustから呼び出します。日付の解析・整形・ISO週の計算や保存先の判定はRustに残します。規則は実行環境のIANA/Unicodeデータに従い、プラグインのlockfileでは固定しません。ネイティブテストでは`jiff`のタイムゾーンデータベースと`unicode-normalization`を使います。
 7. Discord IDは文字列で保持し、新旧比較をRustで行います。JSの浮動小数点数には変換しません。
 8. Obsidian固有のAPIとDOM操作はTypeScriptに残し、JSON変換、通知文、既存クリッピングの判断などの純粋な処理はRustへ置きます。
 9. 未検証の設定入力や応答ヘッダーなど、ホストから渡される`JsValue`だけを`unknown`として受け、Rustで検証します。Discordの応答は`string`で受けてRustでJSON解析し、設定コントロールの戻り値はRustの`SettingControlValue`から`string | boolean | null`を生成します。同期で捕捉した例外は`Error`へ正規化してから結果へ格納します。`tests/wasmTypes.test.ts`と型チェックで、検証後の値に`any`や`unknown`が広がらないことを確認します。
@@ -65,8 +65,7 @@ HTMLからMarkdownへの変換は、[Obsidian公式API](https://github.com/obsid
 | --- | --- |
 | `thiserror` | `Display`／`Error`の実装をコンパイル時に生成し、エラー型の見通しを保つ |
 | `regex-lite` | 固定形式のログ・ID・テンプレートの照合。専用パーサーの保守を避ける |
-| `chrono` | RFC 3339、暦・ISO週、日付の整形。default featuresを無効化して`std`だけを指定 |
-| `chrono-tz` | ネイティブビルド専用のタイムゾーン変換。WASM版はホストの`Intl`を使い、データを同梱しない |
+| `jiff` | RFC 3339、暦・ISO週、日付の整形。WASMでは`std`のみを有効にし、タイムゾーン変換にホストの`Intl`を使う。ネイティブではシステムのzoneinfoとWindows向けの同梱データを利用する |
 | `unicode-normalization` | ネイティブビルド専用のNFC正規化。WASM版ではホストのUnicode実装を使う |
 | `serde`、`serde_json` | 設定の移行・検証、DiscordレスポンスのJSON処理 |
 | `wasm-bindgen`、`js-sys`、`serde-wasm-bindgen`、`tsify` | JS/WASM間の呼び出し・型変換・TypeScript型の生成。`tsify`は`js` featureだけを有効化 |

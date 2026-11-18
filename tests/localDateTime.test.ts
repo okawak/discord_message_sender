@@ -34,6 +34,20 @@ describe("toLocalDateTime", () => {
     });
   });
 
+  test("keeps whole-second file names for fractional and leap seconds", () => {
+    expect(
+      toLocalDateTime("1969-12-31t23:59:59.999999999123z", "UTC").fileTimestamp,
+    ).toBe("19691231_235959");
+    expect(
+      toLocalDateTime("2017-01-01T08:59:60.25+09:00", "Asia/Tokyo")
+        .fileTimestamp,
+    ).toBe("20170101_085960");
+    expect(
+      getPossibleLocalDateTimes("2017-01-01T08:59:60.25+09:00")[1]
+        ?.fileTimestamp,
+    ).toBe("20161231_235960");
+  });
+
   test("rejects invalid timestamps", () => {
     expect(() => toLocalDateTime("invalid", "UTC")).toThrow(
       'Invalid Discord message timestamp: "invalid".',
