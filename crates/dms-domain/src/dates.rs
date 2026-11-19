@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 // Temporal grammar. Fractions are validated here and omitted from the file timestamps.
 static DISCORD_TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"^([0-9]{4}-[0-9]{2}-[0-9]{2}[Tt ][0-9]{2}:[0-9]{2}:[0-9]{2})(?:\.[0-9]+)?([Zz]|[+−-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
+        r"^([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt ]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]+)?([Zz]|[+−-](?:[01][0-9]|2[0-3]):[0-5][0-9])$",
     )
     .unwrap()
 });
@@ -19,20 +19,20 @@ static DISCORD_TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
 fn parse(timestamp: &str) -> Result<(Timestamp, bool), String> {
     let invalid = || format!("Invalid Discord message timestamp: \"{timestamp}\".");
     let parts = DISCORD_TIMESTAMP.captures(timestamp).ok_or_else(invalid)?;
-    let [datetime, offset] = parts.extract().1;
-    // The regex fixes the ASCII field positions. Pass those fields to Jiff
+    let [year, month, day, hour, minute, second, offset] = parts.extract().1;
+    // The regex captures numeric fields. Pass those fields to Jiff
     // directly to keep its general-purpose timestamp parser out of WASM.
-    let leap_second = datetime.ends_with(":60");
+    let leap_second = second == "60";
     let fields = || {
-        let year = datetime[..4].parse().ok()?;
-        let month = datetime[5..7].parse().ok()?;
-        let day = datetime[8..10].parse().ok()?;
-        let hour = datetime[11..13].parse().ok()?;
-        let minute = datetime[14..16].parse().ok()?;
+        let year = year.parse().ok()?;
+        let month = month.parse().ok()?;
+        let day = day.parse().ok()?;
+        let hour = hour.parse().ok()?;
+        let minute = minute.parse().ok()?;
         let second = if leap_second {
             59
         } else {
-            datetime[17..19].parse().ok()?
+            second.parse().ok()?
         };
         let wall = DateTime::new(year, month, day, hour, minute, second, 0).ok()?;
         let utc_offset = if matches!(offset, "Z" | "z") {
@@ -81,7 +81,7 @@ pub fn local(timestamp: &str, zone: &str) -> Result<LocalDateTime, String> {
 #[cfg(not(target_arch = "wasm32"))]
 fn local_datetime(instant: Timestamp, zone: &str) -> Result<DateTime, String> {
     let zone = jiff::tz::TimeZone::get(zone).map_err(|_| format!("Invalid time zone: {zone}"))?;
-    Ok(zone.to_offset(instant).to_datetime(instant))
+    Ok(zone.to_datetime(instant))
 }
 
 #[cfg(target_arch = "wasm32")]
