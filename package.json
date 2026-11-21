@@ -25,15 +25,15 @@
     "wasm:build": "bun scripts/build-wasm.ts"
   },
   "dependencies": {
-    "parse5": "8.0.1"
+    "parse5": "8.1.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.7",
+    "@biomejs/biome": "2.6.8",
     "@types/bun": "1.4.4",
     "binaryen": "132.0.0",
     "obsidian": "1.14.4",
     "typescript": "7.0.2",
-    "vite": "8.3.5"
+    "vite": "8.3.8"
   },
   "packageManager": "bun@1.4.4",
   "engines": {
